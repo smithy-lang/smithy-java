@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "sources": ["../model"],
+  "plugins": {
+    "java-codegen": {
+      "service": "com.example.audubon#BirdWatcher",
+      "namespace": "com.example.audubon.server",
+      "headerFile": "../license.txt",
+      "modes": ["server", "types"],
+      "closure": "com.example.audubon#all"
+    }
+  }
+}

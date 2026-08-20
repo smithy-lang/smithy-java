@@ -65,8 +65,8 @@ public final class SmithyJsonSchemaExtensions
         var jsonNameTrait = schema.getTrait(TraitKey.JSON_NAME_TRAIT);
         String jsonName = jsonNameTrait != null ? jsonNameTrait.getValue() : schema.memberName();
 
-        byte[] jsonNameBytes = JsonWriteUtils.precomputeFieldNameBytes(jsonName);
-        byte[] memberNameBytes = JsonWriteUtils.precomputeFieldNameBytes(schema.memberName());
+        byte[] jsonNameBytes = JsonWriteUtils.encodeFieldNameToken(jsonName);
+        byte[] memberNameBytes = JsonWriteUtils.encodeFieldNameToken(schema.memberName());
 
         return new NativeJsonExtension(jsonNameBytes, memberNameBytes, null, null, null, null);
     }
@@ -92,8 +92,8 @@ public final class SmithyJsonSchemaExtensions
             int idx = m.memberIndex();
             var jsonNameTrait = m.getTrait(TraitKey.JSON_NAME_TRAIT);
             String jsonName = jsonNameTrait != null ? jsonNameTrait.getValue() : m.memberName();
-            jsonFieldNameTable[idx] = JsonWriteUtils.precomputeFieldNameBytes(jsonName);
-            memberFieldNameTable[idx] = JsonWriteUtils.precomputeFieldNameBytes(m.memberName());
+            jsonFieldNameTable[idx] = JsonWriteUtils.encodeFieldNameToken(jsonName);
+            memberFieldNameTable[idx] = JsonWriteUtils.encodeFieldNameToken(m.memberName());
         }
 
         return new NativeJsonExtension(

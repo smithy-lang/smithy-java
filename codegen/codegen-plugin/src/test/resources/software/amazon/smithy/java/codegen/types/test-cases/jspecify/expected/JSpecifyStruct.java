@@ -151,7 +151,7 @@ public final class JSpecifyStruct implements SerializableStruct {
      * Builder for {@link JSpecifyStruct}.
      */
     public static final class Builder implements ShapeBuilder<JSpecifyStruct> {
-        private final PresenceTracker tracker = PresenceTracker.of($SCHEMA);
+        private long $setMembers;
         private String requiredString;
         private String optionalString;
         private boolean requiredPrimitive;
@@ -170,7 +170,7 @@ public final class JSpecifyStruct implements SerializableStruct {
          */
         public Builder requiredString(String requiredString) {
             this.requiredString = Objects.requireNonNull(requiredString, "requiredString cannot be null");
-            tracker.setMember($SCHEMA_REQUIRED_STRING);
+            $setMembers |= 0x1L;
             return this;
         }
 
@@ -188,7 +188,7 @@ public final class JSpecifyStruct implements SerializableStruct {
          */
         public Builder requiredPrimitive(boolean requiredPrimitive) {
             this.requiredPrimitive = requiredPrimitive;
-            tracker.setMember($SCHEMA_REQUIRED_PRIMITIVE);
+            $setMembers |= 0x2L;
             return this;
         }
 
@@ -202,7 +202,9 @@ public final class JSpecifyStruct implements SerializableStruct {
 
         @Override
         public JSpecifyStruct build() {
-            tracker.validate();
+            if ($setMembers != 0x3L) {
+                PresenceTracker.validateRequiredMembers($SCHEMA, $setMembers);
+            }
             return new JSpecifyStruct(this);
         }
 
@@ -220,14 +222,14 @@ public final class JSpecifyStruct implements SerializableStruct {
 
         @Override
         public ShapeBuilder<JSpecifyStruct> errorCorrection() {
-            if (tracker.allSet()) {
+            if ($setMembers == 0x3L) {
                 return this;
             }
-            if (!tracker.checkMember($SCHEMA_REQUIRED_STRING)) {
+            if (($setMembers & 0x1L) == 0L) {
                 requiredString("");
             }
-            if (!tracker.checkMember($SCHEMA_REQUIRED_PRIMITIVE)) {
-                tracker.setMember($SCHEMA_REQUIRED_PRIMITIVE);
+            if (($setMembers & 0x2L) == 0L) {
+                $setMembers |= 0x2L;
             }
             return this;
         }

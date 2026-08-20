@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "sources": ["../model"],
+  "plugins": {
+    "java-codegen": {
+      "namespace": "com.example.audubon.events",
+      "name": "AudubonEvents",
+      "headerFile": "../license.txt",
+      "modes": ["types"],
+      "closure": "com.example.audubon#events"
+    }
+  }
+}

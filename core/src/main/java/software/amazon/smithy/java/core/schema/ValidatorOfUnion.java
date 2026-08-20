@@ -197,7 +197,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
 
     @Override
     public void writeStruct(Schema member, SerializableStruct struct) {
-        validator.pushPath(member);
+        validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeStruct(member, struct);
         }

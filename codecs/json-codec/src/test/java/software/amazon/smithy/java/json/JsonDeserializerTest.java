@@ -41,6 +41,7 @@ import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.Trait;
 
@@ -128,6 +129,54 @@ public class JsonDeserializerTest extends ProviderTestBase {
             assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(Double.POSITIVE_INFINITY));
             de = codec.createDeserializer("\"-Infinity\"".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(Double.NEGATIVE_INFINITY));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("wholeNumberDoubles")
+    public void deserializesWholeNumberDoubleExactly(JsonSerdeProvider provider, String json) {
+        long expected = Double.doubleToRawLongBits(Double.parseDouble(json));
+
+        try (var codec = codec(provider)) {
+            double actual = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readDouble(PreludeSchemas.DOUBLE);
+
+            assertThat(Double.doubleToRawLongBits(actual), is(expected));
+        }
+    }
+
+    static List<Arguments> wholeNumberDoubles() {
+        var result = new ArrayList<Arguments>();
+        var values = List.of(
+                "0",
+                "1",
+                "-1",
+                "9007199254740991",
+                "9007199254740992",
+                "9007199254740993",
+                "123456789012345678",
+                "999999999999999999",
+                "-999999999999999999",
+                "1000000000000000000",
+                "9223372036854775807",
+                "9223372036854775808",
+                "123456789012345678901234567890");
+        for (var provider : List.of(SMITHY, JACKSON)) {
+            for (var value : values) {
+                result.add(Arguments.of(provider, value));
+            }
+        }
+        return result;
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void preservesNegativeWholeNumberZero(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            double actual = codec.createDeserializer("-0".getBytes(StandardCharsets.UTF_8))
+                    .readDouble(PreludeSchemas.DOUBLE);
+
+            assertThat(Double.doubleToRawLongBits(actual), is(Double.doubleToRawLongBits(-0.0d)));
         }
     }
 
@@ -374,6 +423,57 @@ public class JsonDeserializerTest extends ProviderTestBase {
 
             assertThat(members, contains("name", "color"));
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void deserializesFieldNamesAtWordProbeBoundaries(JsonSerdeProvider provider) {
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.test#ProbeBoundaries"))
+                .putMember("shortPrefix", PreludeSchemas.STRING, new JsonNameTrait("a"))
+                .putMember("sevenBytes", PreludeSchemas.STRING, new JsonNameTrait("aaaaaaa"))
+                .putMember("eightBytes", PreludeSchemas.STRING, new JsonNameTrait("aaaaaaaa"))
+                .putMember("sixUtf8Bytes", PreludeSchemas.STRING, new JsonNameTrait("ééé"))
+                .putMember("eightUtf8Bytes", PreludeSchemas.STRING, new JsonNameTrait("éééé"))
+                .build();
+        var json = "{\"aaaaaaaa\":\"8\",\"a\":\"1\",\"aaaaaaa\":\"7\","
+                + "\"ééé\":\"6\",\"éééé\":\"8u\"}";
+        Map<String, String> values = new LinkedHashMap<>();
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readStruct(schema,
+                            values,
+                            (state, member, deser) -> state.put(member.memberName(), deser.readString(member)));
+        }
+
+        assertThat(values,
+                equalTo(Map.of(
+                        "shortPrefix",
+                        "1",
+                        "sevenBytes",
+                        "7",
+                        "eightBytes",
+                        "8",
+                        "sixUtf8Bytes",
+                        "6",
+                        "eightUtf8Bytes",
+                        "8u")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void fallsBackWhenFieldNameIsTooCloseToBufferEndForWordRead(JsonSerdeProvider provider) {
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.test#ShortBuffer"))
+                .putMember("a", PreludeSchemas.INTEGER)
+                .build();
+        AtomicReference<Integer> value = new AtomicReference<>();
+
+        try (var codec = codec(provider)) {
+            codec.createDeserializer("{\"a\":0}".getBytes(StandardCharsets.UTF_8))
+                    .readStruct(schema, value, (state, member, deser) -> state.set(deser.readInteger(member)));
+        }
+
+        assertThat(value.get(), equalTo(0));
     }
 
     @PerProvider
@@ -630,9 +730,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         Assertions.assertThrows(SerializationException.class, () -> {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(input);
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
     }
@@ -644,9 +742,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(
                         "{\"x\":00.5,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
     }
@@ -658,9 +754,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(
                         "{\"x\":1e2e3,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
     }
@@ -693,9 +787,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         Assertions.assertThrows(SerializationException.class, () -> {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(input);
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
     }
@@ -707,11 +799,88 @@ public class JsonDeserializerTest extends ProviderTestBase {
             try (var codec = codec(provider)) {
                 var de = codec.createDeserializer(
                         "{\"a\\eb\":1,\"name\":\"Sam\"}".getBytes(StandardCharsets.UTF_8));
-                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> {
-                    deser.readString(member);
-                });
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (s, member, deser) -> deser.readString(member));
             }
         });
+    }
+
+    @PerProvider
+    public void resolvesEscapedFieldNamesOutOfOrder(JsonSerdeProvider provider) {
+        var json = "{"
+                + "\"héllo\u00e9\":\"e\","
+                + "\"has\\u0001control\":\"d\","
+                + "\"has\\\\slash\":\"b\","
+                + "\"has\\ttab\":\"c\","
+                + "\"has\\\"quote\":\"a\""
+                + "}";
+        Map<String, String> values = new LinkedHashMap<>();
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readStruct(JsonTestData.ESCAPED_FIELD_NAMES,
+                            values,
+                            (state, member, deser) -> state.put(member.memberName(), deser.readString(member)));
+        }
+
+        assertThat(values,
+                equalTo(Map.of(
+                        "quoted",
+                        "a",
+                        "slashed",
+                        "b",
+                        "tabbed",
+                        "c",
+                        "controlled",
+                        "d",
+                        "unicode",
+                        "e")));
+    }
+
+    @PerProvider
+    public void resolvesGratuitouslyEscapedFieldName(JsonSerdeProvider provider) {
+        var json = "{\"\\u0068as\\\"\\u0071uote\":\"a\"}";
+        Map<String, String> values = new LinkedHashMap<>();
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readStruct(JsonTestData.ESCAPED_FIELD_NAMES, values, (state, member, deser) -> {
+                        state.put(member.memberName(), deser.readString(member));
+                    });
+        }
+
+        assertThat(values.get("quoted"), equalTo("a"));
+    }
+
+    @PerProvider
+    public void reportsUnknownMemberByDecodedName(JsonSerdeProvider provider) {
+        var json = "{\"un\\tknown\":\"x\",\"has\\\"quote\":\"a\"}";
+        List<String> unknownNames = new ArrayList<>();
+        Map<String, String> values = new LinkedHashMap<>();
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readStruct(
+                            JsonTestData.ESCAPED_FIELD_NAMES,
+                            values,
+                            new ShapeDeserializer.StructMemberConsumer<>() {
+                                @Override
+                                public void accept(
+                                        Map<String, String> state,
+                                        Schema member,
+                                        ShapeDeserializer deser
+                                ) {
+                                    state.put(member.memberName(), deser.readString(member));
+                                }
+
+                                @Override
+                                public void unknownMember(Map<String, String> state, String memberName) {
+                                    unknownNames.add(memberName);
+                                }
+                            });
+        }
+
+        assertThat(unknownNames, contains("un\tknown"));
+        assertThat(values.get("quoted"), equalTo("a"));
     }
 
     @PerProvider
@@ -1017,25 +1186,71 @@ public class JsonDeserializerTest extends ProviderTestBase {
     }
 
     @PerProvider
-    public void parsesLongAsciiString(JsonSerdeProvider provider) {
-        // > 8 bytes to exercise SWAR scanning path
-        String longStr = "abcdefghijklmnopqrstuvwxyz0123456789";
+    public void parsesAsciiAtStringScanBoundaries(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
-            assertThat(codec.createDeserializer(("\"" + longStr + "\"").getBytes(StandardCharsets.UTF_8))
-                    .readString(PreludeSchemas.STRING), equalTo(longStr));
+            for (int length : List.of(0, 6, 7, 8, 14, 15, 16, 23, 24)) {
+                var value = "a".repeat(length);
+                assertThat(codec.createDeserializer(("\"" + value + "\"").getBytes(StandardCharsets.UTF_8))
+                        .readString(PreludeSchemas.STRING), equalTo(value));
+            }
+
+            for (char value : List.of(' ', '!', '#', (char) 0x7F)) {
+                for (int position : List.of(0, 6, 7, 8, 14, 15, 16)) {
+                    var expected = "a".repeat(position) + value + "z";
+                    assertThat(codec.createDeserializer(("\"" + expected + "\"").getBytes(StandardCharsets.UTF_8))
+                            .readString(PreludeSchemas.STRING), equalTo(expected));
+                }
+            }
         }
     }
 
     @PerProvider
-    public void parsesUtf8MultiByte(JsonSerdeProvider provider) {
-        // 2-byte UTF-8: e-acute (\u00e9)
-        // 3-byte UTF-8: CJK character (\u4e2d)
-        // 4-byte UTF-8: emoji (U+1F600)
-        // Embed directly as UTF-8 bytes with an escape to trigger slow path
-        String input = "\"\u00e9\\n\u4e2d\"";
+    public void parsesEscapesAtStringScanBoundaries(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
-            assertThat(codec.createDeserializer(input.getBytes(StandardCharsets.UTF_8))
-                    .readString(PreludeSchemas.STRING), equalTo("\u00e9\n\u4e2d"));
+            for (int position : List.of(0, 6, 7, 8, 14, 15, 16)) {
+                var prefix = "a".repeat(position);
+                var input = "\"" + prefix + "\\nz\"";
+                assertThat(codec.createDeserializer(input.getBytes(StandardCharsets.UTF_8))
+                        .readString(PreludeSchemas.STRING), equalTo(prefix + "\nz"));
+            }
+        }
+    }
+
+    @PerProvider
+    public void parsesUnescapedUtf8AtStringScanBoundaries(JsonSerdeProvider provider) {
+        var values = List.of(
+                "é",
+                "aaaaaé",
+                "aaaaaaé",
+                "aaaaaaaé",
+                "aaaaaaaaé",
+                "aaaaaaa中z",
+                "aaaaaaa😀z",
+                "中文字符串测试内容值中文字符串测试内容值");
+        try (var codec = codec(provider)) {
+            for (var value : values) {
+                assertThat(codec.createDeserializer(("\"" + value + "\"").getBytes(StandardCharsets.UTF_8))
+                        .readString(PreludeSchemas.STRING), equalTo(value));
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void rejectsControlCharactersAfterUnescapedUtf8(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            for (int position : List.of(0, 5, 6, 7, 8, 13, 14, 15, 16)) {
+                var input = new ByteArrayOutputStream();
+                input.write('"');
+                input.writeBytes(("é" + "a".repeat(position)).getBytes(StandardCharsets.UTF_8));
+                input.write(0x1F);
+                input.write('"');
+
+                var exception = Assertions.assertThrows(
+                        SerializationException.class,
+                        () -> codec.createDeserializer(input.toByteArray()).readString(PreludeSchemas.STRING));
+                assertThat(exception.getMessage(), containsString("control character 0x1f"));
+            }
         }
     }
 
@@ -1221,6 +1436,30 @@ public class JsonDeserializerTest extends ProviderTestBase {
                         .readBlob(PreludeSchemas.BLOB);
             }
         });
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void readsMixedEpochSecondsAndMaintainsTheCursor(JsonSerdeProvider provider) {
+        var schema = Schema.createTimestamp(
+                ShapeId.from("smithy.foo#Time"),
+                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS));
+        var json = "[1000000000, 1, 1712345678.25, 999999999, 9999999999]";
+
+        try (var codec = codecBuilder(provider).useTimestampFormat(true).build()) {
+            var read = new ArrayList<Instant>();
+            codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                    .readList(PreludeSchemas.DOCUMENT, read, (sink, de) -> sink.add(de.readTimestamp(schema)));
+
+            assertThat(
+                    read,
+                    contains(
+                            Instant.ofEpochSecond(1_000_000_000L),
+                            Instant.ofEpochSecond(1),
+                            Instant.ofEpochSecond(1_712_345_678L, 250_000_000),
+                            Instant.ofEpochSecond(999_999_999L),
+                            Instant.ofEpochSecond(9_999_999_999L)));
+        }
     }
 
     @ParameterizedTest

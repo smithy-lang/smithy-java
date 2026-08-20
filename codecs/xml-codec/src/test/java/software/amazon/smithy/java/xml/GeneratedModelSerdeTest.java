@@ -207,6 +207,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
                 "",
                 "abcdefghijklmnopqrstuvwxyz0123456789",
                 "quote:\" backslash:\\ tab:\t newline:\n",
+                "café",
                 "é中ü",
                 "😀🎉",
                 "hello\tworld\né😀\"quoted\"")) {
@@ -362,6 +363,17 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
         var original = XmlAttributeStruct.builder()
                 .version("1.0")
                 .identifier("abc-123")
+                .content("hello world")
+                .build();
+        assertThat(roundtrip(ser, de, original, XmlAttributeStruct.builder())).isEqualTo(original);
+    }
+
+    @ParameterizedTest
+    @MethodSource("crossProviders")
+    void xmlAttributeSpecialCharactersRoundtrip(boolean ser, boolean de) {
+        var original = XmlAttributeStruct.builder()
+                .version("café & \"quoted\"")
+                .identifier("l'été < 2027")
                 .content("hello world")
                 .build();
         assertThat(roundtrip(ser, de, original, XmlAttributeStruct.builder())).isEqualTo(original);

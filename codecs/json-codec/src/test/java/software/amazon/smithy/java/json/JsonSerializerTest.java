@@ -213,6 +213,46 @@ public class JsonSerializerTest extends ProviderTestBase {
     }
 
     @PerProvider
+    public void escapesSpecialCharactersInFieldNames(JsonSerdeProvider provider) {
+        var value = new SerializableStruct() {
+            @Override
+            public Schema schema() {
+                return JsonTestData.ESCAPED_FIELD_NAMES;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                serializer.writeString(schema().member("quoted"), "a");
+                serializer.writeString(schema().member("slashed"), "b");
+                serializer.writeString(schema().member("tabbed"), "c");
+                serializer.writeString(schema().member("controlled"), "d");
+                serializer.writeString(schema().member("unicode"), "e");
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                return (T) switch (member.memberName()) {
+                    case "quoted" -> "a";
+                    case "slashed" -> "b";
+                    case "tabbed" -> "c";
+                    case "controlled" -> "d";
+                    case "unicode" -> "e";
+                    default -> null;
+                };
+            }
+        };
+
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var json = StandardCharsets.UTF_8.decode(codec.serialize(value)).toString();
+            assertThat(
+                    json,
+                    equalTo("{\"has\\\"quote\":\"a\",\"has\\\\slash\":\"b\",\"has\\ttab\":\"c\","
+                            + "\"has\\u0001control\":\"d\",\"héllo\u00e9\":\"e\"}"));
+        }
+    }
+
+    @PerProvider
     public void writesNestedStructures(JsonSerdeProvider provider) throws Exception {
         try (var codec = codec(provider); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
@@ -491,6 +531,32 @@ public class JsonSerializerTest extends ProviderTestBase {
             }
             var de = codec.createDeserializer(output.toByteArray());
             assertThat(de.readString(PreludeSchemas.STRING), equalTo(large));
+        }
+    }
+
+    @Test
+    public void smithySerializerHandlesExactStringCapacityBoundary() throws Exception {
+        String value = "x".repeat(8191);
+        try (var codec = codec(SMITHY); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeString(PreludeSchemas.STRING, value);
+            }
+            var de = codec.createDeserializer(output.toByteArray());
+            assertThat(de.readString(PreludeSchemas.STRING), equalTo(value));
+        }
+    }
+
+    @Test
+    public void smithySerializerReservesColonAfterWidenedMapKey() throws Exception {
+        String key = "\u0000".repeat(5000);
+        Document value = Document.of(Map.of(key, Document.of("value")));
+
+        try (var codec = codec(SMITHY); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeDocument(PreludeSchemas.DOCUMENT, value);
+            }
+            var result = codec.createDeserializer(output.toByteArray()).readDocument();
+            assertThat(result.asStringMap().get(key).asString(), equalTo("value"));
         }
     }
 

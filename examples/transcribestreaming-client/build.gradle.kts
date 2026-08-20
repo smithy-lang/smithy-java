@@ -9,7 +9,7 @@ dependencies {
     smithyBuild("software.amazon.smithy.java:codegen-plugin:$smithyJavaVersion")
     smithyBuild("software.amazon.smithy.java:client-core:$smithyJavaVersion")
 
-    implementation("software.amazon.api.models:transcribe-streaming:1.0.8")
+    implementation("software.amazon.api.models:transcribe-streaming:1.0.9")
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-sigv4:$smithyJavaVersion")

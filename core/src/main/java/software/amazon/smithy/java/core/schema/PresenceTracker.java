@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.Set;
@@ -56,6 +57,39 @@ public abstract sealed class PresenceTracker {
         if (!allSet()) {
             throw new SerializationException("Missing required members: " + getMissingMembers());
         }
+    }
+
+    /**
+     * Validates an inline bitfield used by generated builders.
+     *
+     * @param schema structure schema to validate
+     * @param setBitfields bitfield of required members that were set
+     * @throws IllegalArgumentException if the schema has more than 64 required members
+     * @throws SerializationException if any required members are not set
+     */
+    public static void validateRequiredMembers(Schema schema, long setBitfields) {
+        if (schema.requiredMemberCount() > Long.SIZE) {
+            throw new IllegalArgumentException("Cannot validate more than 64 required members with a long");
+        }
+        long missingBits = schema.requiredStructureMemberBitfield() & ~setBitfields;
+        int missingCount = Long.bitCount(missingBits);
+        if (missingCount == 0) {
+            return;
+        } else if (missingCount == 1) {
+            int memberIndex = Long.numberOfTrailingZeros(missingBits);
+            throw new SerializationException(
+                    "Missing required members: [" + schema.member(memberIndex).memberName() + "]");
+        }
+
+        String[] missing = new String[missingCount];
+        int missingIndex = 0;
+        while (missingBits != 0L) {
+            int memberIndex = Long.numberOfTrailingZeros(missingBits);
+            missing[missingIndex++] = schema.member(memberIndex).memberName();
+            missingBits &= missingBits - 1;
+        }
+        Arrays.sort(missing);
+        throw new SerializationException("Missing required members: " + Arrays.toString(missing));
     }
 
     /**

@@ -32,6 +32,14 @@ final class JsonReadUtils {
     // VarHandle for reading 8 bytes at a time from byte arrays (SWAR technique)
     private static final VarHandle LONG_HANDLE =
             MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
+    private static final VarHandle INT_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
+
+    private static final long ASCII_ZEROES = 0x3030303030303030L;
+    private static final long ASCII_NINES = 0x3939393939393939L;
+    private static final long ASCII_HIGH_BITS = 0x8080808080808080L;
+
+    private static final int MAX_SAFE_LONG_DIGITS = 18;
 
     // Hex digit lookup table: -1 means invalid hex digit
     private static final int[] HEX_VALUES = new int[128];
@@ -47,6 +55,42 @@ final class JsonReadUtils {
         for (int i = 'A'; i <= 'F'; i++) {
             HEX_VALUES[i] = 10 + (i - 'A');
         }
+    }
+
+    // Returns -1 when the input is not a positive ten-digit integer.
+    static long tryParseTenDigitEpochSecond(byte[] buf, int pos, int end) {
+        int stop = pos + 10;
+        if (stop > end || (buf[pos] < '1' || buf[pos] > '9')) {
+            return -1;
+        }
+        byte tenthByte = buf[pos + 9];
+        if (tenthByte < '0' || tenthByte > '9') {
+            return -1;
+        }
+        if (stop < end) {
+            byte next = buf[stop];
+            if ((next >= '0' && next <= '9') || next == '.' || next == 'e' || next == 'E') {
+                return -1;
+            }
+        }
+
+        long chunk = (long) LONG_HANDLE.get(buf, pos);
+        long digits = chunk - ASCII_ZEROES;
+        // Subtraction sets a lane's high bit for bytes outside '0'..'9'.
+        if (((digits | (ASCII_NINES - chunk)) & ASCII_HIGH_BITS) != 0) {
+            return -1;
+        }
+        int ninth = buf[pos + 8] - '0';
+        if ((ninth | (9 - ninth)) < 0) {
+            return -1;
+        }
+        int tenth = tenthByte - '0';
+
+        // The little-endian view places the first digit in the low byte.
+        long pairs = (digits * 10 + (digits >>> 8)) & 0x00FF00FF00FF00FFL;
+        long quads = (pairs * 100 + (pairs >>> 16)) & 0x0000FFFF0000FFFFL;
+        long firstEight = (quads & 0xFFFF) * 10_000 + (quads >>> 32);
+        return firstEight * 100 + ninth * 10L + tenth;
     }
 
     /**
@@ -113,7 +157,8 @@ final class JsonReadUtils {
     static void parseDouble(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         int start = pos;
 
-        if (pos < end && buf[pos] == '-') {
+        boolean negative = pos < end && buf[pos] == '-';
+        if (negative) {
             pos++;
         }
 
@@ -121,6 +166,7 @@ final class JsonReadUtils {
             throw new SerializationException("Unexpected end of input while parsing number");
         }
 
+        int digitStart = pos;
         byte first = buf[pos];
         if (first < '0' || first > '9') {
             throw new SerializationException("Expected digit, found: " + describeChar(first));
@@ -136,8 +182,10 @@ final class JsonReadUtils {
                 pos++;
             }
         }
+        boolean wholeNumber = pos - digitStart <= MAX_SAFE_LONG_DIGITS;
 
         if (pos < end && buf[pos] == '.') {
+            wholeNumber = false;
             pos++;
             if (pos >= end || buf[pos] < '0' || buf[pos] > '9') {
                 throw new SerializationException("Expected digit after decimal point");
@@ -148,6 +196,7 @@ final class JsonReadUtils {
         }
 
         if (pos < end && (buf[pos] == 'e' || buf[pos] == 'E')) {
+            wholeNumber = false;
             pos++;
             if (pos < end && (buf[pos] == '+' || buf[pos] == '-')) {
                 pos++;
@@ -160,7 +209,16 @@ final class JsonReadUtils {
             }
         }
 
-        deser.parsedDouble = NumberCodec.parseDouble(buf, start, pos - start);
+        if (wholeNumber) {
+            long value = 0;
+            for (int i = digitStart; i < pos; i++) {
+                value = value * 10 + (buf[i] - '0');
+            }
+            // Applying the sign after conversion preserves negative zero.
+            deser.parsedDouble = negative ? -(double) value : (double) value;
+        } else {
+            deser.parsedDouble = NumberCodec.parseDouble(buf, start, pos - start);
+        }
         deser.parsedEndPos = pos;
     }
 
@@ -190,61 +248,134 @@ final class JsonReadUtils {
             throw new SerializationException("Expected '\"', found: " + describePos(buf, pos, end));
         }
         pos++; // skip opening quote
-
-        // Fast path: SWAR scan 8 bytes at a time for closing quote, backslash, or control chars.
         int start = pos;
 
-        while (pos + 8 <= end) {
-            long word = (long) LONG_HANDLE.get(buf, pos);
-            if (hasSpecialStringByte(word)) {
-                break; // found something, fall through to scalar loop
+        // Stop on the exact lane containing a quote, backslash, control byte, or non-ASCII byte.
+        while (pos + Long.BYTES <= end) {
+            long stops = stringStopMask((long) LONG_HANDLE.get(buf, pos));
+            if (stops == 0) {
+                pos += Long.BYTES;
+                continue;
             }
-            pos += 8;
+            int stop = pos + stopOffset(stops);
+            byte b = buf[stop];
+            if (b == '"') {
+                deser.parsedString = deser.decodeAsciiCached(buf, start, stop - start);
+                deser.parsedEndPos = stop + 1;
+                return;
+            }
+            if (b == '\\') {
+                parseStringWithEscapes(buf, start, stop, end, deser);
+                return;
+            }
+            if (b >= 0) {
+                throw unescapedControlCharacter(b);
+            }
+            parseStringNonAscii(buf, start, stop + 1, end, deser);
+            return;
         }
 
-        // Scalar loop for remaining bytes and to find the exact special byte
+        parseStringTail(buf, start, pos, end, true, deser);
+    }
+
+    private static void parseStringNonAscii(byte[] buf, int start, int pos, int end, SmithyJsonDeserializer deser) {
+        while (pos + Long.BYTES <= end) {
+            long stops = nonAsciiStringStopMask((long) LONG_HANDLE.get(buf, pos));
+            if (stops == 0) {
+                pos += Long.BYTES;
+                continue;
+            }
+            int stop = pos + stopOffset(stops);
+            byte b = buf[stop];
+            if (b == '"') {
+                deser.parsedString = deser.decodeUtf8Cached(buf, start, stop - start);
+                deser.parsedEndPos = stop + 1;
+                return;
+            }
+            if (b == '\\') {
+                parseStringWithEscapes(buf, start, stop, end, deser);
+                return;
+            }
+            throw unescapedControlCharacter(b);
+        }
+
+        parseStringTail(buf, start, pos, end, false, deser);
+    }
+
+    private static void parseStringTail(
+            byte[] buf,
+            int start,
+            int pos,
+            int end,
+            boolean ascii,
+            SmithyJsonDeserializer deser
+    ) {
         while (pos < end) {
             byte b = buf[pos];
             if (b == '"') {
-                // No escapes found -- fast path. Dedup short strings through the
-                // deserializer's per-document cache (repeated keys/values are common).
-                deser.parsedString = deser.decodeUtf8Cached(buf, start, pos - start);
+                deser.parsedString = ascii
+                        ? deser.decodeAsciiCached(buf, start, pos - start)
+                        : deser.decodeUtf8Cached(buf, start, pos - start);
                 deser.parsedEndPos = pos + 1;
                 return;
             }
             if (b == '\\') {
-                // Has escapes -- slow path
                 parseStringWithEscapes(buf, start, pos, end, deser);
                 return;
             }
             if ((b & 0xFF) < 0x20) {
-                throw new SerializationException(
-                        "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
+                throw unescapedControlCharacter(b);
             }
+            ascii &= b >= 0;
             pos++;
         }
 
         throw new SerializationException("Unterminated string");
     }
 
-    /**
-     * SWAR check: returns true if any byte in the 8-byte word is '"' (0x22), '\\' (0x5C),
-     * or a control character (< 0x20).
-     */
-    private static boolean hasSpecialStringByte(long word) {
-        // Check for control chars (< 0x20): a byte b < 0x20 means (b - 0x20) sets the high bit
-        // when the original high bit was 0. We use the standard "has byte less than" SWAR trick.
-        long controlCheck = (word - 0x2020202020202020L) & ~word & 0x8080808080808080L;
+    static long stringStopMask(long word) {
+        // Cross-lane borrows can only affect lanes after the earliest stop.
+        long quoteOrControl = (word ^ 0x0202020202020202L) - 0x2121212121212121L;
+        long backslash = (word ^ 0x5C5C5C5C5C5C5C5CL) - 0x0101010101010101L;
+        return (quoteOrControl | backslash | word) & ASCII_HIGH_BITS;
+    }
 
-        // Check for '"' (0x22) using XOR + has-zero-byte trick
-        long xorQuote = word ^ 0x2222222222222222L;
-        long hasQuote = (xorQuote - 0x0101010101010101L) & ~xorQuote & 0x8080808080808080L;
+    static int stringStopMask(int word) {
+        int quoteOrControl = (word ^ 0x02020202) - 0x21212121;
+        int backslash = (word ^ 0x5C5C5C5C) - 0x01010101;
+        return (quoteOrControl | backslash | word) & 0x80808080;
+    }
 
-        // Check for '\\' (0x5C)
-        long xorBackslash = word ^ 0x5C5C5C5C5C5C5C5CL;
-        long hasBackslash = (xorBackslash - 0x0101010101010101L) & ~xorBackslash & 0x8080808080808080L;
+    private static long nonAsciiStringStopMask(long word) {
+        long ascii = ~word;
+        long quoteOrControl = ((word ^ 0x0202020202020202L) - 0x2121212121212121L) & ascii;
+        long backslash = ((word ^ 0x5C5C5C5C5C5C5C5CL) - 0x0101010101010101L) & ascii;
+        return (quoteOrControl | backslash) & ASCII_HIGH_BITS;
+    }
 
-        return (controlCheck | hasQuote | hasBackslash) != 0;
+    private static int stopOffset(long stopMask) {
+        return Long.numberOfTrailingZeros(stopMask) >>> 3;
+    }
+
+    static long readWord(byte[] buf, int pos) {
+        return (long) LONG_HANDLE.get(buf, pos);
+    }
+
+    static void writeWord(byte[] buf, int pos, long word) {
+        LONG_HANDLE.set(buf, pos, word);
+    }
+
+    static int readHalfWord(byte[] buf, int pos) {
+        return (int) INT_HANDLE.get(buf, pos);
+    }
+
+    static void writeHalfWord(byte[] buf, int pos, int word) {
+        INT_HANDLE.set(buf, pos, word);
+    }
+
+    private static SerializationException unescapedControlCharacter(byte b) {
+        return new SerializationException(
+                "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
     }
 
     private static void parseStringWithEscapes(
@@ -267,8 +398,7 @@ final class JsonReadUtils {
             }
 
             if ((b & 0xFF) < 0x20) {
-                throw new SerializationException(
-                        "Unescaped control character 0x" + Integer.toHexString(b & 0xFF) + " in string");
+                throw unescapedControlCharacter(b);
             }
 
             if (b == '\\') {

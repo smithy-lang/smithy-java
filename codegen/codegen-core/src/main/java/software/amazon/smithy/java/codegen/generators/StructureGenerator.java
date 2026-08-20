@@ -652,6 +652,10 @@ public final class StructureGenerator<
     }
 
     private static final class StructureBuilderGenerator extends BuilderGenerator {
+        private static final int INLINE_PRESENCE_LIMIT = Long.SIZE;
+        private final List<MemberShape> requiredMembers;
+        private final boolean usesInlinePresence;
+        private final long requiredMask;
 
         StructureBuilderGenerator(
                 JavaWriter writer,
@@ -661,6 +665,17 @@ public final class StructureGenerator<
                 Map<ShapeId, String> renames
         ) {
             super(writer, shape, symbolProvider, model, renames);
+            this.requiredMembers = shape.members()
+                    .stream()
+                    .filter(CodegenUtils::isRequiredWithNoDefault)
+                    .toList();
+            this.usesInlinePresence = !requiredMembers.isEmpty()
+                    && requiredMembers.size() <= INLINE_PRESENCE_LIMIT;
+            this.requiredMask = usesInlinePresence
+                    ? requiredMembers.size() == Long.SIZE
+                            ? -1L
+                            : (1L << requiredMembers.size()) - 1L
+                    : 0L;
         }
 
         // Required shapes marked with clientOptional should not be required to create the type. For these shapes,
@@ -681,9 +696,7 @@ public final class StructureGenerator<
                 writer.openBlock("private Builder() {", "}", () -> {
                     writer.write("// Tell the tracker to assume clientOptional members are present.");
                     for (var member : requiredClientOptional) {
-                        var memberName = symbolProvider.toMemberName(member);
-                        var schemaName = CodegenUtils.toMemberSchemaName(memberName);
-                        writer.write("tracker.setMember($L);", schemaName);
+                        writeSetMember(writer, member);
                     }
                 });
             }
@@ -700,13 +713,14 @@ public final class StructureGenerator<
                     """
                             @Override
                             public ${sdkShapeBuilder:T}<${shape:T}> errorCorrection() {
-                                if (tracker.allSet()) {
+                                if ($C) {
                                     return this;
                                 }
                                 ${C|}
                                 return this;
                             }
                             """,
+                    writer.consumer(this::writeAllRequiredSet),
                     writer.consumer(this::writeErrorCorrectionMembers));
         }
 
@@ -716,11 +730,10 @@ public final class StructureGenerator<
                 var target = model.expectShape(member.getTarget());
                 if (CodegenUtils.isRequiredWithNoDefault(member)) {
                     var memberName = symbolProvider.toMemberName(member);
-                    var schemaName = CodegenUtils.toMemberSchemaName(memberName);
                     visitor.memberShape = member;
-                    writer.openBlock("if (!tracker.checkMember($L)) {", "}", schemaName, () -> {
+                    writer.openBlock("if ($C) {", "}", writer.consumer(w -> writeMemberNotSet(w, member)), () -> {
                         if (assumeShapeHasErrorCorrectedDefault(target, member, symbolProvider, model)) {
-                            writer.write("tracker.setMember($1L);", schemaName);
+                            writeSetMember(writer, member);
                         } else {
                             writer.write("$L($C);", memberName, visitor);
                         }
@@ -860,8 +873,12 @@ public final class StructureGenerator<
 
             // Add presence tracker if any members are required by validation.
             if (shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault)) {
-                writer.putContext("tracker", PresenceTracker.class);
-                writer.write("private final ${tracker:T} tracker = ${tracker:T}.of($$SCHEMA);");
+                if (usesInlinePresence()) {
+                    writer.write("private long $$setMembers;");
+                } else {
+                    writer.putContext("tracker", PresenceTracker.class);
+                    writer.write("private final ${tracker:T} tracker = ${tracker:T}.of($$SCHEMA);");
+                }
             }
 
             // Add non-static builder properties
@@ -903,12 +920,13 @@ public final class StructureGenerator<
                 writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, member));
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
                 writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
+                writer.putContext("setPresence", writer.consumer(w -> writeSetMember(w, member)));
 
                 writer.write(
                         """
                                 public Builder ${memberName:L}(${?isNullable}${memberSymbol:N}${/isNullable}${^isNullable}${memberSymbol:T}${/isNullable} ${memberName:L}) {
                                     this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
-                                    tracker.setMember(${schemaName:L});${/tracked}
+                                    ${setPresence:C|}${/tracked}
                                     return this;
                                 }
                                 """);
@@ -937,18 +955,66 @@ public final class StructureGenerator<
 
         @Override
         protected void generateBuild(JavaWriter writer) {
-            writer.pushState();
-            writer.putContext(
-                    "hasRequiredMembers",
-                    shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault));
-            writer.write("""
-                    @Override
-                    public ${shape:T} build() {${?hasRequiredMembers}
-                        tracker.validate();${/hasRequiredMembers}
-                        return new ${shape:T}(this);
+            writer.openBlock("@Override\npublic ${shape:T} build() {", "}", () -> {
+                if (!requiredMembers.isEmpty()) {
+                    if (usesInlinePresence()) {
+                        writer.openBlock("if ($$setMembers != $L) {", "}", requiredMaskLiteral(), () -> {
+                            writer.write(
+                                    "$T.validateRequiredMembers($$SCHEMA, $$setMembers);",
+                                    PresenceTracker.class);
+                        });
+                    } else {
+                        writer.write("tracker.validate();");
                     }
-                    """);
-            writer.popState();
+                }
+                writer.write("return new ${shape:T}(this);");
+            });
+        }
+
+        private boolean usesInlinePresence() {
+            return usesInlinePresence;
+        }
+
+        private String requiredMaskLiteral() {
+            return longLiteral(requiredMask);
+        }
+
+        private String memberBitLiteral(MemberShape member) {
+            var index = requiredMembers.indexOf(member);
+            if (index < 0) {
+                throw new IllegalArgumentException("Member is not required by validation: " + member.getId());
+            }
+            return longLiteral(1L << index);
+        }
+
+        private static String longLiteral(long value) {
+            return "0x" + Long.toUnsignedString(value, 16) + "L";
+        }
+
+        private void writeSetMember(JavaWriter writer, MemberShape member) {
+            if (usesInlinePresence()) {
+                writer.write("$$setMembers |= $L;", memberBitLiteral(member));
+            } else {
+                var memberName = symbolProvider.toMemberName(member);
+                writer.write("tracker.setMember($L);", CodegenUtils.toMemberSchemaName(memberName));
+            }
+        }
+
+        private void writeMemberNotSet(JavaWriter writer, MemberShape member) {
+            if (usesInlinePresence()) {
+                writer.writeInline("($$setMembers & $L) == 0L", memberBitLiteral(member));
+            } else {
+                var memberName = symbolProvider.toMemberName(member);
+                writer.writeInline("!tracker.checkMember($L)", CodegenUtils.toMemberSchemaName(memberName));
+            }
+        }
+
+        private void writeAllRequiredSet(JavaWriter writer) {
+            if (usesInlinePresence()) {
+                writer.writeInline("$$setMembers == $L", requiredMaskLiteral());
+            } else {
+                writer.writeInline("tracker.allSet()");
+            }
         }
 
         /**

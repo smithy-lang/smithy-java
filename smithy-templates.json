@@ -58,7 +58,7 @@
       ]
     },
     "closure-types": {
-      "documentation": "Code generation of both standalone types and mixed service + standalone types, driven by a modeled shape closure.",
+      "documentation": "Types-only, server, and client code generation driven by a modeled shape closure, including types for events outside the service closure.",
       "path": "examples/closure-types",
       "include": [
         "examples/gradle.properties",

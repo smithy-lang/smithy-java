@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.xml;
 
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
+
 /**
  * Low-level utilities for writing XML content directly to byte arrays with proper escaping.
  */
@@ -19,6 +21,13 @@ final class XmlWriteUtils {
     private static final byte[] APOS_ESC = {'&', 'a', 'p', 'o', 's', ';'};
 
     static int writeEscapedText(byte[] buf, int pos, String value) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        return latin1 != null
+                ? writeEscapedLatin1(buf, pos, latin1, false)
+                : writeEscapedTextChars(buf, pos, value);
+    }
+
+    private static int writeEscapedTextChars(byte[] buf, int pos, String value) {
         int len = value.length();
         for (int i = 0; i < len; i++) {
             char c = value.charAt(i);
@@ -64,6 +73,13 @@ final class XmlWriteUtils {
     }
 
     static int writeEscapedAttribute(byte[] buf, int pos, String value) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        return latin1 != null
+                ? writeEscapedLatin1(buf, pos, latin1, true)
+                : writeEscapedAttributeChars(buf, pos, value);
+    }
+
+    private static int writeEscapedAttributeChars(byte[] buf, int pos, String value) {
         int len = value.length();
         for (int i = 0; i < len; i++) {
             char c = value.charAt(i);
@@ -112,6 +128,45 @@ final class XmlWriteUtils {
             }
         }
         return pos;
+    }
+
+    private static int writeEscapedLatin1(byte[] buf, int pos, byte[] value, boolean attribute) {
+        int copyStart = 0;
+        for (int i = 0; i < value.length; i++) {
+            byte current = value[i];
+            byte[] escape = null;
+            if (current == '&') {
+                escape = AMP_ESC;
+            } else if (current == '<') {
+                escape = LT_ESC;
+            } else if (current == '>') {
+                escape = GT_ESC;
+            } else if (attribute && current == '"') {
+                escape = QUOT_ESC;
+            } else if (attribute && current == '\'') {
+                escape = APOS_ESC;
+            }
+
+            if (escape != null) {
+                pos = copyAscii(value, copyStart, i, buf, pos);
+                System.arraycopy(escape, 0, buf, pos, escape.length);
+                pos += escape.length;
+                copyStart = i + 1;
+            } else if (current < 0) {
+                pos = copyAscii(value, copyStart, i, buf, pos);
+                int c = current & 0xff;
+                buf[pos++] = (byte) (0xC0 | (c >> 6));
+                buf[pos++] = (byte) (0x80 | (c & 0x3F));
+                copyStart = i + 1;
+            }
+        }
+        return copyAscii(value, copyStart, value.length, buf, pos);
+    }
+
+    private static int copyAscii(byte[] value, int start, int end, byte[] buf, int pos) {
+        int length = end - start;
+        System.arraycopy(value, start, buf, pos, length);
+        return pos + length;
     }
 
     static int maxEscapedTextBytes(String value) {

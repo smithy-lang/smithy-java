@@ -1,6 +1,7 @@
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.fuzz-test")
+    id("smithy-java.jmh-conventions")
     id("software.amazon.smithy.gradle.smithy-base")
     id("com.gradleup.shadow")
 }
@@ -31,8 +32,8 @@ tasks {
                         .toString(),
                 ),
             )
-            relocate("tools.jackson.core", "software.amazon.smithy.java.internal.shaded.tools.jackson.core")
         }
+        relocate("tools.jackson.core", "software.amazon.smithy.java.internal.shaded.tools.jackson.core")
     }
     jar {
         finalizedBy(shadowJar)
@@ -68,6 +69,49 @@ afterEvaluate {
             srcDir("$typePath/resources")
         }
     }
+}
+
+val compactStringAccessFallbackTest =
+    tasks.register<Test>("compactStringAccessFallbackTest") {
+        description = "Test JSON string writing when compact String access initialization fails."
+        group = "verification"
+
+        val testSourceSet = project.the<SourceSetContainer>()["test"]
+        testClassesDirs = testSourceSet.output.classesDirs
+        classpath = testSourceSet.runtimeClasspath
+
+        useJUnitPlatform()
+        systemProperty(
+            "software.amazon.smithy.java.codecs.commons.disableCompactStringAccess",
+            "true",
+        )
+        systemProperty("smithy.java.test.compactStringAccessMode", "fallback")
+
+        filter {
+            includeTestsMatching("*JsonWriteUtilsTest.forcedInitializationFailureUsesFallback")
+        }
+    }
+
+val compactStringsDisabledTest =
+    tasks.register<Test>("compactStringsDisabledTest") {
+        description = "Test JSON string writing with HotSpot compact strings disabled."
+        group = "verification"
+
+        val testSourceSet = project.the<SourceSetContainer>()["test"]
+        testClassesDirs = testSourceSet.output.classesDirs
+        classpath = testSourceSet.runtimeClasspath
+
+        useJUnitPlatform()
+        jvmArgs("-XX:-CompactStrings")
+        systemProperty("smithy.java.test.compactStringAccessMode", "compactStringsDisabled")
+
+        filter {
+            includeTestsMatching("*JsonWriteUtilsTest.compactStringsDisabledUsesFallback")
+        }
+    }
+
+tasks.named("check") {
+    dependsOn(compactStringAccessFallbackTest, compactStringsDisabledTest)
 }
 
 tasks.named("compileTestJava") {

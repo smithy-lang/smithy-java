@@ -6,8 +6,9 @@
 package software.amazon.smithy.java.json.smithy;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.io.ByteBufferUtils;
@@ -72,10 +73,61 @@ final class JsonWriteUtils {
     }
 
     /**
-     * Writes a JSON quoted string. Returns new position.
+     * Writes a quoted JSON string. Requires {@link #maxQuotedStringBytes} of capacity.
      */
-    @SuppressWarnings("deprecation")
     static int writeQuotedString(byte[] buf, int pos, String value) {
+        int next = tryWriteQuotedAscii(buf, pos, value);
+        return next >= 0 ? next : writeQuotedStringGeneral(buf, pos, value);
+    }
+
+    /**
+     * Writes a quoted string if every char is unescaped ASCII. Returns {@code -1} otherwise.
+     * Requires {@code value.length() + 2} bytes; on rejection, retry from the original position.
+     */
+    static int tryWriteQuotedAscii(byte[] buf, int pos, String value) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        return latin1 != null
+                ? writeQuotedAscii(buf, pos, latin1)
+                : tryWriteQuotedAsciiChars(buf, pos, value);
+    }
+
+    private static int tryWriteQuotedAsciiChars(byte[] buf, int pos, String value) {
+        int len = value.length();
+        int p = pos;
+        buf[p++] = '"';
+
+        // The JIT auto-vectorizes this loop on JDK 21.
+        //
+        // String.getBytes(int,int,byte[],int) truncates chars above 0xff, so it cannot
+        // safely replace this fallback.
+        for (int i = 0; i < len; i++) {
+            char c = value.charAt(i);
+            if (c >= 0x80 || c < 0x20 || c == '"' || c == '\\') {
+                return -1;
+            }
+            buf[p++] = (byte) c;
+        }
+
+        buf[p++] = '"';
+        return p;
+    }
+
+    private static int writeQuotedAscii(byte[] buf, int pos, byte[] latin1) {
+        int copied = copyJsonAscii(latin1, buf, pos + 1);
+        if (copied < 0) {
+            return -1;
+        }
+        buf[pos] = '"';
+        int endQuote = pos + 1 + copied;
+        buf[endQuote] = '"';
+        return endQuote + 1;
+    }
+
+    /**
+     * Writes a JSON quoted string that may need escaping or multi-byte encoding, from scratch.
+     * Requires {@link #maxQuotedStringBytes} of capacity.
+     */
+    static int writeQuotedStringGeneral(byte[] buf, int pos, String value) {
         int len = value.length();
         buf[pos++] = '"';
 
@@ -84,14 +136,7 @@ final class JsonWriteUtils {
             return pos;
         }
 
-        // Single-pass: write safe ASCII chars directly to buf, bail to slow path
-        // on the first char needing escaping or multi-byte UTF-8 encoding.
-        // The JIT auto-vectorizes this loop on JDK 21.
-        //
-        // Note: we cannot use String.getBytes(int,int,byte[],int) + SWAR here because
-        // that method truncates chars >= 0x100 to their low byte, which can produce
-        // valid-looking ASCII bytes (e.g. U+0123 -> 0x23 '#') indistinguishable from
-        // real ASCII via any byte-level check.
+        // Copy the safe ASCII prefix before using the per-char encoder.
         int i = 0;
         for (; i < len; i++) {
             char c = value.charAt(i);
@@ -105,6 +150,86 @@ final class JsonWriteUtils {
 
         buf[pos++] = '"';
         return pos;
+    }
+
+    private static int copyJsonAscii(byte[] value, byte[] buf, int pos) {
+        int length = value.length;
+        if (length < Long.BYTES) {
+            if (length >= Integer.BYTES) {
+                int tail = length - Integer.BYTES;
+                int head = JsonReadUtils.readHalfWord(value, 0);
+                int last = JsonReadUtils.readHalfWord(value, tail);
+                if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(last)) != 0) {
+                    return -1;
+                }
+                JsonReadUtils.writeHalfWord(buf, pos, head);
+                JsonReadUtils.writeHalfWord(buf, pos + tail, last);
+                return length;
+            }
+            for (int index = 0; index < length; index++) {
+                int current = value[index] & 0xff;
+                if (current < 0x20 || current >= 0x80 || current == '"' || current == '\\') {
+                    return -1;
+                }
+                buf[pos + index] = (byte) current;
+            }
+            return length;
+        }
+        int tail = length - Long.BYTES;
+        long head = JsonReadUtils.readWord(value, 0);
+        long last = JsonReadUtils.readWord(value, tail);
+        if (length <= Long.BYTES * 2) {
+            if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(last)) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeWord(buf, pos, head);
+            JsonReadUtils.writeWord(buf, pos + tail, last);
+            return length;
+        }
+        long middle = JsonReadUtils.readWord(value, Long.BYTES);
+        if (length <= Long.BYTES * 3) {
+            if ((JsonReadUtils.stringStopMask(head)
+                    | JsonReadUtils.stringStopMask(middle)
+                    | JsonReadUtils.stringStopMask(last)) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeWord(buf, pos, head);
+            JsonReadUtils.writeWord(buf, pos + Long.BYTES, middle);
+            JsonReadUtils.writeWord(buf, pos + tail, last);
+            return length;
+        }
+        return copyJsonAsciiLoop(value, buf, pos, length, tail, head, last);
+    }
+
+    private static int copyJsonAsciiLoop(
+            byte[] value,
+            byte[] buf,
+            int pos,
+            int length,
+            int tail,
+            long head,
+            long last
+    ) {
+        long middle = JsonReadUtils.readWord(value, Long.BYTES);
+        if ((JsonReadUtils.stringStopMask(head) | JsonReadUtils.stringStopMask(middle)) != 0) {
+            return -1;
+        }
+        JsonReadUtils.writeWord(buf, pos, head);
+        JsonReadUtils.writeWord(buf, pos + Long.BYTES, middle);
+        int index = Long.BYTES * 2;
+        while (index < tail) {
+            long word = JsonReadUtils.readWord(value, index);
+            if (JsonReadUtils.stringStopMask(word) != 0) {
+                return -1;
+            }
+            JsonReadUtils.writeWord(buf, pos + index, word);
+            index += Long.BYTES;
+        }
+        if (JsonReadUtils.stringStopMask(last) != 0) {
+            return -1;
+        }
+        JsonReadUtils.writeWord(buf, pos + tail, last);
+        return length;
     }
 
     private static int writeStringSlowPath(byte[] buf, int pos, String value, int startIdx, int len) {
@@ -160,20 +285,8 @@ final class JsonWriteUtils {
         return pos;
     }
 
-    /**
-     * Writes a double value as JSON. Handles integer-valued doubles optimization.
-     * Returns new position.
-     */
-    static int writeDouble(byte[] buf, int pos, double value) {
-        return NumberCodec.writeDouble(buf, pos, value);
-    }
-
     static int writeEpochSeconds(byte[] buf, int pos, long epochSecond, int nano) {
         return TimestampCodec.writeEpochSeconds(buf, pos, epochSecond, nano);
-    }
-
-    static int writeFloat(byte[] buf, int pos, float value) {
-        return NumberCodec.writeFloat(buf, pos, value);
     }
 
     static int writeIso8601Timestamp(byte[] buf, int pos, Instant value) {
@@ -188,16 +301,6 @@ final class JsonWriteUtils {
         pos = TimestampCodec.writeHttpDate(buf, pos, value);
         buf[pos++] = '"';
         return pos;
-    }
-
-    /**
-     * Writes an ASCII string directly to the buffer without quoting.
-     * Used for number-to-string conversions (Double.toString, BigDecimal.toString, etc).
-     */
-    static int writeAsciiString(byte[] buf, int pos, String s) {
-        int len = s.length();
-        s.getBytes(0, len, buf, pos);
-        return pos + len;
     }
 
     /**
@@ -232,18 +335,15 @@ final class JsonWriteUtils {
         return ((dataLen + 2) / 3) * 4 + 2;
     }
 
-    /**
-     * Pre-computes the UTF-8 byte representation of a JSON field name prefix.
-     * The result includes the opening quote, the field name, the closing quote, and the colon.
-     * Example: for field name "foo", returns bytes for {@code "foo":}
-     */
-    static byte[] precomputeFieldNameBytes(String fieldName) {
-        byte[] nameUtf8 = fieldName.getBytes(StandardCharsets.UTF_8);
-        byte[] result = new byte[nameUtf8.length + 3];
-        result[0] = '"';
-        System.arraycopy(nameUtf8, 0, result, 1, nameUtf8.length);
-        result[nameUtf8.length + 1] = '"';
-        result[nameUtf8.length + 2] = ':';
-        return result;
+    /// Computes the UTF-8 byte representation of a JSON field name prefix. The result includes the opening quote, the
+    /// field name, the closing quote, and the colon. Example: for field name "foo", returns bytes for `"foo":`
+    ///
+    /// The name is escaped like any other JSON string. Smithy member names are alphanumeric identifiers, but a
+    /// `@jsonName` trait can carry any character, including `"` and `\\`, which would otherwise emit invalid JSON.
+    static byte[] encodeFieldNameToken(String fieldName) {
+        byte[] scratch = new byte[maxQuotedStringBytes(fieldName) + 1];
+        int pos = writeQuotedString(scratch, 0, fieldName);
+        scratch[pos++] = ':';
+        return Arrays.copyOf(scratch, pos);
     }
 }

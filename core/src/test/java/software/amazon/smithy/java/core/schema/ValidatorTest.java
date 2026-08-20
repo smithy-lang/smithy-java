@@ -456,6 +456,10 @@ public class ValidatorTest {
                 .putMember("a", PreludeSchemas.STRING, LengthTrait.builder().max(3L).build())
                 .putMember("b", PreludeSchemas.STRING)
                 .putMember("c", PreludeSchemas.STRING)
+                .putMember("d",
+                        Schema.structureBuilder(ShapeId.from("smithy.example#Test"))
+                                .putMember("foo", PreludeSchemas.STRING, LengthTrait.builder().max(3L).build())
+                                .build())
                 .build();
     }
 
@@ -535,6 +539,24 @@ public class ValidatorTest {
         });
 
         assertThat(errors, empty());
+    }
+
+    @Test
+    public void producesCorrectPathInSubObjects() {
+        Validator validator = Validator.builder().build();
+        var unionSchema = getTestUnionSchema();
+
+        var errors = validator.validate(s -> {
+            s.writeStruct(unionSchema, TestHelper.create(unionSchema, (schema, serializer) -> {
+                serializer.writeStruct(schema.member("d"),
+                        TestHelper.create(schema.member("d"), (passedSchema, innerSerializer) -> {
+                            innerSerializer.writeString(passedSchema.member("foo"), "1234");
+                        }));
+            }));
+        });
+
+        assertThat(errors, hasSize(1));
+        assertThat(errors.get(0).path(), equalTo("/d/foo"));
     }
 
     // Null value tests.

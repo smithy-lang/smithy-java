@@ -16,11 +16,6 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Tests the packed-long short-name fast path in {@link SmithyMemberLookup#lookup}.
- *
- * <p>Names of length 1..7 are matched by packing their bytes into a long together with
- * the length; these tests guard that this packing is an exact identity (no collisions
- * across different lengths or against control-byte inputs) and that longer names still
- * resolve via the FNV fallback.
  */
 public class SmithyMemberLookupTest {
 
@@ -81,6 +76,8 @@ public class SmithyMemberLookupTest {
     public void boundaryLengthsSevenAndEight() {
         // 7 bytes uses the packed path; 8 bytes falls back to FNV. Both must resolve.
         var l = lookupOf("seven77", "eight888");
+        assertThat(l.orderedPackedNames[0]).isEqualTo(0x2237376e65766573L);
+        assertThat(l.orderedPackedNames[1]).isZero();
         assertThat(lookup(l, "seven77").memberName()).isEqualTo("seven77");
         assertThat(lookup(l, "eight888").memberName()).isEqualTo("eight888");
         assertThat(lookup(l, "seven78")).isNull();
@@ -95,4 +92,5 @@ public class SmithyMemberLookupTest {
         assertThat(lookup(l, "ReadCapacityUnits").memberName()).isEqualTo("ReadCapacityUnits");
         assertThat(lookup(l, "WriteCapacityUnits")).isNull();
     }
+
 }
