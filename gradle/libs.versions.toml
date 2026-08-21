@@ -43,6 +43,7 @@ smithy-jmespath = { module = "software.amazon.smithy:smithy-jmespath", version.r
 smithy-jmespath-tests = { module = "software.amazon.smithy:smithy-jmespath-tests", version.ref = "smithy" }
 smithy-waiters = { module = "software.amazon.smithy:smithy-waiters", version.ref = "smithy" }
 smithy-utils = { module = "software.amazon.smithy:smithy-utils", version.ref = "smithy" }
+jmh-core = { module = "org.openjdk.jmh:jmh-core", version.ref = "jmhCore" }
 smithy-traitcodegen = { module = "software.amazon.smithy:smithy-trait-codegen", version.ref = "smithy" }
 smithy-rules = { module = "software.amazon.smithy:smithy-rules-engine", version.ref = "smithy" }
 smithy-aws-endpoints = { module = "software.amazon.smithy:smithy-aws-endpoints", version.ref = "smithy" }
