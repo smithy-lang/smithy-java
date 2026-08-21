@@ -13,6 +13,8 @@ application {
 }
 
 dependencies {
+    implementation(project(":benchmarks:benchmark-commons"))
+
     // Codegen plugin and runtime modules referenced by generated client code.
     smithyBuild(project(":codegen:codegen-plugin"))
     smithyBuild(project(":client:client-core"))
@@ -97,6 +99,16 @@ afterEvaluate {
             projectionPaths.forEach { srcDir("$it/resources") }
         }
     }
+    tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+        // Feed original service descriptors to Shadow. processResources writes
+        // duplicate paths to one output directory, which loses all but one
+        // projection before mergeServiceFiles() can see them.
+        projectionPaths.forEach { path ->
+            from("$path/resources") {
+                include("META-INF/services/**")
+            }
+        }
+    }
 }
 
 tasks.named("compileJava") {
@@ -114,6 +126,10 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
     archiveBaseName.set("smithy-java-e2e-benchmark-runner")
     archiveClassifier.set("")
     archiveVersion.set("")
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    filesNotMatching(listOf("META-INF/services/**", "META-INF/smithy/manifest")) {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
     mergeServiceFiles()
     // Keep META-INF/smithy/manifest entries from each codegen projection
     // so all schema indexes are discovered at runtime.

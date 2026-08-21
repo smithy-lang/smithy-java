@@ -74,12 +74,20 @@ if [[ -z "$JAR" ]]; then
     exit 1
 fi
 JAR_NAME=$(basename "$JAR")
+REMOTE_CLASSPATH_DIR="$REMOTE_DIR/${JAR_NAME%.jar}-classpath"
 echo "==> Using jar: $JAR_NAME"
 
 # --- Copy jar to remote ---
 echo "==> Copying jar to $SSH_HOST:$REMOTE_DIR/"
 ssh "$SSH_HOST" "mkdir -p $REMOTE_DIR"
 scp -q "$JAR" "$SSH_HOST:$REMOTE_DIR/$JAR_NAME"
+
+# The Gradle JMH plugin packages runtime dependencies as nested JARs and adds
+# them to the manifest Class-Path. Extract the artifact on the remote host so
+# those dependency JARs are available as real classpath entries.
+echo "==> Extracting remote JMH classpath..."
+ssh "$SSH_HOST" "rm -rf $REMOTE_CLASSPATH_DIR && mkdir -p $REMOTE_CLASSPATH_DIR \
+    && cd $REMOTE_CLASSPATH_DIR && jar xf ../$JAR_NAME"
 
 # --- Build JMH CLI args ---
 JVM_ARGS="-Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch -Dsmithy-java.json-provider=smithy -Dsmithy-java.xml-provider=smithy"
@@ -95,15 +103,19 @@ fi
 [[ -n "$INCLUDES" ]] && JMH_ARGS="$JMH_ARGS $INCLUDES"
 [[ -n "$TEST_CASE_ID" ]] && JMH_ARGS="$JMH_ARGS -p testCaseId=$TEST_CASE_ID"
 [[ -n "$PROFILERS" ]] && JMH_ARGS="$JMH_ARGS -prof $PROFILERS"
+# Register this last so its measurement excludes other profilers' setup and
+# teardown, matching the Gradle JMH configuration.
+JMH_ARGS="$JMH_ARGS -prof software.amazon.smithy.java.benchmarks.OpsPerCpuSecondProfiler"
 
 # --- Run benchmarks on remote ---
 echo "==> Running benchmarks on $SSH_HOST..."
-echo "    $REMOTE_JAVA -jar $JAR_NAME $JMH_ARGS"
-ssh "$SSH_HOST" "$REMOTE_JAVA -jar $REMOTE_DIR/$JAR_NAME $JMH_ARGS"
+echo "    $REMOTE_JAVA -cp '$REMOTE_CLASSPATH_DIR:$REMOTE_CLASSPATH_DIR/*' org.openjdk.jmh.Main $JMH_ARGS"
+ssh "$SSH_HOST" "$REMOTE_JAVA -cp '$REMOTE_CLASSPATH_DIR:$REMOTE_CLASSPATH_DIR/*' \
+    org.openjdk.jmh.Main $JMH_ARGS"
 
 # --- Run converter on remote ---
 echo "==> Converting results on $SSH_HOST..."
-ssh "$SSH_HOST" "$REMOTE_JAVA -cp $REMOTE_DIR/$JAR_NAME \
+ssh "$SSH_HOST" "$REMOTE_JAVA -cp '$REMOTE_CLASSPATH_DIR:$REMOTE_CLASSPATH_DIR/*' \
     software.amazon.smithy.java.benchmarks.serde.JmhResultConverter \
     --input $REMOTE_DIR/results.json \
     --output-prefix $REMOTE_DIR/output"

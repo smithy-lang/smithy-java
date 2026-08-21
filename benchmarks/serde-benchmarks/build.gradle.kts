@@ -33,6 +33,8 @@ dependencies {
     implementation(libs.smithy.protocol.test.traits)
     implementation(libs.smithy.utils)
 
+    jmhImplementation(project(":benchmarks:benchmark-commons"))
+
     // The Smithy Java codegen plugin produces typed shape classes plus
     // ApiOperation classes per service (see `smithy-build.json`). The
     // client-core dep is required because the generated client classes
@@ -137,6 +139,16 @@ afterEvaluate {
             srcDir(generateSmithyManifest)
         }
     }
+    tasks.jmhJar {
+        // Feed original service descriptors to Shadow. processJmhResources
+        // writes duplicate paths to one output directory, which loses all but
+        // one projection before mergeServiceFiles() can see them.
+        projectionPaths.forEach { path ->
+            from("$path/resources") {
+                include("META-INF/services/**")
+            }
+        }
+    }
 }
 
 tasks.named("processJmhResources") {
@@ -159,6 +171,7 @@ tasks.named("compileJmhJava") {
 val fast = providers.gradleProperty("jmh.fast").isPresent
 jmh {
     benchmarkMode.set(listOf("sample"))
+    profilers.add("software.amazon.smithy.java.benchmarks.OpsPerCpuSecondProfiler")
     if (!fast) {
         warmupIterations = 5
         iterations = 10
@@ -185,6 +198,10 @@ jmh {
 // mergeServiceFiles() so duplicate META-INF/services/ entries from
 // multiple codegen projections are concatenated rather than overwritten.
 tasks.jmhJar {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    filesNotMatching(listOf("META-INF/services/**", "META-INF/smithy/manifest")) {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
     mergeServiceFiles()
     append("META-INF/smithy/manifest")
 }
