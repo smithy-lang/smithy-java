@@ -6,10 +6,10 @@
 package software.amazon.smithy.java.rulesengine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,12 +19,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.rulesengine.language.Endpoint;
+import software.amazon.smithy.rulesengine.language.evaluation.type.Type;
 import software.amazon.smithy.rulesengine.language.evaluation.value.Value;
 import software.amazon.smithy.rulesengine.language.syntax.Identifier;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Expression;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.ExpressionVisitor;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Template;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.BooleanEquals;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Coalesce;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.FunctionDefinition;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.FunctionNode;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.GetAttr;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsSet;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
@@ -223,6 +227,44 @@ class BytecodeCompilerTest {
     }
 
     @Test
+    void testCompileEndpointHostAndPathTemplates() {
+        Rule rule = EndpointRule.builder()
+                .endpoint(Endpoint.builder()
+                        .url(Literal.stringLiteral(
+                                Template.fromString("https://prefix.{host}/{bucket}")))
+                        .build());
+        Parameters params = Parameters.builder()
+                .addParameter(Parameter.builder()
+                        .name("host")
+                        .type(ParameterType.STRING)
+                        .required(true)
+                        .build())
+                .addParameter(Parameter.builder()
+                        .name("bucket")
+                        .type(ParameterType.STRING)
+                        .required(true)
+                        .build())
+                .build();
+        EndpointBddTrait bdd = EndpointBddTrait.builder()
+                .parameters(params)
+                .conditions(List.of())
+                .results(List.of(rule))
+                .bdd(new Bdd(100000000, 0, 1, 1, nc -> nc.accept(-1, 1, -1)))
+                .build();
+
+        Bytecode bytecode = new BytecodeCompiler(
+                extensions,
+                bdd,
+                functions,
+                builtinProviders,
+                Map.of()).compile();
+
+        assertEquals(2, countOpcode(bytecode, Opcodes.BUILD_TEMPLATE));
+        assertOpcodePresent(bytecode, Opcodes.BUILD_URI);
+        assertOpcodeNotPresent(bytecode, Opcodes.RESOLVE_TEMPLATE);
+    }
+
+    @Test
     void testCompileEndpointWithHeaders() {
         Map<String, List<Expression>> headers = new HashMap<>();
         headers.put("X-Custom", List.of(Literal.stringLiteral(Template.fromString("value"))));
@@ -299,7 +341,122 @@ class BytecodeCompilerTest {
 
         Bytecode bytecode = compiler.compile();
 
+        assertOpcodePresent(bytecode, Opcodes.BUILD_TEMPLATE);
+        assertOpcodeNotPresent(bytecode, Opcodes.RESOLVE_TEMPLATE);
+    }
+
+    @Test
+    void testCompileStringTemplateWithRegisterProperty() {
+        Condition assignCondition = Condition.builder()
+                .fn(ParseUrl.ofExpressions(Expression.getReference(Identifier.of("url"))))
+                .result(Identifier.of("parsedUrl"))
+                .build();
+        Condition templateCondition = Condition.builder()
+                .fn(StringEquals.ofExpressions(
+                        Literal.stringLiteral(Template.fromString("https://{parsedUrl#authority}")),
+                        Literal.stringLiteral(Template.fromString("https://example.com"))))
+                .build();
+
+        Parameters params = Parameters.builder()
+                .addParameter(Parameter.builder()
+                        .name("url")
+                        .type(ParameterType.STRING)
+                        .required(true)
+                        .build())
+                .build();
+        EndpointBddTrait bdd = EndpointBddTrait.builder()
+                .parameters(params)
+                .conditions(List.of(assignCondition, templateCondition))
+                .results(List.of(NoMatchRule.INSTANCE))
+                .bdd(new Bdd(3, 2, 1, 3, nc -> {
+                    nc.accept(-1, 1, -1);
+                    nc.accept(0, 2, -1);
+                    nc.accept(1, 100000000, -1);
+                }))
+                .build();
+
+        Bytecode bytecode = new BytecodeCompiler(
+                extensions,
+                bdd,
+                functions,
+                builtinProviders,
+                Map.of()).compile();
+
+        assertOpcodePresent(bytecode, Opcodes.BUILD_TEMPLATE);
+        assertOpcodeNotPresent(bytecode, Opcodes.RESOLVE_TEMPLATE);
+    }
+
+    @Test
+    void testCompileStringTemplateFallsBackForNestedPropertyAccess() {
+        FunctionDefinition nestedRecord = new FunctionDefinition() {
+            @Override
+            public String getId() {
+                return "nestedRecord";
+            }
+
+            @Override
+            public List<Type> getArguments() {
+                return List.of();
+            }
+
+            @Override
+            public Type getReturnType() {
+                return Type.recordType(Map.of(
+                        Identifier.of("nested"),
+                        Type.recordType(Map.of(Identifier.of("value"), Type.stringType()))));
+            }
+
+            @Override
+            public Value evaluate(List<Value> arguments) {
+                return Value.recordValue(Map.of(
+                        Identifier.of("nested"),
+                        Value.recordValue(Map.of(Identifier.of("value"), Value.stringValue("first")))));
+            }
+
+            @Override
+            public LibraryFunction createFunction(FunctionNode functionNode) {
+                return new LibraryFunction(this, functionNode) {
+                    @Override
+                    public <R> R accept(ExpressionVisitor<R> visitor) {
+                        return visitor.visitLibraryFunction(getFunctionDefinition(), getArguments());
+                    }
+                };
+            }
+        };
+        LibraryFunction nestedRecordFunction = nestedRecord.createFunction(
+                FunctionNode.ofExpressions(nestedRecord.getId()));
+        functions.put(nestedRecord.getId(), new TestFunction(nestedRecord.getId(), 0));
+
+        Condition assignCondition = Condition.builder()
+                .fn(nestedRecordFunction)
+                .result(Identifier.of("metadata"))
+                .build();
+        Condition templateCondition = Condition.builder()
+                .fn(StringEquals.ofExpressions(
+                        Literal.stringLiteral(Template.fromString("Hello {metadata#nested.value}!")),
+                        Literal.stringLiteral(Template.fromString("Hello first!"))))
+                .build();
+        EndpointBddTrait bdd = EndpointBddTrait.builder()
+                .parameters(Parameters.builder().build())
+                .conditions(List.of(assignCondition, templateCondition))
+                .results(List.of(NoMatchRule.INSTANCE))
+                .bdd(new Bdd(3, 2, 1, 3, nc -> {
+                    nc.accept(-1, 1, -1);
+                    nc.accept(0, 2, -1);
+                    nc.accept(1, 100000000, -1);
+                }))
+                .build();
+
+        Bytecode bytecode = new BytecodeCompiler(
+                extensions,
+                bdd,
+                functions,
+                builtinProviders,
+                Map.of()).compile();
+
+        assertOpcodeNotPresent(bytecode, Opcodes.BUILD_TEMPLATE);
         assertOpcodePresent(bytecode, Opcodes.RESOLVE_TEMPLATE);
+        assertOpcodePresent(bytecode, Opcodes.GET_PROPERTY);
     }
 
     @Test
@@ -677,19 +834,31 @@ class BytecodeCompilerTest {
     }
 
     private void assertOpcodePresent(Bytecode bytecode, int expectedOpcode) {
-        ByteBuffer instructions = bytecode.getInstructions();
-        byte[] instructionBytes = new byte[instructions.remaining()];
-        instructions.get(instructionBytes);
+        assertTrue(
+                findOpcodeWithValue(bytecode, (byte) expectedOpcode).found(),
+                "Expected opcode " + expectedOpcode + " to be present in bytecode");
+    }
 
-        boolean found = false;
-        for (byte b : instructionBytes) {
-            if ((b & 0xFF) == expectedOpcode) {
-                found = true;
-                break;
+    private void assertOpcodeNotPresent(Bytecode bytecode, int expectedOpcode) {
+        assertFalse(
+                findOpcodeWithValue(bytecode, (byte) expectedOpcode).found(),
+                "Expected opcode " + expectedOpcode + " not to be present in bytecode");
+    }
+
+    private int countOpcode(Bytecode bytecode, byte expectedOpcode) {
+        int count = 0;
+        for (int i = 0; i < bytecode.getResultCount(); i++) {
+            BytecodeWalker walker = new BytecodeWalker(bytecode.getInstructions(), bytecode.getResultOffset(i));
+            while (walker.hasNext()) {
+                if (walker.currentOpcode() == expectedOpcode) {
+                    count++;
+                }
+                if (walker.isReturnOpcode() || !walker.advance()) {
+                    break;
+                }
             }
         }
-
-        assertTrue(found, "Expected opcode " + expectedOpcode + " to be present in bytecode");
+        return count;
     }
 
     private void assertConstantPresent(Bytecode bytecode, Object expectedConstant) {

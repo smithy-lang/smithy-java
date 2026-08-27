@@ -380,6 +380,47 @@ final class BytecodeEvaluator implements ConditionEvaluator {
                         stack[firstArgPosition] = new String(buf, 0, totalLen);
                         sp = firstArgPosition + 1;
                     }
+                    case Opcodes.BUILD_TEMPLATE -> {
+                        int segmentCount = instructions[pc++] & 0xFF;
+                        int firstArgPosition = sp;
+                        int totalLen = 0;
+                        for (int i = 0; i < segmentCount; i++) {
+                            int segmentType = instructions[pc++] & 0xFF;
+                            String segment = switch (segmentType) {
+                                case TemplateSegmentType.LITERAL -> {
+                                    int constIdx = ((instructions[pc] & 0xFF) << 8)
+                                            | (instructions[pc + 1] & 0xFF);
+                                    pc += 2;
+                                    yield (String) constantPool[constIdx];
+                                }
+                                case TemplateSegmentType.REGISTER -> (String) regs[instructions[pc++] & 0xFF];
+                                case TemplateSegmentType.REGISTER_PROPERTY -> {
+                                    int regIdx = instructions[pc++] & 0xFF;
+                                    int propertyIdx = ((instructions[pc] & 0xFF) << 8)
+                                            | (instructions[pc + 1] & 0xFF);
+                                    pc += 2;
+                                    yield (String) EndpointUtils.getProperty(
+                                            regs[regIdx],
+                                            (String) constantPool[propertyIdx]);
+                                }
+                                default -> throw new RulesEvaluationError(
+                                        "Unknown template segment type: " + segmentType,
+                                        pc);
+                            };
+                            totalLen += segment.length();
+                            stack[sp++] = segment;
+                        }
+
+                        char[] buf = getCharBuffer(totalLen);
+                        int pos = 0;
+                        for (int i = firstArgPosition; i < sp; i++) {
+                            String segment = (String) stack[i];
+                            segment.getChars(0, segment.length(), buf, pos);
+                            pos += segment.length();
+                        }
+                        stack[firstArgPosition] = new String(buf, 0, totalLen);
+                        sp = firstArgPosition + 1;
+                    }
                     case Opcodes.FN0 -> stack[sp++] = functions[instructions[pc++] & 0xFF].apply0();
                     case Opcodes.FN1 -> {
                         // Pops 1, pushes 1 - reuse position
