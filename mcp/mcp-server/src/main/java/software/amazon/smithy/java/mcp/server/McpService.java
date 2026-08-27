@@ -77,6 +77,7 @@ public final class McpService {
 
     private static final InternalLogger LOG = InternalLogger.getLogger(McpService.class);
     private static final Context.Key<Boolean> ASYNC_DISPATCH = Context.key("mcp.asyncDispatch");
+    private static final int METHOD_NOT_FOUND_ERROR_CODE = -32601;
 
     private static final JsonCodec CODEC = JsonCodec.builder()
             .settings(JsonSettings.builder()
@@ -131,8 +132,8 @@ public final class McpService {
      *   <li><b>Synchronous (return value):</b> For most requests, the response is returned directly.</li>
      *   <li><b>Asynchronous (callback):</b> For proxy tool calls, returns {@code null} and the callback
      *       is invoked when the proxy responds.</li>
-     *   <li><b>Neither:</b> For notifications and unknown methods, returns {@code null} and the callback
-     *       is never invoked.</li>
+     *   <li><b>Neither:</b> For notifications, returns {@code null} and the callback is never
+     *       invoked. Requests with unknown methods receive a -32601 (Method not found) error.</li>
      * </ul>
      *
      * @param req The JSON-RPC request to handle
@@ -172,7 +173,7 @@ public final class McpService {
                         case "tools/list" -> handleToolsList(currentReq, protocolVersion);
                         case "tools/call" ->
                             handleToolsCall(currentReq, asyncResponseCallback, protocolVersion, hook);
-                        default -> null;
+                        default -> methodNotFound(currentReq);
                     };
                 }
             };
@@ -211,7 +212,7 @@ public final class McpService {
                         case "tools/list" -> handleToolsList(req, protocolVersion);
                         case "tools/call" ->
                             handleToolsCallDirect(req, asyncResponseCallback, protocolVersion);
-                        default -> null; // Notifications or unknown methods
+                        default -> methodNotFound(req);
                     };
                 }
             };
@@ -790,6 +791,25 @@ public final class McpService {
         var error = JsonRpcErrorResponse.builder()
                 .code(500)
                 .message(s)
+                .build();
+        return JsonRpcResponse.builder()
+                .id(req.getId())
+                .error(error)
+                .jsonrpc("2.0")
+                .build();
+    }
+
+    /**
+     * Per JSON-RPC 2.0, a request with an unknown method must receive a -32601 (Method not found)
+     * error, while notifications (requests without an id) must never receive a response.
+     */
+    private static JsonRpcResponse methodNotFound(JsonRpcRequest req) {
+        if (req.getId() == null) {
+            return null;
+        }
+        var error = JsonRpcErrorResponse.builder()
+                .code(METHOD_NOT_FOUND_ERROR_CODE)
+                .message("Method not found: " + req.getMethod())
                 .build();
         return JsonRpcResponse.builder()
                 .id(req.getId())
