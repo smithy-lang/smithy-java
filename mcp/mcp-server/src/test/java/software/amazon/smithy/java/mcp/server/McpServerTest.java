@@ -755,6 +755,77 @@ public class McpServerTest {
     }
 
     @Test
+    void testUnknownMethodReturnsMethodNotFound() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("nonexistent/method", Document.of(Map.of()), Document.of(42));
+        var response = read();
+        assertEquals("2.0", response.getJsonrpc());
+        assertEquals(42, response.getId().asNumber().intValue());
+        assertNull(response.getResult());
+        assertNotNull(response.getError());
+        assertEquals(-32601, response.getError().getCode());
+        assertTrue(response.getError().getMessage().contains("nonexistent/method"));
+
+        // String ids must be echoed back with their original type
+        write("server/discover", Document.of(Map.of()), Document.of("discover-1"));
+        response = read();
+        assertEquals("discover-1", response.getId().asString());
+        assertNull(response.getResult());
+        assertEquals(-32601, response.getError().getCode());
+
+        // Known methods are unaffected
+        write("ping", Document.of(Map.of()), Document.of(43));
+        response = read();
+        assertEquals(43, response.getId().asNumber().intValue());
+        assertNull(response.getError());
+        assertNotNull(response.getResult());
+    }
+
+    @Test
+    void testUnknownNotificationIsSilentlyDropped() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Unknown notifications (no id) must not receive a Method not found error
+        writeNotification("notifications/does-not-exist", Document.of(Map.of()));
+        output.assertNoOutput();
+
+        // Known notifications remain silently dropped
+        writeNotification("notifications/initialized", Document.of(Map.of()));
+        output.assertNoOutput();
+
+        // The next response on the wire belongs to the follow-up request, not a late error
+        write("tools/list", Document.of(Map.of()), Document.of(7));
+        var response = read();
+        assertEquals(7, response.getId().asNumber().intValue());
+        assertNotNull(response.getResult());
+    }
+
+    @Test
     void testPromptsList() {
         server = McpServer.builder()
                 .name("smithy-mcp-server")
