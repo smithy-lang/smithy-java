@@ -16,18 +16,20 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
@@ -87,19 +89,40 @@ public final class McpService {
 
     private static final TraitKey<OneOfTrait> ONE_OF_TRAIT = TraitKey.get(OneOfTrait.class);
 
-    private final Map<String, Tool> tools;
-    private final Map<String, Prompt> prompts;
+    // The tool, prompt, proxy, and service registries are held as immutable snapshots behind volatile
+    // references (copy-on-write). Readers (tools/list, prompts/list, tools/call dispatch, shutdown)
+    // read the current snapshot with no locking and always see a complete, consistent map. Every
+    // mutation (proxy init, dynamic add, and tools/list_changed refresh) rebuilds the affected
+    // snapshot under registryLock and publishes it atomically, so concurrent mutators cannot lose
+    // each other's updates and readers never observe a half-updated registry. Network I/O
+    // (proxy.listTools()/listPrompts()) is always performed outside the lock.
+    private final Object registryLock = new Object();
+    private volatile Map<String, Tool> tools;
+    private volatile Map<String, Prompt> prompts;
+    private volatile Map<String, McpServerProxy> proxies;
+    private volatile Map<String, Service> services;
     private final String serviceName;
     private final String version;
-    private final Map<String, McpServerProxy> proxies;
-    private final Map<String, Service> services;
     private final AtomicReference<JsonRpcRequest> initializeRequest = new AtomicReference<>();
     private final ToolFilter toolFilter;
     private final AtomicReference<Boolean> proxiesInitialized = new AtomicReference<>(false);
     private final McpMetricsObserver metricsObserver;
     private final SchemaIndex schemaIndex;
     private final McpServerInterceptor interceptor;
-    private Consumer<JsonRpcRequest> notificationWriter;
+    // Set once via setNotificationWriter() and read later from the refresh/proxy paths on other
+    // threads, so it is volatile for safe publication.
+    private volatile Consumer<JsonRpcRequest> notificationWriter;
+
+    // Runs tools/list_changed refreshes off the transport's reader thread. A synchronous refresh calls
+    // listTools() whose response is read by that same reader thread, so doing it inline deadlocks it.
+    // A single thread also serializes refreshes from different proxies with each other. It is a daemon
+    // thread that lives for the process; McpService has no explicit lifecycle so it is never shut down.
+    private final ExecutorService toolRefreshExecutor =
+            Executors.newSingleThreadExecutor(r -> {
+                var t = new Thread(r, "mcp-tools-refresh");
+                t.setDaemon(true);
+                return t;
+            });
 
     McpService(
             Map<String, Service> services,
@@ -110,14 +133,21 @@ public final class McpService {
             McpMetricsObserver metricsObserver,
             McpServerInterceptor interceptor
     ) {
-        this.services = services;
+        // Only services needs copying: it is supplied by the builder, which may still hold or mutate
+        // it. The tools, prompts, and proxies maps are all built fresh here and never referenced
+        // again, so snapshot() can wrap them without copying.
+        this.services = snapshot(new LinkedHashMap<>(services));
         this.schemaIndex =
                 SchemaIndex.compose(services.values().stream().map(Service::schemaIndex).toArray(SchemaIndex[]::new));
-        this.tools = createTools(services);
-        this.prompts = new ConcurrentHashMap<>(PromptLoader.loadPrompts(services.values()));
+        this.tools = snapshot(createTools(services));
+        this.prompts = snapshot(PromptLoader.loadPrompts(services.values()));
         this.serviceName = name;
         this.version = version;
-        this.proxies = proxyList.stream().collect(Collectors.toMap(McpServerProxy::name, p -> p));
+        var proxyMap = new LinkedHashMap<String, McpServerProxy>();
+        for (var proxy : proxyList) {
+            proxyMap.put(proxy.name(), proxy);
+        }
+        this.proxies = snapshot(proxyMap);
         this.toolFilter = toolFilter;
         this.metricsObserver = metricsObserver;
         this.interceptor = interceptor;
@@ -328,8 +358,13 @@ public final class McpService {
     }
 
     private JsonRpcResponse handlePromptsList(JsonRpcRequest req) {
+        var promptValues = prompts.values();
+        var promptInfos = new ArrayList<PromptInfo>(promptValues.size());
+        for (var prompt : promptValues) {
+            promptInfos.add(prompt.promptInfo());
+        }
         var result = ListPromptsResult.builder()
-                .prompts(prompts.values().stream().map(Prompt::promptInfo).toList())
+                .prompts(promptInfos)
                 .build();
         return createSuccessResponse(req.getId(), result);
     }
@@ -349,12 +384,15 @@ public final class McpService {
     }
 
     private JsonRpcResponse handleToolsList(JsonRpcRequest req, ProtocolVersion protocolVersion) {
+        var toolValues = tools.values();
+        var toolInfos = new ArrayList<ToolInfo>(toolValues.size());
+        for (var tool : toolValues) {
+            if (toolFilter.allowTool(tool.serverId(), tool.toolInfo().getName())) {
+                toolInfos.add(extractToolInfo(tool, protocolVersion));
+            }
+        }
         var result = ListToolsResult.builder()
-                .tools(tools.values()
-                        .stream()
-                        .filter(t -> toolFilter.allowTool(t.serverId(), t.toolInfo().getName()))
-                        .map(tool -> extractToolInfo(tool, protocolVersion))
-                        .toList())
+                .tools(toolInfos)
                 .build();
         return createSuccessResponse(req.getId(), result);
     }
@@ -552,22 +590,77 @@ public final class McpService {
             Consumer<JsonRpcRequest> baseNotificationWriter
     ) {
         return notification -> {
-            // Check if this is a tools/list_changed notification
             if ("notifications/tools/list_changed".equals(notification.getMethod())) {
                 LOG.debug("Received tools/list_changed notification from proxy: {}", proxy.name());
-                // Remove only this proxy's tools
-                tools.entrySet().removeIf(entry -> entry.getValue().proxy() == proxy);
-                // Re-fetch tools from only this proxy
-                List<ToolInfo> proxyTools = proxy.listTools();
-                for (var toolInfo : proxyTools) {
-                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
-                }
+                // Refresh on a separate thread. This notification is delivered on the proxy's transport
+                // reader thread, and refreshProxyTools() calls listTools() whose response is read by that
+                // same thread, so doing it inline would deadlock the reader.
+                toolRefreshExecutor.execute(() -> refreshProxyTools(proxy));
             }
             // Forward the notification
             if (baseNotificationWriter != null) {
                 baseNotificationWriter.accept(notification);
             }
         };
+    }
+
+    /**
+     * Re-fetches a proxy's tools after a {@code tools/list_changed} notification and swaps them into the
+     * registry. Runs off the transport reader thread (see caller). The network fetch happens outside
+     * {@code registryLock}; only the in-memory snapshot swap is locked. Fetches first so a failed or
+     * slow refresh never wipes the current tools, then adds the new set before pruning this proxy's
+     * stale entries, so a concurrent {@code tools/list} never observes a gap (at worst a brief superset).
+     */
+    void refreshProxyTools(McpServerProxy proxy) {
+        List<ToolInfo> proxyTools;
+        try {
+            proxyTools = proxy.listTools();
+        } catch (Exception e) {
+            LOG.error("Failed to re-fetch tools from proxy: {}", proxy.name(), e);
+            return;
+        }
+        // Fast path: the proxy reports no tools and has none currently registered, so there is
+        // nothing to add and nothing to prune. Reads the current snapshot lock-free and avoids the
+        // set allocation, map copy, and lock entirely. (If a tool for this proxy is added
+        // concurrently right after this check, that add publishes it and a later refresh reconciles.)
+        if (proxyTools.isEmpty() && !hasToolsFor(proxy)) {
+            return;
+        }
+        synchronized (registryLock) {
+            Set<String> newNames = new HashSet<>();
+            // LinkedHashMap so a refresh keeps the existing order of every other tool: re-put entries
+            // stay in place and genuinely new tools append, rather than the whole listing reshuffling
+            // to hash order on each tools/list_changed.
+            var next = new LinkedHashMap<>(tools);
+            for (var toolInfo : proxyTools) {
+                newNames.add(toolInfo.getName());
+                next.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+            }
+            next.entrySet()
+                    .removeIf(entry -> entry.getValue().proxy() == proxy && !newNames.contains(entry.getKey()));
+            tools = snapshot(next);
+        }
+    }
+
+    /** Whether any currently registered tool belongs to the given proxy. Reads the current snapshot. */
+    private boolean hasToolsFor(McpServerProxy proxy) {
+        for (var tool : tools.values()) {
+            if (tool.proxy() == proxy) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Publishes a registry snapshot by wrapping the given map unmodifiable. The caller hands off
+     * ownership: the argument must be a freshly built map that is never mutated or retained after
+     * this call, since it becomes the live snapshot without being copied. Callers build these as
+     * {@link LinkedHashMap}s so {@code tools/list} and {@code prompts/list} return a stable,
+     * deterministic insertion order across refreshes and dynamic additions.
+     */
+    private static <K, V> Map<K, V> snapshot(Map<K, V> ownedMap) {
+        return Collections.unmodifiableMap(ownedMap);
     }
 
     /**
@@ -605,24 +698,52 @@ public final class McpService {
                     var proxyNotificationWriter = createProxyNotificationWriter(proxy, notificationWriter);
                     proxy.initialize(responseWriter, proxyNotificationWriter, initRequest, protocolVersion);
                 }
+                // Isolate each proxy: a failure fetching one proxy's tools or prompts must not abort
+                // discovery for the rest.
+                registerProxyListing(proxy);
+            }
+        }
+    }
 
-                List<ToolInfo> proxyTools = proxy.listTools();
+    /**
+     * Fetches a proxy's tools and prompts (outside {@code registryLock}) and merges them into the
+     * registries under the lock. A failure fetching either list is logged and skipped so it cannot
+     * abort discovery for other proxies.
+     */
+    private void registerProxyListing(McpServerProxy proxy) {
+        List<ToolInfo> proxyTools = null;
+        try {
+            proxyTools = proxy.listTools();
+        } catch (Exception e) {
+            LOG.error("Failed to fetch tools from proxy: {}", proxy.name(), e);
+        }
+
+        List<PromptInfo> proxyPrompts = null;
+        try {
+            proxyPrompts = proxy.listPrompts();
+        } catch (Exception e) {
+            LOG.error("Failed to fetch prompts from proxy: {}", proxy.name(), e);
+        }
+
+        if (proxyTools == null && proxyPrompts == null) {
+            return;
+        }
+
+        synchronized (registryLock) {
+            if (proxyTools != null) {
+                var nextTools = new LinkedHashMap<>(tools);
                 for (var toolInfo : proxyTools) {
-                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
+                    nextTools.put(toolInfo.getName(), new Tool(toolInfo, proxy.name(), proxy));
                 }
-
-                // Fetch and register prompts from proxy
-                try {
-                    List<PromptInfo> proxyPrompts = proxy.listPrompts();
-                    for (var promptInfo : proxyPrompts) {
-                        var normalizedName = PromptLoader.normalize(promptInfo.getName());
-                        if (!prompts.containsKey(normalizedName)) {
-                            prompts.put(normalizedName, new Prompt(promptInfo, proxy));
-                        }
-                    }
-                } catch (Exception e) {
-                    LOG.error("Failed to fetch prompts from proxy: " + proxy.name(), e);
+                tools = snapshot(nextTools);
+            }
+            if (proxyPrompts != null) {
+                var nextPrompts = new LinkedHashMap<>(prompts);
+                for (var promptInfo : proxyPrompts) {
+                    var normalizedName = PromptLoader.normalize(promptInfo.getName());
+                    nextPrompts.putIfAbsent(normalizedName, new Prompt(promptInfo, proxy));
                 }
+                prompts = snapshot(nextPrompts);
             }
         }
     }
@@ -638,39 +759,32 @@ public final class McpService {
      * Adds a new service and updates the tools map.
      */
     public void addNewService(String id, Service service) {
-        services.put(id, service);
-        tools.putAll(createTools(Map.of(id, service)));
+        var newTools = createTools(Map.of(id, service));
+        synchronized (registryLock) {
+            var nextServices = new LinkedHashMap<>(services);
+            nextServices.put(id, service);
+            services = snapshot(nextServices);
+
+            var nextTools = new LinkedHashMap<>(tools);
+            nextTools.putAll(newTools);
+            tools = snapshot(nextTools);
+        }
     }
 
     public void addNewProxy(
             McpServerProxy mcpServerProxy,
             Consumer<JsonRpcResponse> responseWriter
     ) {
-        proxies.put(mcpServerProxy.name(), mcpServerProxy);
+        synchronized (registryLock) {
+            var nextProxies = new LinkedHashMap<>(proxies);
+            nextProxies.put(mcpServerProxy.name(), mcpServerProxy);
+            proxies = snapshot(nextProxies);
+        }
 
         mcpServerProxy.start();
 
-        try {
-            List<ToolInfo> proxyTools = mcpServerProxy.listTools();
-            for (var toolInfo : proxyTools) {
-                tools.put(toolInfo.getName(), new Tool(toolInfo, mcpServerProxy.name(), mcpServerProxy));
-            }
-        } catch (Exception e) {
-            LOG.error("Failed to fetch tools from proxy", e);
-        }
-
-        // Also fetch prompts from the new proxy
-        try {
-            List<PromptInfo> proxyPrompts = mcpServerProxy.listPrompts();
-            for (var promptInfo : proxyPrompts) {
-                var normalizedName = PromptLoader.normalize(promptInfo.getName());
-                if (!prompts.containsKey(normalizedName)) {
-                    prompts.put(normalizedName, new Prompt(promptInfo, mcpServerProxy));
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("Failed to fetch prompts from proxy: " + mcpServerProxy.name(), e);
-        }
+        // Fetches tools/prompts (network I/O) outside the lock, then swaps under it.
+        registerProxyListing(mcpServerProxy);
     }
 
     /**
@@ -681,7 +795,8 @@ public final class McpService {
     }
 
     /**
-     * Returns all registered proxies.
+     * Returns an immutable snapshot of the registered proxies at the time of the call. Subsequent
+     * additions via {@link #addNewProxy} are not reflected in a previously returned snapshot.
      */
     public Map<String, McpServerProxy> getProxies() {
         return proxies;
@@ -799,7 +914,7 @@ public final class McpService {
     }
 
     private Map<String, Tool> createTools(Map<String, Service> services) {
-        var tools = new ConcurrentHashMap<String, Tool>();
+        var tools = new LinkedHashMap<String, Tool>();
         for (var entry : services.entrySet()) {
             var id = entry.getKey();
             var service = entry.getValue();
