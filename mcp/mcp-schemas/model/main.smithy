@@ -55,6 +55,7 @@ structure InitializeResult with [BaseResult] {
 }
 
 structure Capabilities {
+    completions: Document
     logging: Document
     prompts: Prompts
     tools: Tools
@@ -156,6 +157,10 @@ structure JsonPrimitiveSchema {
 
     /// JSON Schema format annotation (e.g., "date-time" for timestamps)
     format: String
+
+    /// MCP HTTP parameter header suffix from smithy.ai#mcpHeader.
+    @jsonName("x-mcp-header")
+    mcpHeader: String
 }
 
 structure JsonDocumentSchema {
