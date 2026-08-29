@@ -1,6 +1,7 @@
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.codegen-plugin-conventions")
+    `java-test-fixtures`
 }
 
 description =
@@ -32,3 +33,20 @@ spotbugs {
 }
 
 addGenerateSrcsTask("software.amazon.smithy.java.mcp.server.utils.TestJavaCodegenRunner", null, null, "server")
+
+tasks.named<Test>("integ") {
+    useJUnitPlatform {
+        excludeTags("conformance")
+    }
+}
+
+tasks.register<Test>("conformance") {
+    description = "Runs the official Model Context Protocol conformance scenarios"
+    group = "verification"
+    useJUnitPlatform {
+        includeTags("conformance")
+    }
+    testClassesDirs = sourceSets["it"].output.classesDirs
+    classpath = sourceSets["it"].runtimeClasspath
+    shouldRunAfter("integ")
+}

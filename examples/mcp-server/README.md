@@ -1,5 +1,12 @@
 ## Example: MCP Server
 
+This example contains two newline-delimited JSON-RPC servers using the MCP
+standard input/output transport:
+
+- `MCPServerExample` exposes generated Smithy service implementations directly.
+- `ProxyMCPExample` starts a Smithy HTTP server on port `8080` and exposes a
+  `ProxyService` for it through MCP.
+
 ### Usage
 
 To use this example as a template, run the following command with
@@ -15,34 +22,42 @@ Or
 smithy init -t mcp-server --url git@github.com:smithy-lang/smithy-java.git
 ```
 
-To generate a fat jar which contains all the dependencies required to run
-a [Model Context Protocol](https://modelcontextprotocol.io/) (
-MCP) [StdIO](https://modelcontextprotocol.io/docs/concepts/transports#standard-input%2Foutput-stdio) server,
-run the following from the root of the project:
+The generated server uses the transport-specific `StdioMcpServer` entry point:
+
+```java
+var mcpServer = StdioMcpServer.builder()
+        .stdio()
+        .name("smithy-mcp-server")
+        .addService("employee-mcp", service)
+        .build();
+
+mcpServer.start();
+mcpServer.awaitCompletion();
+```
+
+To compile both implementations and generate a fat JAR from a Smithy Java
+checkout, run:
 
 ```console
-gradle build
+./gradlew :examples:mcp-server:build
 ```
 
-This will generate a fat JAR file at `build/libs/mcp-server-0.0.1-all.jar`. This artifact includes all the necessary
-code to create an MCP server that uses the StdIO transport.
+The fat JAR is written to
+`examples/mcp-server/build/libs/mcp-server-<version>-all.jar`. It contains the
+generated service code, both example entry points, and the MCP standard
+input/output transport.
 
-There are two example implementations included:
+Run the proxy example from the repository root with:
 
-* `MCPServerExample` : Demonstrates how to build an MCP server by modeling tools as Smithy APIs.
-
-* `ProxyMCPExample` : Shows how to create a Proxy MCP Server for any Smithy service. In this example, a Smithy Java
-  server is started on port 8080, and the MCP server proxies requests to it.
-
-You can run the Proxy MCP Server using the following command:
-
-```
-java -cp mcp-server-0.0.1-all.jar software.amazon.smithy.java.example.server.mcp.ProxyMCPExample
+```console
+java -cp examples/mcp-server/build/libs/mcp-server-*-all.jar \
+  software.amazon.smithy.java.example.server.mcp.ProxyMCPExample
 ```
 
-To run the direct MCP server example instead, simply replace `ProxyMCPExample` with `MCPServerExample`.
+Replace `ProxyMCPExample` with `MCPServerExample` to run the direct service
+implementation.
 
-Here's how you might configure the MCP client to invoke the proxy server:
+An MCP client can launch the proxy server with a configuration like:
 
 ```json
 {
@@ -51,14 +66,10 @@ Here's how you might configure the MCP client to invoke the proxy server:
       "command": "java",
       "args": [
         "-cp",
-        "/path/to/build/libs/mcp-server-0.0.1-all.jar",
+        "/path/to/smithy-java/examples/mcp-server/build/libs/mcp-server-<version>-all.jar",
         "software.amazon.smithy.java.example.server.mcp.ProxyMCPExample"
       ]
     }
   }
 }
 ```
-
-
-
-

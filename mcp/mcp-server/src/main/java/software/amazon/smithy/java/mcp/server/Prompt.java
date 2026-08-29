@@ -33,7 +33,7 @@ public final class Prompt {
 
     private final PromptInfo promptInfo;
     private final String promptTemplate;
-    private final McpServerProxy proxy;
+    private final McpRemoteClient proxy;
 
     /**
      * Creates a local prompt with a template.
@@ -53,7 +53,7 @@ public final class Prompt {
      * @param promptInfo The prompt metadata
      * @param proxy The MCP server proxy to delegate to
      */
-    public Prompt(PromptInfo promptInfo, McpServerProxy proxy) {
+    public Prompt(PromptInfo promptInfo, McpRemoteClient proxy) {
         this.promptInfo = promptInfo;
         this.promptTemplate = null;
         this.proxy = proxy;
@@ -75,8 +75,21 @@ public final class Prompt {
      * @return GetPromptResult with processed template or proxy response
      */
     public GetPromptResult getPromptResult(Document arguments, Document requestId) {
+        return proxy == null
+                ? buildLocalPromptResult(arguments)
+                : getPromptResult(arguments, requestId, McpMetadata.EMPTY, proxy.protocol());
+    }
+
+    GetPromptResult getPromptResult(
+            Document arguments,
+            Document requestId,
+            McpMetadata metadata,
+            McpProtocol protocol
+    ) {
         if (proxy != null) {
-            return delegateToProxy(arguments, requestId);
+            return proxy.usingProtocol(
+                    protocol,
+                    () -> delegateToProxy(arguments, requestId, metadata));
         }
         return buildLocalPromptResult(arguments);
     }
@@ -84,7 +97,11 @@ public final class Prompt {
     /**
      * Delegates the prompt request to the proxy server via RPC.
      */
-    private GetPromptResult delegateToProxy(Document arguments, Document requestId) {
+    private GetPromptResult delegateToProxy(
+            Document arguments,
+            Document requestId,
+            McpMetadata metadata
+    ) {
         Map<String, Document> params = new HashMap<>();
         params.put("name", Document.of(promptInfo.getName()));
         if (arguments != null) {
@@ -94,16 +111,15 @@ public final class Prompt {
         JsonRpcRequest request = JsonRpcRequest.builder()
                 .method("prompts/get")
                 .id(requestId)
-                .params(Document.of(params))
+                .params(metadata.applyTo(Document.of(params)))
                 .jsonrpc("2.0")
                 .build();
 
-        return proxy.rpc(request).thenApply(response -> {
-            if (response.getError() != null) {
-                throw new RuntimeException("Error getting prompt: " + response.getError().getMessage());
-            }
-            return response.getResult().asShape(GetPromptResult.builder());
-        }).join();
+        var response = proxy.exchangeForwarded(request);
+        if (response.getError() != null) {
+            throw new McpRemoteException("Error getting prompt: " + response.getError().getMessage());
+        }
+        return response.getResult().asShape(GetPromptResult.builder());
     }
 
     /**

@@ -56,5 +56,9 @@ tasks.assemble {
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+}
+
+tasks.withType<JavaCompile>() {
+    options.release.set(25)
 }
