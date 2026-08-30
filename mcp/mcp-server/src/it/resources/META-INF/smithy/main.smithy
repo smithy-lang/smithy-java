@@ -7,7 +7,7 @@ use smithy.mcp#oneOf
 service TestService {
     operations: [
         McpEcho,
-    CalculateArea
+        CalculateArea
     ]
 }
 

@@ -4,7 +4,7 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.example.server.mcp.operations.GetCodingStatistics;
 import software.amazon.smithy.java.example.server.mcp.operations.GetEmployeeDetails;
 import software.amazon.smithy.java.example.server.mcp.service.EmployeeService;
-import software.amazon.smithy.java.mcp.server.McpServer;
+import software.amazon.smithy.java.mcp.server.StdioMcpServer;
 import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.model.Model;
@@ -38,7 +38,7 @@ public class ProxyMCPExample {
                 .proxyEndpoint("http://localhost:8080")
                 .build();
 
-        var mcpServer = McpServer.builder()
+        var mcpServer = StdioMcpServer.builder()
                 .stdio()
                 .name("smithy-mcp-server")
                 .addService("employee-mcp", mcpService)
@@ -46,8 +46,10 @@ public class ProxyMCPExample {
         mcpServer.start();
 
         try {
-            Thread.currentThread().join();
+            mcpServer.awaitCompletion();
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
             mcpServer.shutdown();
             server.shutdown();
         }

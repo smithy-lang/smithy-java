@@ -1,0 +1,2842 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.mcp.server;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.InputHook;
+import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.dynamicschemas.StructDocument;
+import software.amazon.smithy.java.json.JsonCodec;
+import software.amazon.smithy.java.json.JsonSettings;
+import software.amazon.smithy.java.mcp.model.JsonObjectSchema;
+import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
+import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
+import software.amazon.smithy.java.mcp.model.PromptInfo;
+import software.amazon.smithy.java.mcp.model.ToolInfo;
+import software.amazon.smithy.java.server.ProxyService;
+import software.amazon.smithy.java.server.Server;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
+
+public class StdioMcpServerTest {
+    private static final JsonCodec CODEC = JsonCodec.builder()
+            .settings(JsonSettings.builder()
+                    .serializeTypeInDocuments(false)
+                    .useJsonName(true)
+                    .build())
+            .build();
+
+    private TestInputStream input;
+    private TestOutputStream output;
+    private Server server;
+    private int id;
+
+    @BeforeEach
+    public void beforeEach() {
+        input = new TestInputStream();
+        output = new TestOutputStream();
+    }
+
+    @Test
+    void malformedJsonReturnsParseError() {
+        server = StdioMcpServer.builder()
+                .engine(McpEngine.builder().build())
+                .input(input)
+                .output(output)
+                .build();
+        server.start();
+
+        input.write("{not-json}\n");
+        var response = read();
+
+        assertEquals(-32700, response.getError().getCode());
+        assertNull(response.getId());
+    }
+
+    @AfterEach
+    public void afterEach() {
+        if (server != null) {
+            server.shutdown().join();
+        }
+    }
+
+    private void initializeWithProtocolVersion(ProtocolVersion protocolVersion) {
+        final Document pvDoc;
+        final String expectedPv;
+        if (protocolVersion == null) {
+            pvDoc = Document.of(Map.of());
+            expectedPv = ProtocolVersion.defaultVersion().identifier();
+        } else {
+            pvDoc = Document.of(Map.of("protocolVersion", Document.of(protocolVersion.identifier())));
+            expectedPv = protocolVersion.identifier();
+        }
+        write("initialize", pvDoc);
+        var pv = read().getResult().getMember("protocolVersion").asString();
+        assertEquals(expectedPv, pv);
+    }
+
+    private Document modernParams(Map<String, Document> members) {
+        var params = new HashMap<>(members);
+        params.put("_meta",
+                Document.of(Map.of(
+                        "io.modelcontextprotocol/protocolVersion",
+                        Document.of(KnownProtocolVersion.V2026_07_28.identifier()),
+                        "io.modelcontextprotocol/clientInfo",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("test-client"),
+                                "version",
+                                Document.of("1.0.0"))),
+                        "io.modelcontextprotocol/clientCapabilities",
+                        Document.of(Map.of()))));
+        return Document.of(params);
+    }
+
+    @Test
+    public void testPing() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("ping", Document.of(Map.of()), Document.of(42));
+        var response = read();
+        assertEquals(42, response.getId().asNumber().intValue());
+        assertNotNull(response.getResult());
+        assertTrue(response.getResult().asStringMap().isEmpty());
+        assertEquals("2.0", response.getJsonrpc());
+
+        write("ping", Document.of(Map.of()), Document.of("ping-id"));
+        response = read();
+        assertEquals("ping-id", response.getId().asString());
+        assertNotNull(response.getResult());
+        assertTrue(response.getResult().asStringMap().isEmpty());
+    }
+
+    @Test
+    public void initializeWithV2025_11_25ProtocolVersion() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_11_25);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+        assertEquals(6, tools.size());
+
+        // 2025-11-25 >= 2025-06-18, so outputSchema must be retained. This is the positive
+        // mirror of noOutputSchemaWithUnsupportedProtocolVersion, which asserts it is stripped.
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoInputOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoInputOperation", tool.get("name").asString());
+        assertNotNull(tool.get("inputSchema"));
+
+        var outputSchema = tool.get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        assertTrue(outputSchema.get("properties").asStringMap().containsKey("outputStr"));
+    }
+
+    @Test
+    public void supportsLoggingAndCompletionUtilities() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("initialize",
+                Document.of(Map.of(
+                        "protocolVersion",
+                        Document.of(KnownProtocolVersion.V2025_11_25.identifier()))));
+        var capabilities = read().getResult().getMember("capabilities");
+        assertNotNull(capabilities.getMember("completions"));
+        assertNotNull(capabilities.getMember("logging"));
+
+        write("logging/setLevel", Document.of(Map.of("level", Document.of("info"))));
+        assertTrue(read().getResult().asStringMap().isEmpty());
+
+        write("completion/complete",
+                Document.of(Map.of(
+                        "ref",
+                        Document.of(Map.of(
+                                "type",
+                                Document.of("ref/prompt"),
+                                "name",
+                                Document.of("test_prompt"))),
+                        "argument",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("value"),
+                                "value",
+                                Document.of("par"))))));
+        var completion = read().getResult().getMember("completion");
+        assertTrue(completion.getMember("values").asList().isEmpty());
+        assertEquals(0, completion.getMember("total").asNumber().intValue());
+        assertFalse(completion.getMember("hasMore").asBoolean());
+    }
+
+    @Test
+    public void supportsV2026_07_28StatelessProtocol() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .version("1.2.3")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("server/discover", modernParams(Map.of()));
+        var discoverResponse = read();
+        assertNull(
+                discoverResponse.getError(),
+                () -> discoverResponse.getError() == null ? null : discoverResponse.getError().getMessage());
+        var discover = discoverResponse.getResult();
+        assertEquals("complete", discover.getMember("resultType").asString());
+        assertEquals(0, discover.getMember("ttlMs").asNumber().intValue());
+        assertEquals("private", discover.getMember("cacheScope").asString());
+        assertEquals(
+                "2026-07-28",
+                discover.getMember("supportedVersions").asList().getFirst().asString());
+        assertNotNull(discover.getMember("capabilities").getMember("tools"));
+        assertNotNull(discover.getMember("capabilities").getMember("prompts"));
+        assertEquals(
+                "smithy-mcp-server",
+                discover.getMember("_meta")
+                        .getMember("io.modelcontextprotocol/serverInfo")
+                        .getMember("name")
+                        .asString());
+
+        write("tools/list", modernParams(Map.of()));
+        var tools = read().getResult();
+        assertEquals("complete", tools.getMember("resultType").asString());
+        assertEquals(0, tools.getMember("ttlMs").asNumber().intValue());
+        assertEquals("private", tools.getMember("cacheScope").asString());
+        assertEquals(6, tools.getMember("tools").asList().size());
+
+        write("ping", modernParams(Map.of()));
+        assertEquals(-32601, read().getError().getCode());
+    }
+
+    @Test
+    public void modernProtocolRejectsMissingMetadata() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        var incompleteMeta = Document.of(Map.of(
+                "_meta",
+                Document.of(Map.of(
+                        "io.modelcontextprotocol/protocolVersion",
+                        Document.of("2026-07-28")))));
+        write("server/discover", incompleteMeta);
+        assertEquals(-32602, read().getError().getCode());
+    }
+
+    @Test
+    public void noOutputSchemaWithUnsupportedProtocolVersion() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_03_26);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoInputOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoInputOperation", tool.get("name").asString());
+        assertNotNull(tool.get("inputSchema"));
+        assertNull(tool.get("outputSchema"));
+    }
+
+    @Test
+    public void validateToolsList() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var result = response.getResult().asStringMap();
+        var tools = result.get("tools").asList();
+
+        assertEquals(6, tools.size());
+
+        var toolNames = tools.stream()
+                .map(tool -> tool.asStringMap().get("name").asString())
+                .toList();
+
+        assertTrue(toolNames.contains("NoIOOperation"));
+        assertTrue(toolNames.contains("NoOutputOperation"));
+        assertTrue(toolNames.contains("TestOperation"));
+        assertTrue(toolNames.contains("NoInputOperation"));
+        assertTrue(toolNames.contains("ReadOnlyOperation"));
+        assertTrue(toolNames.contains("IdempotentOperation"));
+    }
+
+    @Test
+    public void validateNoIOOperationTool() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoIOOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoIOOperation", tool.get("name").asString());
+        assertEquals("This tool invokes NoIOOperation API of TestService.", tool.get("description").asString());
+
+        validateEmptySchema(tool.get("inputSchema").asStringMap());
+        validateEmptySchema(tool.get("outputSchema").asStringMap());
+    }
+
+    @Test
+    public void validateNoOutputOperationTool() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoOutputOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoOutputOperation", tool.get("name").asString());
+        assertEquals("This tool invokes NoOutputOperation API of TestService.", tool.get("description").asString());
+
+        var inputSchema = tool.get("inputSchema").asStringMap();
+        assertEquals("object", inputSchema.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", inputSchema.get("$schema").asString());
+        assertTrue(inputSchema.get("required").asList().isEmpty());
+
+        var properties = inputSchema.get("properties").asStringMap();
+        assertTrue(properties.containsKey("inputStr"));
+        var inputStr = properties.get("inputStr").asStringMap();
+        assertEquals("string", inputStr.get("type").asString());
+
+        validateEmptySchema(tool.get("outputSchema").asStringMap());
+    }
+
+    @Test
+    public void validateNoInputOperationTool() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("NoInputOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("NoInputOperation", tool.get("name").asString());
+        assertEquals("This tool invokes NoInputOperation API of TestService.", tool.get("description").asString());
+
+        validateEmptySchema(tool.get("inputSchema").asStringMap());
+
+        var outputSchema = tool.get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", outputSchema.get("$schema").asString());
+        assertTrue(outputSchema.get("required").asList().isEmpty());
+
+        var properties = outputSchema.get("properties").asStringMap();
+        assertTrue(properties.containsKey("outputStr"));
+        var outputStr = properties.get("outputStr").asStringMap();
+        assertEquals("string", outputStr.get("type").asString());
+    }
+
+    @Test
+    public void validateTestOperationTool() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("TestOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertEquals("TestOperation", tool.get("name").asString());
+        assertEquals("A TestOperation", tool.get("description").asString());
+
+        validateTestInputSchema(tool.get("inputSchema").asStringMap());
+        validateTestInputSchema(tool.get("outputSchema").asStringMap());
+    }
+
+    @Test
+    void readOnlyOperationHasReadOnlyHintAnnotation() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ReadOnlyOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        var annotations = tool.get("annotations").asStringMap();
+        assertTrue(annotations.get("readOnlyHint").asBoolean());
+        assertNull(annotations.get("idempotentHint"));
+    }
+
+    @Test
+    void idempotentOperationHasIdempotentHintAnnotation() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("IdempotentOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        var annotations = tool.get("annotations").asStringMap();
+        assertTrue(annotations.get("idempotentHint").asBoolean());
+        assertNull(annotations.get("readOnlyHint"));
+    }
+
+    @Test
+    void plainOperationHasNoAnnotations() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(null);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("TestOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertNull(tool.get("annotations"));
+    }
+
+    @Test
+    void annotationsStrippedForOldProtocolVersion() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2024_11_05);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ReadOnlyOperation"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        assertNull(tool.get("annotations"));
+    }
+
+    @Test
+    void testNumberAndStringIds() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Test with numeric ID
+        write("tools/list", Document.of(Map.of()), Document.of(42));
+        var response = read();
+        assertEquals(42, response.getId().asNumber().intValue());
+        assertNotNull(response.getResult());
+
+        // Test with long ID
+        var longId = (long) Integer.MAX_VALUE + 1;
+        write("tools/list", Document.of(Map.of()), Document.of(longId));
+        response = read();
+        assertEquals(longId, response.getId().asLong());
+        assertNotNull(response.getResult());
+
+        // Test with arbitrary precision integer ID
+        var bigIntegerId = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE);
+        write("tools/list", Document.of(Map.of()), Document.of(bigIntegerId));
+        response = read();
+        assertEquals(bigIntegerId, response.getId().asBigInteger());
+        assertNotNull(response.getResult());
+
+        // Test with string ID
+        write("tools/list", Document.of(Map.of()), Document.of("test-id-1"));
+        response = read();
+        assertEquals("test-id-1", response.getId().asString());
+        assertNotNull(response.getResult());
+
+        // Test sequence: number -> string -> number -> string
+        write("tools/list", Document.of(Map.of()), Document.of(1));
+        response = read();
+        assertEquals(1, response.getId().asNumber().intValue());
+
+        write("tools/list", Document.of(Map.of()), Document.of("mixed-test"));
+        response = read();
+        assertEquals("mixed-test", response.getId().asString());
+
+        write("tools/list", Document.of(Map.of()), Document.of(999));
+        response = read();
+        assertEquals(999, response.getId().asNumber().intValue());
+
+        write("tools/list", Document.of(Map.of()), Document.of("final-string-id"));
+        response = read();
+        assertEquals("final-string-id", response.getId().asString());
+    }
+
+    @Test
+    void testInvalidIds() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Test with boolean ID (should fail)
+        write("tools/list", Document.of(Map.of()), Document.of(true));
+        var response = read();
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("Request id is of invalid type"));
+
+        // Test with double ID (should fail)
+        write("tools/list", Document.of(Map.of()), Document.of(3.14));
+        response = read();
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("Request id is of invalid type"));
+
+        // Test with array ID (should fail)
+        write("tools/list",
+                Document.of(Map.of()),
+                Document.of(List.of(Document.of(1), Document.of(2), Document.of(3))));
+        response = read();
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("Request id is of invalid type"));
+
+        // Test with object ID (should fail)
+        write("tools/list", Document.of(Map.of()), Document.of(Map.of("key", Document.of("value"))));
+        response = read();
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("Request id is of invalid type"));
+    }
+
+    @Test
+    void testRequestsRequireIds() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // JSON-RPC treats any request without an ID as a notification, even when the
+        // method name is not in the notifications namespace.
+        write("tools/list", Document.of(Map.of()), null);
+        output.assertNoOutput();
+    }
+
+    @Test
+    void testInputAdaptation() {
+        AtomicReference<StructDocument> capturedInput = new AtomicReference<>();
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .clientConfigurator(
+                                        clientConfigurator -> clientConfigurator
+                                                .addInterceptor(new ClientInterceptor() {
+                                                    @Override
+                                                    public void readBeforeSerialization(InputHook<?, ?> hook) {
+                                                        capturedInput.set((StructDocument) hook.input());
+                                                    }
+                                                }))
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        var bigDecimalValue = BigDecimal.valueOf(Integer.MAX_VALUE).add(BigDecimal.TEN);
+        var bigIntegerValue = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(100));
+        var blobValue = "Hello, World!";
+        var blobValueBase64 = Base64.getEncoder().encodeToString(blobValue.getBytes(StandardCharsets.UTF_8));
+        var nestedBigDecimalValue = new BigDecimal("123.456");
+        var nestedBigIntegerValue = new BigInteger("9876543210");
+        var nestedBlobValue = "Nested blob content";
+        var nestedBlobValueBase64 =
+                Base64.getEncoder().encodeToString(nestedBlobValue.getBytes(StandardCharsets.UTF_8));
+
+        write("tools/call",
+                Document.of(
+                        Map.of("name",
+                                Document.of("TestOperation"),
+                                "arguments",
+                                Document.of(Map.of(
+                                        "bigDecimalField",
+                                        Document.of(bigDecimalValue.toString()),
+                                        "bigIntegerField",
+                                        Document.of(bigIntegerValue.toString()),
+                                        "blobField",
+                                        Document.of(blobValueBase64),
+                                        "nestedWithBigNumbers",
+                                        Document.of(Map.of(
+                                                "nestedBigDecimal",
+                                                Document.of(nestedBigDecimalValue.toString()),
+                                                "nestedBigInteger",
+                                                Document.of(nestedBigIntegerValue.toString()),
+                                                "nestedBlob",
+                                                Document.of(nestedBlobValueBase64),
+                                                "bigDecimalList",
+                                                Document.of(List.of(
+                                                        Document.of("100.25"),
+                                                        Document.of("200.75"))))))))));
+        assertNotNull(read());
+        var inputDocument = capturedInput.get();
+
+        var bigDecimalField = inputDocument.getMember("bigDecimalField");
+        assertNotNull(bigDecimalField);
+        assertEquals(ShapeType.BIG_DECIMAL, bigDecimalField.type());
+        assertEquals(bigDecimalValue, bigDecimalField.asBigDecimal());
+
+        var bigIntegerField = inputDocument.getMember("bigIntegerField");
+        assertNotNull(bigIntegerField);
+        assertEquals(ShapeType.BIG_INTEGER, bigIntegerField.type());
+        assertEquals(bigIntegerValue, bigIntegerField.asBigInteger());
+
+        var blobField = inputDocument.getMember("blobField");
+        assertNotNull(blobField);
+        assertEquals(ShapeType.BLOB, blobField.type());
+        // Blob is sent as Base64 encoded string, decoded to bytes
+        assertEquals(blobValue, new String(blobField.asBlob().array(), StandardCharsets.UTF_8));
+
+        var nestedWithBigNumbers = inputDocument.getMember("nestedWithBigNumbers");
+        assertNotNull(nestedWithBigNumbers);
+        assertEquals(ShapeType.STRUCTURE, nestedWithBigNumbers.type());
+
+        var nestedStruct = (StructDocument) nestedWithBigNumbers;
+
+        var nestedBigDecimalField = nestedStruct.getMember("nestedBigDecimal");
+        assertNotNull(nestedBigDecimalField);
+        assertEquals(ShapeType.BIG_DECIMAL, nestedBigDecimalField.type());
+        assertEquals(nestedBigDecimalValue, nestedBigDecimalField.asBigDecimal());
+
+        var nestedBigIntegerField = nestedStruct.getMember("nestedBigInteger");
+        assertNotNull(nestedBigIntegerField);
+        assertEquals(ShapeType.BIG_INTEGER, nestedBigIntegerField.type());
+        assertEquals(nestedBigIntegerValue, nestedBigIntegerField.asBigInteger());
+
+        var nestedBlobField = nestedStruct.getMember("nestedBlob");
+        assertNotNull(nestedBlobField);
+        assertEquals(ShapeType.BLOB, nestedBlobField.type());
+        assertEquals(nestedBlobValue, new String(nestedBlobField.asBlob().array(), StandardCharsets.UTF_8));
+
+        var bigDecimalListField = nestedStruct.getMember("bigDecimalList");
+        assertNotNull(bigDecimalListField);
+        assertEquals(ShapeType.LIST, bigDecimalListField.type());
+        var bigDecimalList = bigDecimalListField.asList();
+        assertEquals(2, bigDecimalList.size());
+        assertEquals(ShapeType.BIG_DECIMAL, bigDecimalList.get(0).type());
+        assertEquals(ShapeType.BIG_DECIMAL, bigDecimalList.get(1).type());
+        assertEquals(new BigDecimal("100.25"), bigDecimalList.get(0).asBigDecimal());
+        assertEquals(new BigDecimal("200.75"), bigDecimalList.get(1).asBigDecimal());
+
+        server.shutdown().join();
+    }
+
+    @Test
+    void testNotificationsDoNotRequireRequestId() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Test notifications/initialized without ID (should not produce any error response)
+        writeNotification("notifications/initialized", Document.of(Map.of()));
+        output.assertNoOutput();
+
+        // Test another notification to ensure it's consistently handled
+        writeNotification("notifications/progress", Document.of(Map.of("progressToken", Document.of("test"))));
+        output.assertNoOutput();
+
+        // Send a regular request to verify the server is still functioning
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        assertNotNull(response.getResult());
+    }
+
+    @Test
+    void testUnknownMethodReturnsMethodNotFound() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("nonexistent/method", Document.of(Map.of()), Document.of(42));
+        var response = read();
+        assertEquals("2.0", response.getJsonrpc());
+        assertEquals(42, response.getId().asNumber().intValue());
+        assertNull(response.getResult());
+        assertNotNull(response.getError());
+        assertEquals(-32601, response.getError().getCode());
+        assertTrue(response.getError().getMessage().contains("nonexistent/method"));
+
+        // String ids must be echoed back with their original type
+        write("server/discover", Document.of(Map.of()), Document.of("discover-1"));
+        response = read();
+        assertEquals("discover-1", response.getId().asString());
+        assertNull(response.getResult());
+        assertEquals(-32601, response.getError().getCode());
+
+        // Known methods are unaffected
+        write("ping", Document.of(Map.of()), Document.of(43));
+        response = read();
+        assertEquals(43, response.getId().asNumber().intValue());
+        assertNull(response.getError());
+        assertNotNull(response.getResult());
+    }
+
+    @Test
+    void testUnknownNotificationIsSilentlyDropped() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Unknown notifications (no id) must not receive a Method not found error
+        writeNotification("notifications/does-not-exist", Document.of(Map.of()));
+        output.assertNoOutput();
+
+        // Known notifications remain silently dropped
+        writeNotification("notifications/initialized", Document.of(Map.of()));
+        output.assertNoOutput();
+
+        // The next response on the wire belongs to the follow-up request, not a late error
+        write("tools/list", Document.of(Map.of()), Document.of(7));
+        var response = read();
+        assertEquals(7, response.getId().asNumber().intValue());
+        assertNotNull(response.getResult());
+    }
+
+    @Test
+    void testPromptsList() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("prompts/list", Document.of(Map.of()));
+        var response = read();
+        var prompts = response.getResult().asStringMap().get("prompts").asList();
+
+        prompts.forEach(prompt -> System.out.println(prompt.asStringMap()));
+        assertEquals(2, prompts.size());
+
+        // Check the prompt (service and operation have same name, so only one is returned)
+        var servicePrompt = prompts.stream()
+                .filter(p -> p.asStringMap().get("name").asString().equals("search_users"))
+                .findFirst()
+                .orElseThrow();
+        var servicePromptMap = servicePrompt.asStringMap();
+        assertEquals("search_users", servicePromptMap.get("name").asString());
+        assertEquals("Test Template", servicePromptMap.get("description").asString());
+        assertTrue(servicePromptMap.get("arguments").asList().isEmpty());
+
+        var promptNames = prompts.stream()
+                .map(p -> p.asStringMap().get("name").asString())
+                .toList();
+        assertTrue(promptNames.contains("search_users"));
+        assertTrue(promptNames.contains("perform_operation"));
+
+        for (String name : promptNames) {
+            assertEquals(name.toLowerCase(), name, "Prompt name should be normalized to lowercase: " + name);
+        }
+    }
+
+    @Test
+    void testPromptsGetWithValidPrompt() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("search_users"))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+
+        assertEquals("Test Template", result.get("description").asString());
+        var messages = result.get("messages").asList();
+        assertEquals(1, messages.size());
+
+        var message = messages.get(0).asStringMap();
+        assertEquals("user", message.get("role").asString());
+        var content = message.get("content").asStringMap();
+        assertEquals("text", content.get("type").asString());
+        assertEquals("Search for if many results expected.", content.get("text").asString());
+    }
+
+    @Test
+    void testPromptsGetWithDifferentCasing() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Test with uppercase prompt name
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("SEARCH_USERS"))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+
+        assertEquals("Test Template", result.get("description").asString());
+        var messages = result.get("messages").asList();
+        assertEquals(1, messages.size());
+
+        var message = messages.get(0).asStringMap();
+        assertEquals("user", message.get("role").asString());
+        var content = message.get("content").asStringMap();
+        assertEquals("text", content.get("type").asString());
+        assertEquals("Search for if many results expected.", content.get("text").asString());
+
+        // Test with mixed case prompt name
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("Search_Users"))));
+        response = read();
+        result = response.getResult().asStringMap();
+
+        assertEquals("Test Template", result.get("description").asString());
+        messages = result.get("messages").asList();
+        assertEquals(1, messages.size());
+
+        message = messages.get(0).asStringMap();
+        assertEquals("user", message.get("role").asString());
+        content = message.get("content").asStringMap();
+        assertEquals("text", content.get("type").asString());
+        assertEquals("Search for if many results expected.", content.get("text").asString());
+
+        // Test with perform_operation prompt in different case
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("PERFORM_OPERATION"))));
+        response = read();
+        result = response.getResult().asStringMap();
+
+        assertEquals("perform operation", result.get("description").asString());
+        messages = result.get("messages").asList();
+        assertEquals(1, messages.size());
+
+        message = messages.get(0).asStringMap();
+        assertEquals("user", message.get("role").asString());
+        content = message.get("content").asStringMap();
+        assertEquals("text", content.get("type").asString());
+        assertEquals("use tool TestOperation with some information.", content.get("text").asString());
+    }
+
+    @Test
+    void testPromptsGetWithInvalidPrompt() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("nonexistent_prompt"))));
+        var response = read();
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("Prompt not found: nonexistent_prompt"));
+
+        // Test with invalid prompt in different case - should still fail
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NONEXISTENT_PROMPT"))));
+        response = read();
+        assertNotNull(response.getError());
+        assertTrue(response.getError().getMessage().contains("Prompt not found: NONEXISTENT_PROMPT"));
+    }
+
+    @Test
+    void testPromptsGetWithTemplateArguments() {
+        var modelWithArgs = Model.assembler()
+                .addUnparsedModel("test-with-args.smithy", PROMPT_WITH_ARGS)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.args#TestServiceWithArgs"))
+                                .proxyEndpoint("http://localhost")
+                                .model(modelWithArgs)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Test with arguments provided
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("search_with_args"),
+                        "arguments",
+                        Document.of(Map.of(
+                                "query",
+                                Document.of("test query"),
+                                "limit",
+                                Document.of("10"))))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+
+        var messages = result.get("messages").asList();
+        var message = messages.get(0).asStringMap();
+        var content = message.get("content").asStringMap();
+        assertEquals("Search for test query with limit 10", content.get("text").asString());
+    }
+
+    @Test
+    void testPromptsGetWithMissingRequiredArguments() {
+        var modelWithArgs = Model.assembler()
+                .addUnparsedModel("test-with-args.smithy", PROMPT_WITH_ARGS)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.args#TestServiceWithArgs"))
+                                .proxyEndpoint("http://localhost")
+                                .model(modelWithArgs)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Test without required arguments
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("search_with_args"))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+
+        var messages = result.get("messages").asList();
+        var message = messages.get(0).asStringMap();
+        assertEquals("user", message.get("role").asString());
+        var content = message.get("content").asStringMap();
+        assertTrue(content.get("text").asString().contains("missing arguments"));
+        assertTrue(content.get("text").asString().contains("query"));
+    }
+
+    @Test
+    void testApplyTemplateArgumentsEdgeCases() {
+        var modelEdgeCases = Model.assembler()
+                .addUnparsedModel("test-edge-cases.smithy", PROMPT_EDGE_CASES)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.edge#TestServiceEdgeCases"))
+                                .proxyEndpoint("http://localhost")
+                                .model(modelEdgeCases)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Test with empty template
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("empty_template"))));
+        var response = read();
+        var result = response.getResult().asStringMap();
+        var messages = result.get("messages").asList();
+        var message = messages.get(0).asStringMap();
+        var content = message.get("content").asStringMap();
+        assertEquals("", content.get("text").asString());
+
+        // Test with no placeholders
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("no_placeholders"))));
+        response = read();
+        result = response.getResult().asStringMap();
+        messages = result.get("messages").asList();
+        message = messages.get(0).asStringMap();
+        content = message.get("content").asStringMap();
+        assertEquals("This has no placeholders", content.get("text").asString());
+
+        // Test with multiple same placeholders
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("duplicate_placeholders"),
+                        "arguments",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("John"))))));
+        response = read();
+        result = response.getResult().asStringMap();
+        messages = result.get("messages").asList();
+        message = messages.get(0).asStringMap();
+        content = message.get("content").asStringMap();
+        assertEquals("Hello John, welcome John!", content.get("text").asString());
+
+        // Test with missing argument (should leave placeholder as-is when no arguments provided)
+        write("prompts/get",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("missing_arg_template"))));
+        response = read();
+        result = response.getResult().asStringMap();
+        messages = result.get("messages").asList();
+        message = messages.get(0).asStringMap();
+        content = message.get("content").asStringMap();
+        assertEquals("Hello {{name}}, how are you?", content.get("text").asString());
+    }
+
+    private void validateEmptySchema(Map<String, Document> schema) {
+        assertEquals("object", schema.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", schema.get("$schema").asString());
+        assertTrue(schema.get("properties").asStringMap().isEmpty());
+        assertTrue(schema.get("required").asList().isEmpty());
+    }
+
+    private void validateTestInputSchema(Map<String, Document> schema) {
+        assertEquals("object", schema.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", schema.get("$schema").asString());
+        assertEquals("An input for TestOperation with a nested member", schema.get("description").asString());
+        assertTrue(schema.get("required").asList().isEmpty());
+
+        var properties = schema.get("properties").asStringMap();
+
+        var str = properties.get("str").asStringMap();
+        assertEquals("string", str.get("type").asString());
+        assertEquals("It's a string", str.get("description").asString());
+
+        var blobField = properties.get("blobField").asStringMap();
+        assertEquals("string", blobField.get("type").asString());
+
+        var bigIntegerField = properties.get("bigIntegerField").asStringMap();
+        assertEquals("string", bigIntegerField.get("type").asString());
+
+        var bigDecimalField = properties.get("bigDecimalField").asStringMap();
+        assertEquals("string", bigDecimalField.get("type").asString());
+
+        validateNestedWithBigNumbers(properties.get("nestedWithBigNumbers").asStringMap());
+        validateNestedStructure(properties.get("nested").asStringMap(),
+                "The nested member. A structure that can be nested");
+        validateNestedList(properties.get("list").asStringMap());
+        validateDoubleNestedList(properties.get("doubleNestedList").asStringMap());
+    }
+
+    private void validateNestedWithBigNumbers(Map<String, Document> nestedSchema) {
+        assertEquals("object", nestedSchema.get("type").asString());
+        assertEquals("A structure containing big number types", nestedSchema.get("description").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", nestedSchema.get("$schema").asString());
+        assertTrue(nestedSchema.get("required").asList().isEmpty());
+
+        var properties = nestedSchema.get("properties").asStringMap();
+
+        var nestedBigDecimal = properties.get("nestedBigDecimal").asStringMap();
+        assertEquals("string", nestedBigDecimal.get("type").asString());
+        assertEquals("A nested BigDecimal", nestedBigDecimal.get("description").asString());
+
+        var nestedBigInteger = properties.get("nestedBigInteger").asStringMap();
+        assertEquals("string", nestedBigInteger.get("type").asString());
+        assertEquals("A nested BigInteger", nestedBigInteger.get("description").asString());
+
+        var nestedBlob = properties.get("nestedBlob").asStringMap();
+        assertEquals("string", nestedBlob.get("type").asString());
+        assertEquals("A nested Blob", nestedBlob.get("description").asString());
+
+        var bigDecimalList = properties.get("bigDecimalList").asStringMap();
+        assertEquals("array", bigDecimalList.get("type").asString());
+        assertFalse(bigDecimalList.get("uniqueItems").asBoolean());
+        var listItems = bigDecimalList.get("items").asStringMap();
+        assertEquals("string", listItems.get("type").asString());
+    }
+
+    private void validateNestedList(Map<String, Document> listSchema) {
+        assertEquals("array", listSchema.get("type").asString());
+        assertFalse(listSchema.get("uniqueItems").asBoolean());
+
+        var listItems = listSchema.get("items").asStringMap();
+        validateNestedStructure(listItems, "A structure that can be nested");
+    }
+
+    private void validateDoubleNestedList(Map<String, Document> doubleListSchema) {
+        assertEquals("array", doubleListSchema.get("type").asString());
+        assertFalse(doubleListSchema.get("uniqueItems").asBoolean());
+
+        var outerItems = doubleListSchema.get("items").asStringMap();
+        assertEquals("array", outerItems.get("type").asString());
+        assertFalse(outerItems.get("uniqueItems").asBoolean());
+
+        var innerItems = outerItems.get("items").asStringMap();
+        validateNestedStructure(innerItems, "A structure that can be nested");
+    }
+
+    private void validateNestedStructure(Map<String, Document> nestedSchema, String expectedDescription) {
+        assertEquals("object", nestedSchema.get("type").asString());
+        assertEquals(expectedDescription, nestedSchema.get("description").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", nestedSchema.get("$schema").asString());
+        assertTrue(nestedSchema.get("required").asList().isEmpty());
+
+        var properties = nestedSchema.get("properties").asStringMap();
+
+        var nestedStr = properties.get("nestedStr").asStringMap();
+        assertEquals("string", nestedStr.get("type").asString());
+        assertEquals("A string that's nested", nestedStr.get("description").asString());
+
+        var nestedDocument = properties.get("nestedDocument").asStringMap();
+        var documentTypesDocs = nestedDocument.get("type").asList();
+        var documentTypes = documentTypesDocs.stream().map(Document::asString).toList();
+        assertEquals(6, documentTypes.size());
+        assertTrue(documentTypes.contains("string"));
+        assertTrue(documentTypes.contains("number"));
+        assertTrue(documentTypes.contains("boolean"));
+        assertTrue(documentTypes.contains("object"));
+        assertTrue(documentTypes.contains("array"));
+        assertTrue(documentTypes.contains("null"));
+
+        var recursive = properties.get("recursive").asStringMap();
+        assertEquals("object", recursive.get("type").asString());
+        assertEquals("A field that recurses back into us. A structure that references itself recursively",
+                recursive.get("description").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", recursive.get("$schema").asString());
+        assertTrue(recursive.get("required").asList().isEmpty());
+
+        var recursiveProperties = recursive.get("properties").asStringMap();
+        assertTrue(recursiveProperties.containsKey("nested"));
+        var nestedRecursive = recursiveProperties.get("nested").asStringMap();
+        assertEquals("object", nestedRecursive.get("type").asString());
+        assertEquals("http://json-schema.org/draft-07/schema#", nestedRecursive.get("$schema").asString());
+    }
+
+    private void write(String method, Document document) {
+        write(method, document, Document.of(id++));
+    }
+
+    private void write(String method, Document document, Document requestId) {
+        var request = JsonRpcRequest.builder()
+                .id(requestId)
+                .method(method)
+                .params(document)
+                .jsonrpc("2.0")
+                .build();
+        input.write(CODEC.serializeToString(request));
+        input.write("\n");
+    }
+
+    private JsonRpcResponse read() {
+        var line = assertTimeoutPreemptively(Duration.ofSeconds(1), output::read, "No response within one second");
+        return CODEC.deserializeShape(line, JsonRpcResponse.builder());
+    }
+
+    private void writeNotification(String method, Document params) {
+        var request = JsonRpcRequest.builder()
+                .method(method)
+                .params(params)
+                .jsonrpc("2.0")
+                .build();
+        input.write(CODEC.serializeToString(request));
+        input.write("\n");
+    }
+
+    private static final String MODEL_STR =
+            """
+                    $version: "2"
+
+                    namespace smithy.test
+
+                    use smithy.ai#prompts
+
+                    /// A TestService
+                    @aws.protocols#awsJson1_0
+                    @prompts({
+                        search_users: { description: "Test Template", template: "Search for if many results expected." }
+                    })
+                    service TestService {
+                        operations: [TestOperation, NoInputOperation, NoOutputOperation, NoIOOperation, ReadOnlyOperation, IdempotentOperation]
+                    }
+
+                    operation NoOutputOperation {
+                        input := {
+                            inputStr: String
+                        }
+                    }
+
+                    operation NoInputOperation {
+                        output := {
+                            outputStr: String
+                        }
+                    }
+
+                    operation NoIOOperation {}
+
+                    @readonly
+                    operation ReadOnlyOperation {
+                        input := {
+                            query: String
+                        }
+                        output := {
+                            result: String
+                        }
+                    }
+
+                    @idempotent
+                    operation IdempotentOperation {
+                        input := {
+                            key: String
+                        }
+                        output := {
+                            value: String
+                        }
+                    }
+
+                    /// A TestOperation
+                    @prompts({
+                        perform_operation: { description: "perform operation", template: "use tool TestOperation with some information." }
+                    })
+                    operation TestOperation {
+                        input: TestInput
+                        output: TestInput
+                    }
+
+                    /// An input for TestOperation with a nested member
+                    structure TestInput {
+                        /// It's a string
+                        str: String
+
+                        /// The nested member
+                        nested: Nested
+
+                        list: NestedList
+
+                        doubleNestedList: DoubleNestedList
+
+                        bigDecimalField: BigDecimal
+
+                        bigIntegerField: BigInteger
+
+                        blobField: Blob
+
+                        nestedWithBigNumbers: NestedWithBigNumbers
+                    }
+
+                    list NestedList {
+                        member: Nested
+                    }
+
+                    list DoubleNestedList {
+                        member: NestedList
+                    }
+
+                    /// A structure that can be nested
+                    structure Nested {
+                        /// A string that's nested
+                        nestedStr: String
+
+                        /// A document that's nested
+                        nestedDocument: Document
+
+                        /// A field that recurses back into us
+                        recursive: Recursive
+                    }
+
+                    /// A structure that references itself recursively
+                    structure Recursive {
+                        /// the nested field that points back to us
+                        nested: Nested
+                    }
+
+                    /// A structure containing big number types
+                    structure NestedWithBigNumbers {
+                        /// A nested BigDecimal
+                        nestedBigDecimal: BigDecimal
+
+                        /// A nested BigInteger
+                        nestedBigInteger: BigInteger
+
+                        /// A nested Blob
+                        nestedBlob: Blob
+
+                        /// A list of BigDecimals
+                        bigDecimalList: BigDecimalList
+                    }
+
+                    list BigDecimalList {
+                        member: BigDecimal
+                    }""";
+
+    private static final String PROMPT_WITH_ARGS =
+            """
+                    $version: "2"
+
+                    namespace smithy.test.args
+
+                    use smithy.ai#prompts
+                    use aws.protocols#awsJson1_0
+
+                    @awsJson1_0
+                    @prompts({
+                        search_with_args: {
+                            description: "Search with arguments",
+                            template: "Search for {{query}} with limit {{limit}}",
+                            arguments: SearchArgs
+                        }
+                    })
+                    service TestServiceWithArgs {
+                        operations: []
+                    }
+
+                    structure SearchArgs {
+                        @required
+                        query: String
+
+                        limit: String
+                    }""";
+
+    private static final String PROMPT_EDGE_CASES =
+            """
+                    $version: "2"
+
+                    namespace smithy.test.edge
+
+                    use smithy.ai#prompts
+                    use aws.protocols#awsJson1_0
+
+                    @awsJson1_0
+                    @prompts({
+                        empty_template: {
+                            description: "Empty template",
+                            template: ""
+                        },
+                        no_placeholders: {
+                            description: "No placeholders",
+                            template: "This has no placeholders"
+                        },
+                        duplicate_placeholders: {
+                            description: "Duplicate placeholders",
+                            template: "Hello {{name}}, welcome {{name}}!",
+                            arguments: NameArgs
+                        },
+                        missing_arg_template: {
+                            description: "Missing argument",
+                            template: "Hello {{name}}, how are you?"
+                        }
+                    })
+                    service TestServiceEdgeCases {
+                        operations: []
+                    }
+
+                    structure NameArgs {
+                        name: String
+                    }""";
+
+    private static final Model MODEL = Model.assembler()
+            .addUnparsedModel("test.smithy", MODEL_STR)
+            .discoverModels()
+            .assemble()
+            .unwrap();
+
+    private static final String UNION_MODEL_STR =
+            """
+                    $version: "2"
+
+                    namespace smithy.test.union
+
+                    use smithy.mcp#oneOf
+
+                    @aws.protocols#awsJson1_0
+                    service TestUnionService {
+                        operations: [ProcessShape, ProcessShapeWithOneOf]
+                    }
+
+                    /// Process a regular union (no @oneOf trait)
+                    operation ProcessShape {
+                        input: ProcessShapeInput
+                        output: ProcessShapeOutput
+                    }
+
+                    /// Process a union with @oneOf trait (discriminator transformation)
+                    operation ProcessShapeWithOneOf {
+                        input: ProcessShapeWithOneOfInput
+                        output: ProcessShapeWithOneOfOutput
+                    }
+
+                    structure ProcessShapeInput {
+                        shape: Shape
+                    }
+
+                    structure ProcessShapeOutput {
+                        shape: Shape
+                    }
+
+                    structure ProcessShapeWithOneOfInput {
+                        shape: ShapeWithOneOf
+                    }
+
+                    structure ProcessShapeWithOneOfOutput {
+                        shape: ShapeWithOneOf
+                    }
+
+                    /// Union without @oneOf trait - uses wrapper format natively
+                    union Shape {
+                        circle: Circle
+                        square: Square
+                    }
+
+                    /// Document with @oneOf trait - for testing Document-based polymorphic types
+                    @oneOf(discriminator: "__type", members: [
+                        {name: "circle", target: Circle},
+                        {name: "square", target: Square}
+                    ])
+                    document ShapeWithOneOf
+
+                    structure Circle {
+                        @required
+                        radius: Integer
+                    }
+
+                    structure Square {
+                        @required
+                        side: Integer
+                    }""";
+
+    private static final Model UNION_MODEL = Model.assembler()
+            .addUnparsedModel("test-union.smithy", UNION_MODEL_STR)
+            .discoverModels()
+            .assemble()
+            .unwrap();
+
+    @Test
+    void testUnionSchemaGeneratesOneOfWithWrappedMembers() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.union#TestUnionService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(UNION_MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        // Find ProcessShape tool and validate its input schema
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ProcessShape"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        var inputSchema = tool.get("inputSchema").asStringMap();
+        var properties = inputSchema.get("properties").asStringMap();
+        var shapeProperty = properties.get("shape").asStringMap();
+
+        // Union should have oneOf array with wrapped member variants
+        var oneOf = shapeProperty.get("oneOf").asList();
+        assertEquals(2, oneOf.size(), "Union should have 2 oneOf variants");
+
+        // Each variant should be an object with one property
+        for (var variant : oneOf) {
+            var variantMap = variant.asStringMap();
+            assertEquals("object", variantMap.get("type").asString());
+            var variantProps = variantMap.get("properties").asStringMap();
+            assertEquals(1, variantProps.size(), "Each variant should have exactly one property");
+            var required = variantMap.get("required").asList();
+            assertEquals(1, required.size(), "Each variant should have one required property");
+            assertFalse(variantMap.get("additionalProperties").asBoolean(), "additionalProperties should be false");
+        }
+
+        // Verify the member names are circle and square
+        var memberNames = oneOf.stream()
+                .flatMap(v -> v.asStringMap().get("properties").asStringMap().keySet().stream())
+                .toList();
+        assertTrue(memberNames.contains("circle"));
+        assertTrue(memberNames.contains("square"));
+    }
+
+    @Test
+    void testUnionWithOneOfTraitSchemaAlsoGeneratesOneOf() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.union#TestUnionService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(UNION_MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        // Find ProcessShapeWithOneOf tool
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ProcessShapeWithOneOf"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        var inputSchema = tool.get("inputSchema").asStringMap();
+        var properties = inputSchema.get("properties").asStringMap();
+        var shapeProperty = properties.get("shape").asStringMap();
+
+        // Document with @oneOf should have oneOf array generated from trait members
+        var oneOf = shapeProperty.get("oneOf").asList();
+        assertEquals(2, oneOf.size(), "Document with @oneOf should have 2 oneOf variants");
+    }
+
+    @Test
+    void testToolsListChangedNotificationInvalidatesCache() {
+        var callCounter = new AtomicInteger(0);
+        var mockProxy = new CacheTestProxy(callCounter);
+
+        var service = McpEngine.builder()
+                .name("test")
+                .remoteClients(List.of(mockProxy))
+                .build();
+
+        var notifications = new ArrayList<JsonRpcRequest>();
+        service.bindTransport(notifications::add, ignored -> {});
+
+        // Initialize to set up proxies
+        var initRequest = JsonRpcRequest.builder()
+                .method("initialize")
+                .id(Document.of(1))
+                .params(Document.of(Map.of("protocolVersion", Document.of("2024-11-05"))))
+                .jsonrpc("2.0")
+                .build();
+        service.execute(initRequest, ProtocolVersion.defaultVersion());
+
+        // Verify notifications/initialized was sent during initialization
+        assertTrue(mockProxy.getSentNotifications().contains("notifications/initialized"),
+                "notifications/initialized should be sent during initialization");
+
+        // First tools/list - fetches from proxy
+        var toolsRequest = JsonRpcRequest.builder()
+                .method("tools/list")
+                .id(Document.of(2))
+                .params(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+        service.execute(toolsRequest, ProtocolVersion.defaultVersion());
+        assertEquals(1, callCounter.get(), "First call should fetch from proxy");
+
+        // Second tools/list - uses cache
+        service.execute(toolsRequest, ProtocolVersion.defaultVersion());
+        assertEquals(1, callCounter.get(), "Second call should use cache");
+
+        // Send tools/list_changed notification
+        var notification = JsonRpcRequest.builder()
+                .method("notifications/tools/list_changed")
+                .params(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+        mockProxy.sendNotification(notification);
+
+        // Verify notification was forwarded
+        assertEquals(1, notifications.size());
+        assertEquals("notifications/tools/list_changed", notifications.get(0).getMethod());
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
+            while (callCounter.get() < 2) {
+                Thread.sleep(10);
+            }
+        });
+
+        // Third tools/list - should use the asynchronously refreshed cache
+        service.execute(toolsRequest, ProtocolVersion.defaultVersion());
+        assertEquals(2, callCounter.get(), "Notification should refresh before the third call");
+
+        // Fourth tools/list - uses cache again (counter should NOT increment)
+        service.execute(toolsRequest, ProtocolVersion.defaultVersion());
+        assertEquals(2, callCounter.get(), "Fourth call should use cache (not increment to 3)");
+    }
+
+    @Test
+    void testOtherNotificationsDoNotInvalidateCache() {
+        var callCounter = new AtomicInteger(0);
+        var mockProxy = new CacheTestProxy(callCounter);
+
+        var service = McpEngine.builder()
+                .name("test")
+                .remoteClients(List.of(mockProxy))
+                .build();
+
+        var notifications = new ArrayList<JsonRpcRequest>();
+        service.bindTransport(notifications::add, ignored -> {});
+
+        // Initialize
+        var initRequest = JsonRpcRequest.builder()
+                .method("initialize")
+                .id(Document.of(1))
+                .params(Document.of(Map.of("protocolVersion", Document.of("2024-11-05"))))
+                .jsonrpc("2.0")
+                .build();
+        service.execute(initRequest, ProtocolVersion.defaultVersion());
+
+        // Verify notifications/initialized was sent during initialization
+        assertTrue(mockProxy.getSentNotifications().contains("notifications/initialized"),
+                "notifications/initialized should be sent during initialization");
+
+        // First tools/list
+        var toolsRequest = JsonRpcRequest.builder()
+                .method("tools/list")
+                .id(Document.of(2))
+                .params(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+        service.execute(toolsRequest, ProtocolVersion.defaultVersion());
+        assertEquals(1, callCounter.get());
+
+        // Send different notification
+        var notification = JsonRpcRequest.builder()
+                .method("notifications/prompts/list_changed")
+                .params(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+        mockProxy.sendNotification(notification);
+
+        assertEquals(1, notifications.size());
+        assertEquals("notifications/prompts/list_changed", notifications.get(0).getMethod());
+
+        // Second tools/list - should still use cache
+        service.execute(toolsRequest, ProtocolVersion.defaultVersion());
+        assertEquals(1, callCounter.get(), "Cache should not be invalidated by other notifications");
+    }
+
+    private static class CacheTestProxy extends McpRemoteClient {
+        private final AtomicInteger callCounter;
+        private final List<String> sentNotifications = new ArrayList<>();
+
+        CacheTestProxy(AtomicInteger callCounter) {
+            this.callCounter = callCounter;
+        }
+
+        @Override
+        public List<ToolInfo> listTools() {
+            callCounter.incrementAndGet();
+            return List.of(
+                    ToolInfo.builder()
+                            .name("test-tool")
+                            .description("Test")
+                            .inputSchema(JsonObjectSchema.builder().build())
+                            .build());
+        }
+
+        @Override
+        public List<PromptInfo> listPrompts() {
+            return List.of();
+        }
+
+        @Override
+        protected JsonRpcResponse exchange(JsonRpcRequest request) {
+            // Notifications have no ID
+            if (request.getId() == null) {
+                sentNotifications.add(request.getMethod());
+                return null;
+            }
+            return JsonRpcResponse.builder()
+                    .id(request.getId())
+                    .result(Document.of(Map.of()))
+                    .jsonrpc("2.0")
+                    .build();
+        }
+
+        List<String> getSentNotifications() {
+            return sentNotifications;
+        }
+
+        @Override
+        public void start() {}
+
+        @Override
+        public void close() {}
+
+        @Override
+        public String name() {
+            return "cache-test";
+        }
+
+        void sendNotification(JsonRpcRequest notification) {
+            notify(notification);
+        }
+    }
+
+    // ==================== Read-only hooks ====================
+
+    @Test
+    void testReadBeforeAndAfterExecution() {
+        var capturedMethod = new AtomicReference<String>();
+        var capturedResponse = new AtomicReference<McpOutcome>();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionContext hook) {
+                        capturedMethod.set(hook.call().method().wireName());
+                    }
+
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        capturedResponse.set(response);
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        read();
+
+        assertEquals("ping", capturedMethod.get());
+        assertNotNull(capturedResponse.get());
+    }
+
+    @Test
+    void testReadBeforeAndAfterToolCallLocal() {
+        var capturedToolName = new AtomicReference<String>();
+        var capturedServerId = new AtomicReference<String>();
+        var capturedIsProxy = new AtomicReference<Boolean>();
+        var afterToolCallFired = new AtomicReference<>(false);
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readBeforeToolCall(McpToolExecutionContext hook) {
+                        capturedToolName.set(hook.call().name());
+                        capturedServerId.set(hook.serverId());
+                        capturedIsProxy.set(hook.remote());
+                    }
+
+                    @Override
+                    public void readAfterToolCall(
+                            McpToolExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        afterToolCallFired.set(true);
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertEquals("NoIOOperation", capturedToolName.get());
+        assertEquals("test-mcp", capturedServerId.get());
+        assertFalse(capturedIsProxy.get());
+        assertTrue(afterToolCallFired.get());
+    }
+
+    @Test
+    void testReadBeforeAndAfterToolCallProxy() {
+        var capturedToolName = new AtomicReference<String>();
+        var capturedIsProxy = new AtomicReference<Boolean>();
+        var afterToolCallFired = new AtomicReference<>(false);
+        var mockProxy = new CacheTestProxy(new AtomicInteger(0));
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .addRemoteClient(mockProxy)
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readBeforeToolCall(McpToolExecutionContext hook) {
+                        capturedToolName.set(hook.call().name());
+                        capturedIsProxy.set(hook.remote());
+                    }
+
+                    @Override
+                    public void readAfterToolCall(
+                            McpToolExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        afterToolCallFired.set(true);
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("test-tool"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertEquals("test-tool", capturedToolName.get());
+        assertTrue(capturedIsProxy.get());
+        assertTrue(afterToolCallFired.get());
+    }
+
+    @Test
+    void testReadAfterExecutionAlwaysFires() {
+        var afterCount = new AtomicInteger(0);
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        afterCount.incrementAndGet();
+                    }
+                })
+                .build();
+
+        server.start();
+
+        write("ping", Document.of(Map.of()));
+        read();
+        assertEquals(1, afterCount.get());
+
+        writeNotification("notifications/initialized", Document.of(Map.of()));
+        output.assertNoOutput();
+        assertEquals(2, afterCount.get());
+
+        write("ping", Document.of(Map.of()));
+        read();
+        assertEquals(3, afterCount.get());
+    }
+
+    @Test
+    void testReadAfterToolCallFiresWhenBeforeToolCallThrows() {
+        var afterToolCallFired = new AtomicReference<>(false);
+        var capturedErrorMessage = new AtomicReference<String>();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readBeforeToolCall(McpToolExecutionContext hook) {
+                        throw new RuntimeException("blocked");
+                    }
+
+                    @Override
+                    public void readAfterToolCall(
+                            McpToolExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        afterToolCallFired.set(true);
+                        if (error != null) {
+                            capturedErrorMessage.set(error.getMessage());
+                        }
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        var response = read();
+
+        assertTrue(afterToolCallFired.get());
+        assertEquals("blocked", capturedErrorMessage.get());
+        assertEquals(-32603, response.getError().getCode());
+        assertEquals("Internal error", response.getError().getMessage());
+    }
+
+    @Test
+    void testReadAfterExecutionFiresForProxyToolCall() {
+        var afterExecutionFired = new AtomicReference<>(false);
+        var mockProxy = new CacheTestProxy(new AtomicInteger(0));
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .addRemoteClient(mockProxy)
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        afterExecutionFired.set(true);
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("test-tool"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertTrue(afterExecutionFired.get());
+    }
+
+    @Test
+    void testReadBeforeExecutionThrowSkipsToolHooks() {
+        var beforeToolCallFired = new AtomicReference<>(false);
+        var afterExecutionError = new AtomicReference<RuntimeException>();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionContext hook) {
+                        if ("tools/call".equals(hook.call().method().wireName())) {
+                            throw new RuntimeException("execution-blocked");
+                        }
+                    }
+
+                    @Override
+                    public void readBeforeToolCall(McpToolExecutionContext hook) {
+                        beforeToolCallFired.set(true);
+                    }
+
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        if ("tools/call".equals(hook.call().method().wireName())) {
+                            afterExecutionError.set(error);
+                        }
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertFalse(beforeToolCallFired.get());
+        assertNotNull(afterExecutionError.get());
+        assertEquals("execution-blocked", afterExecutionError.get().getMessage());
+    }
+
+    @Test
+    void testContextPassesBetweenReadHooks() {
+        var duration = new AtomicReference<Long>();
+        Context.Key<Long> START_KEY =
+                Context.key("start");
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionContext hook) {
+                        hook.requestContext().attributes().put(START_KEY, System.nanoTime());
+                    }
+
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        long start = hook.requestContext().attributes().get(START_KEY);
+                        duration.set(System.nanoTime() - start);
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        read();
+
+        assertNotNull(duration.get());
+        assertTrue(duration.get() > 0);
+    }
+
+    // ==================== Modify-only hooks ====================
+
+    @Test
+    void testModifyBeforeExecutionRewritesRequest() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public McpCall modifyBeforeExecution(McpExecutionContext hook) {
+                        return new McpCall.Ping(hook.call().id(), hook.call().metadata());
+                    }
+                })
+                .build();
+
+        server.start();
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        assertTrue(response.getResult().asStringMap().isEmpty());
+    }
+
+    @Test
+    void testModifyBeforeToolCallModifiesRequest() {
+        var modifyHookCalled = new AtomicReference<>(false);
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public McpCall.CallTool modifyBeforeToolCall(McpToolExecutionContext hook) {
+                        modifyHookCalled.set(true);
+                        return hook.call();
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        var response = read();
+
+        assertTrue(modifyHookCalled.get());
+        assertNotNull(response);
+    }
+
+    @Test
+    void testModifyAfterExecutionTransformsResponse() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public McpOutcome modifyAfterExecution(
+                            McpExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        if (error != null) {
+                            throw error;
+                        }
+                        return new McpOutcome.Success(
+                                hook.call().id(),
+                                Document.of(Map.of("modified", Document.of("true"))));
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        var response = read();
+
+        assertEquals("true", response.getResult().getMember("modified").asString());
+    }
+
+    @Test
+    void testModifyAfterToolCallTransformsResponse() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public McpOutcome modifyAfterToolCall(
+                            McpToolExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        // Always return custom response, ignoring any tool error
+                        return new McpOutcome.Success(
+                                hook.call().id(),
+                                Document.of(Map.of("tool-modified", Document.of("true"))));
+                    }
+                })
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        var response = read();
+
+        assertEquals("true", response.getResult().getMember("tool-modified").asString());
+    }
+
+    // ==================== Error handling ====================
+
+    @Test
+    void testReadBeforeExecutionThrowShortCircuits() {
+        var afterExecutionError = new AtomicReference<RuntimeException>();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionContext hook) {
+                        throw new RuntimeException("blocked");
+                    }
+
+                    @Override
+                    public void readAfterExecution(
+                            McpExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        afterExecutionError.set(error);
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        var response = read();
+
+        assertNotNull(response.getError());
+        assertEquals(-32603, response.getError().getCode());
+        assertEquals("Internal error", response.getError().getMessage());
+        assertNotNull(afterExecutionError.get());
+        assertEquals("blocked", afterExecutionError.get().getMessage());
+    }
+
+    @Test
+    void testModifyAfterExecutionCanRecoverFromError() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public void readBeforeExecution(McpExecutionContext hook) {
+                        throw new RuntimeException("original-error");
+                    }
+
+                    @Override
+                    public McpOutcome modifyAfterExecution(
+                            McpExecutionContext hook,
+                            McpOutcome response,
+                            RuntimeException error
+                    ) {
+                        // Recover from the error by returning a success response
+                        return new McpOutcome.Success(hook.call().id(), Document.of(Map.of()));
+                    }
+                })
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        var response = read();
+
+        assertNull(response.getError());
+        assertNotNull(response.getResult());
+    }
+
+    // ==================== Chain composition ====================
+
+    @Test
+    void testChainReadHooksInvokedInOrder() {
+        var order = new ArrayList<String>();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(McpInterceptor.chain(List.of(
+                        new McpInterceptor() {
+                            @Override
+                            public void readBeforeExecution(McpExecutionContext hook) {
+                                order.add("A-before");
+                            }
+
+                            @Override
+                            public void readAfterExecution(
+                                    McpExecutionContext hook,
+                                    McpOutcome response,
+                                    RuntimeException error
+                            ) {
+                                order.add("A-after");
+                            }
+                        },
+                        new McpInterceptor() {
+                            @Override
+                            public void readBeforeExecution(McpExecutionContext hook) {
+                                order.add("B-before");
+                            }
+
+                            @Override
+                            public void readAfterExecution(
+                                    McpExecutionContext hook,
+                                    McpOutcome response,
+                                    RuntimeException error
+                            ) {
+                                order.add("B-after");
+                            }
+                        })))
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        read();
+
+        assertEquals(List.of("A-before", "B-before", "A-after", "B-after"), order);
+    }
+
+    @Test
+    void testChainModifyBeforeToolCallPropagatesRequest() {
+        var replacement = new AtomicReference<McpCall.CallTool>();
+        var capturedRequest = new AtomicReference<McpCall.CallTool>();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(McpInterceptor.chain(List.of(
+                        new McpInterceptor() {
+                            @Override
+                            public McpCall.CallTool modifyBeforeToolCall(McpToolExecutionContext hook) {
+                                var call = hook.call();
+                                var modified = new McpCall.CallTool(
+                                        call.id(),
+                                        call.name(),
+                                        call.arguments(),
+                                        call.metadata());
+                                replacement.set(modified);
+                                return modified;
+                            }
+                        },
+                        new McpInterceptor() {
+                            @Override
+                            public McpCall.CallTool modifyBeforeToolCall(McpToolExecutionContext hook) {
+                                capturedRequest.set(hook.call());
+                                return hook.call();
+                            }
+                        })))
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        read();
+
+        assertNotNull(capturedRequest.get());
+        assertTrue(replacement.get() == capturedRequest.get());
+    }
+
+    @Test
+    void testChainModifyAfterExecutionErrorPropagates() {
+        // When a modify hook throws, the exception propagates immediately (no try/catch in
+        // chain modify hooks, matching ClientInterceptorChain). The caller converts it to
+        // an error response.
+        var secondInterceptorCalled = new AtomicReference<>(false);
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(McpInterceptor.chain(List.of(
+                        new McpInterceptor() {
+                            @Override
+                            public McpOutcome modifyAfterExecution(
+                                    McpExecutionContext hook,
+                                    McpOutcome response,
+                                    RuntimeException error
+                            ) {
+                                throw new RuntimeException("first-error");
+                            }
+                        },
+                        new McpInterceptor() {
+                            @Override
+                            public McpOutcome modifyAfterExecution(
+                                    McpExecutionContext hook,
+                                    McpOutcome response,
+                                    RuntimeException error
+                            ) {
+                                secondInterceptorCalled.set(true);
+                                return response;
+                            }
+                        })))
+                .build();
+
+        server.start();
+        write("ping", Document.of(Map.of()));
+        var response = read();
+
+        // Second interceptor never runs — exception propagates immediately
+        assertFalse(secondInterceptorCalled.get());
+        assertNotNull(response.getError());
+        assertEquals(-32603, response.getError().getCode());
+        assertEquals("Internal error", response.getError().getMessage());
+    }
+
+    @Test
+    void testChainModifyAfterToolCallErrorPropagates() {
+        // When a modify hook throws, the exception propagates immediately (no try/catch in
+        // chain modify hooks, matching ClientInterceptorChain). The caller converts it to
+        // an error response.
+        var secondInterceptorCalled = new AtomicReference<>(false);
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .interceptor(McpInterceptor.chain(List.of(
+                        new McpInterceptor() {
+                            @Override
+                            public McpOutcome modifyAfterToolCall(
+                                    McpToolExecutionContext hook,
+                                    McpOutcome response,
+                                    RuntimeException error
+                            ) {
+                                throw new RuntimeException("tool-error");
+                            }
+                        },
+                        new McpInterceptor() {
+                            @Override
+                            public McpOutcome modifyAfterToolCall(
+                                    McpToolExecutionContext hook,
+                                    McpOutcome response,
+                                    RuntimeException error
+                            ) {
+                                secondInterceptorCalled.set(true);
+                                return response;
+                            }
+                        })))
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(null);
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("NoIOOperation"),
+                        "arguments",
+                        Document.of(Map.of()))));
+        var response = read();
+
+        // Second interceptor never runs — exception propagates immediately
+        assertFalse(secondInterceptorCalled.get());
+        assertNotNull(response.getError());
+        assertEquals(-32603, response.getError().getCode());
+        assertEquals("Internal error", response.getError().getMessage());
+    }
+}

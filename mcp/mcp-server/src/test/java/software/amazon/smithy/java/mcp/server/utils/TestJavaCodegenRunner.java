@@ -34,12 +34,33 @@ public final class TestJavaCodegenRunner {
                 .discoverModels(TestJavaCodegenRunner.class.getClassLoader())
                 .assemble()
                 .unwrap();
+        var fileManifest = FileManifest.create(Paths.get(System.getenv("output")));
+        execute(plugin,
+                model,
+                fileManifest,
+                "smithy.java.mcp.test#TestService",
+                "software.amazon.smithy.java.mcp.test");
+        execute(
+                plugin,
+                model,
+                fileManifest,
+                "software.amazon.smithy.java.mcp.conformance#ConformanceService",
+                "software.amazon.smithy.java.mcp.conformance");
+    }
+
+    private static void execute(
+            SmithyBuildPlugin plugin,
+            Model model,
+            FileManifest fileManifest,
+            String service,
+            String namespace
+    ) {
         PluginContext context = PluginContext.builder()
-                .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
+                .fileManifest(fileManifest)
                 .settings(
                         ObjectNode.builder()
-                                .withMember("service", "smithy.java.mcp.test#TestService")
-                                .withMember("namespace", "software.amazon.smithy.java.mcp.test")
+                                .withMember("service", service)
+                                .withMember("namespace", namespace)
                                 .withMember("modes", ArrayNode.fromStrings("server"))
                                 .withMember("runtimeTraits",
                                         fromStrings("smithy.api#documentation",
