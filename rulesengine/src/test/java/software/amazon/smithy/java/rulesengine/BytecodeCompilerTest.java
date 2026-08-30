@@ -231,9 +231,14 @@ class BytecodeCompilerTest {
         Rule rule = EndpointRule.builder()
                 .endpoint(Endpoint.builder()
                         .url(Literal.stringLiteral(
-                                Template.fromString("https://prefix.{host}/{bucket}")))
+                                Template.fromString("https://{region}.{host}/{bucket}/suffix")))
                         .build());
         Parameters params = Parameters.builder()
+                .addParameter(Parameter.builder()
+                        .name("region")
+                        .type(ParameterType.STRING)
+                        .required(true)
+                        .build())
                 .addParameter(Parameter.builder()
                         .name("host")
                         .type(ParameterType.STRING)
@@ -346,6 +351,32 @@ class BytecodeCompilerTest {
     }
 
     @Test
+    void testCompileTwoSegmentStringTemplateUsesResolveTemplate() {
+        Template template = Template.fromString("Hello {name}");
+        Condition condition = Condition.builder()
+                .fn(StringEquals.ofExpressions(
+                        Literal.stringLiteral(template),
+                        Literal.stringLiteral(Template.fromString("test"))))
+                .build();
+
+        Parameters params = Parameters.builder()
+                .addParameter(Parameter.builder()
+                        .name("name")
+                        .type(ParameterType.STRING)
+                        .required(true)
+                        .build())
+                .build();
+
+        EndpointBddTrait bdd = createBddWithConditionAndParams(condition, params);
+        BytecodeCompiler compiler = new BytecodeCompiler(extensions, bdd, functions, builtinProviders, Map.of());
+
+        Bytecode bytecode = compiler.compile();
+
+        assertOpcodeNotPresent(bytecode, Opcodes.BUILD_TEMPLATE);
+        assertOpcodePresent(bytecode, Opcodes.RESOLVE_TEMPLATE);
+    }
+
+    @Test
     void testCompileStringTemplateWithRegisterProperty() {
         Condition assignCondition = Condition.builder()
                 .fn(ParseUrl.ofExpressions(Expression.getReference(Identifier.of("url"))))
@@ -353,8 +384,8 @@ class BytecodeCompilerTest {
                 .build();
         Condition templateCondition = Condition.builder()
                 .fn(StringEquals.ofExpressions(
-                        Literal.stringLiteral(Template.fromString("https://{parsedUrl#authority}")),
-                        Literal.stringLiteral(Template.fromString("https://example.com"))))
+                        Literal.stringLiteral(Template.fromString("https://{parsedUrl#authority}/")),
+                        Literal.stringLiteral(Template.fromString("https://example.com/"))))
                 .build();
 
         Parameters params = Parameters.builder()

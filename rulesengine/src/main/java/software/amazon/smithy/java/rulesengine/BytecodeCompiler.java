@@ -39,6 +39,8 @@ import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
 
 final class BytecodeCompiler {
 
+    private static final int MIN_BUILD_TEMPLATE_SEGMENTS = 3;
+
     private final List<RulesExtension> extensions;
     private final EndpointBddTrait bdd;
     private final Map<String, Function<Context, Object>> builtinProviders;
@@ -250,7 +252,8 @@ final class BytecodeCompiler {
             return;
         }
 
-        if (segmentCount > 1 && tryCompileBuildTemplate(parts, start, end, leadingLiteral)) {
+        if (segmentCount >= MIN_BUILD_TEMPLATE_SEGMENTS
+                && tryCompileBuildTemplate(parts, start, end, leadingLiteral)) {
             return;
         }
 
