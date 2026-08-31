@@ -34,6 +34,16 @@ structure JsonRpcErrorResponse {
     data: Document
 }
 
+/// Error data for the -32022 UnsupportedProtocolVersionError (MCP 2026-07-28): names the
+/// versions the server supports so the client can pick one and retry.
+structure UnsupportedProtocolVersionErrorData {
+    @required
+    supported: StringList
+
+    @required
+    requested: String
+}
+
 @private
 @length(min: 1)
 string NonEmptyString
@@ -81,6 +91,30 @@ structure ServerInfo {
 
     @required
     version: String
+}
+
+/// Result of the `server/discover` request (MCP 2026-07-28): advertises the protocol versions
+/// the server supports, its capabilities, and (in `_meta`) its identity.
+structure DiscoverResult {
+    @required
+    resultType: String = "complete"
+
+    @required
+    supportedVersions: StringList
+
+    @required
+    capabilities: Capabilities
+
+    @required
+    ttlMs: Long = 0
+
+    @required
+    cacheScope: String = "private"
+
+    instructions: String
+
+    @jsonName("_meta")
+    meta: Document
 }
 
 structure ListToolsResult {

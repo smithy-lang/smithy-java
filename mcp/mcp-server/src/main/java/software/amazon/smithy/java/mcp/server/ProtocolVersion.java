@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.mcp.server;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
@@ -63,6 +64,10 @@ public abstract sealed class ProtocolVersion implements Comparable<ProtocolVersi
                 v2025_06_18.INSTANCE,
                 v2025_11_25.INSTANCE);
         private static final ProtocolVersion LATEST = Collections.max(ALL);
+        private static final List<String> IDENTIFIERS_NEWEST_FIRST = ALL.stream()
+                .sorted(Comparator.reverseOrder())
+                .map(ProtocolVersion::identifier)
+                .toList();
     }
 
     private final String identifier;
@@ -109,5 +114,14 @@ public abstract sealed class ProtocolVersion implements Comparable<ProtocolVersi
      */
     public static ProtocolVersion latestVersion() {
         return SupportedVersions.LATEST;
+    }
+
+    /**
+     * Identifiers of every protocol version this server supports, newest first — the order
+     * clients expect in {@code server/discover} results and in the {@code supported} list of
+     * UnsupportedProtocolVersionError data.
+     */
+    public static List<String> supportedIdentifiers() {
+        return SupportedVersions.IDENTIFIERS_NEWEST_FIRST;
     }
 }
