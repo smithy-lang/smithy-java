@@ -40,6 +40,12 @@ class ProtocolVersionTest {
     }
 
     @Test
+    void latestVersionIs2025_11_25() {
+        assertInstanceOf(ProtocolVersion.v2025_11_25.class, ProtocolVersion.latestVersion());
+        assertEquals("2025-11-25", ProtocolVersion.latestVersion().identifier());
+    }
+
+    @Test
     void compareToOrdersChronologically() {
         assertTrue(ProtocolVersion.v2024_11_05.INSTANCE.compareTo(ProtocolVersion.v2025_03_26.INSTANCE) < 0);
         assertTrue(ProtocolVersion.v2025_03_26.INSTANCE.compareTo(ProtocolVersion.v2025_06_18.INSTANCE) < 0);

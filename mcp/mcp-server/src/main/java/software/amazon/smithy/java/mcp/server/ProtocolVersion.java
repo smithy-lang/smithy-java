@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.mcp.server;
 
+import java.util.Collections;
+import java.util.List;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -49,6 +51,20 @@ public abstract sealed class ProtocolVersion implements Comparable<ProtocolVersi
         }
     }
 
+    /**
+     * Holder defers initialization until first use so the version subclasses are fully loaded
+     * first — a plain static field on this class would read a still-null INSTANCE whenever a
+     * subclass is the first member of the hierarchy to be initialized.
+     */
+    private static final class SupportedVersions {
+        private static final List<ProtocolVersion> ALL = List.of(
+                v2024_11_05.INSTANCE,
+                v2025_03_26.INSTANCE,
+                v2025_06_18.INSTANCE,
+                v2025_11_25.INSTANCE);
+        private static final ProtocolVersion LATEST = Collections.max(ALL);
+    }
+
     private final String identifier;
 
     private ProtocolVersion(String identifier) {
@@ -72,17 +88,26 @@ public abstract sealed class ProtocolVersion implements Comparable<ProtocolVersi
     }
 
     public static ProtocolVersion version(String identifier) {
-        return switch (identifier) {
-            case null -> v2025_03_26.INSTANCE;
-            case "2024-11-05" -> v2024_11_05.INSTANCE;
-            case "2025-03-26" -> v2025_03_26.INSTANCE;
-            case "2025-06-18" -> v2025_06_18.INSTANCE;
-            case "2025-11-25" -> v2025_11_25.INSTANCE;
-            default -> new UnknownVersion(identifier);
-        };
+        if (identifier == null) {
+            return defaultVersion();
+        }
+        for (var version : SupportedVersions.ALL) {
+            if (version.identifier.equals(identifier)) {
+                return version;
+            }
+        }
+        return new UnknownVersion(identifier);
     }
 
     public static ProtocolVersion defaultVersion() {
         return v2025_03_26.INSTANCE;
+    }
+
+    /**
+     * The most recent protocol version this server supports, derived from the supported-version
+     * registry.
+     */
+    public static ProtocolVersion latestVersion() {
+        return SupportedVersions.LATEST;
     }
 }
