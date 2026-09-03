@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ProtocolVersionTest {
@@ -37,6 +38,19 @@ class ProtocolVersionTest {
     @Test
     void defaultVersionIs2025_03_26() {
         assertEquals("2025-03-26", ProtocolVersion.defaultVersion().identifier());
+    }
+
+    @Test
+    void latestVersionIs2025_11_25() {
+        assertInstanceOf(ProtocolVersion.v2025_11_25.class, ProtocolVersion.latestVersion());
+        assertEquals("2025-11-25", ProtocolVersion.latestVersion().identifier());
+    }
+
+    @Test
+    void supportedIdentifiersAreNewestFirst() {
+        assertEquals(
+                List.of("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"),
+                ProtocolVersion.supportedIdentifiers());
     }
 
     @Test

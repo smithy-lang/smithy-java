@@ -44,6 +44,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.OneOfTrait;
 import software.amazon.smithy.java.mcp.model.CallToolResult;
 import software.amazon.smithy.java.mcp.model.Capabilities;
+import software.amazon.smithy.java.mcp.model.DiscoverResult;
 import software.amazon.smithy.java.mcp.model.InitializeResult;
 import software.amazon.smithy.java.mcp.model.JsonArraySchema;
 import software.amazon.smithy.java.mcp.model.JsonDocumentSchema;
@@ -63,6 +64,7 @@ import software.amazon.smithy.java.mcp.model.TextContent;
 import software.amazon.smithy.java.mcp.model.ToolAnnotations;
 import software.amazon.smithy.java.mcp.model.ToolInfo;
 import software.amazon.smithy.java.mcp.model.Tools;
+import software.amazon.smithy.java.mcp.model.UnsupportedProtocolVersionErrorData;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -80,6 +82,9 @@ public final class McpService {
     private static final InternalLogger LOG = InternalLogger.getLogger(McpService.class);
     private static final Context.Key<Boolean> ASYNC_DISPATCH = Context.key("mcp.asyncDispatch");
     private static final int METHOD_NOT_FOUND_ERROR_CODE = -32601;
+    private static final int UNSUPPORTED_PROTOCOL_VERSION_ERROR_CODE = -32022;
+    private static final String PROTOCOL_VERSION_META_KEY = "io.modelcontextprotocol/protocolVersion";
+    private static final String SERVER_INFO_META_KEY = "io.modelcontextprotocol/serverInfo";
 
     private static final JsonCodec CODEC = JsonCodec.builder()
             .settings(JsonSettings.builder()
@@ -163,7 +168,9 @@ public final class McpService {
      *   <li><b>Asynchronous (callback):</b> For proxy tool calls, returns {@code null} and the callback
      *       is invoked when the proxy responds.</li>
      *   <li><b>Neither:</b> For notifications, returns {@code null} and the callback is never
-     *       invoked. Requests with unknown methods receive a -32601 (Method not found) error.</li>
+     *       invoked. Requests with unknown methods receive a -32601 (Method not found) error, and
+     *       requests naming an unsupported protocol version in {@code params._meta} receive a
+     *       -32022 (Unsupported protocol version) error.</li>
      * </ul>
      *
      * @param req The JSON-RPC request to handle
@@ -192,21 +199,25 @@ public final class McpService {
             // Dispatch
             validate(currentReq);
             var method = currentReq.getMethod();
-            response = switch (method) {
-                case "initialize" -> handleInitialize(currentReq);
-                case "ping" -> handlePing(currentReq);
-                default -> {
-                    initializeProxies(rpcResponse -> {});
-                    yield switch (method) {
-                        case "prompts/list" -> handlePromptsList(currentReq);
-                        case "prompts/get" -> handlePromptsGet(currentReq);
-                        case "tools/list" -> handleToolsList(currentReq, protocolVersion);
-                        case "tools/call" ->
-                            handleToolsCall(currentReq, asyncResponseCallback, protocolVersion, hook);
-                        default -> methodNotFound(currentReq);
-                    };
-                }
-            };
+            response = unsupportedProtocolVersion(method, currentReq);
+            if (response == null) {
+                response = switch (method) {
+                    case "initialize" -> handleInitialize(currentReq);
+                    case "ping" -> handlePing(currentReq);
+                    case "server/discover" -> handleServerDiscover(currentReq);
+                    default -> {
+                        initializeProxies(rpcResponse -> {});
+                        yield switch (method) {
+                            case "prompts/list" -> handlePromptsList(currentReq);
+                            case "prompts/get" -> handlePromptsGet(currentReq);
+                            case "tools/list" -> handleToolsList(currentReq, protocolVersion);
+                            case "tools/call" ->
+                                handleToolsCall(currentReq, asyncResponseCallback, protocolVersion, hook);
+                            default -> methodNotFound(currentReq);
+                        };
+                    }
+                };
+            }
             if (Boolean.TRUE.equals(hook.context().get(ASYNC_DISPATCH))) {
                 return null;
             }
@@ -231,9 +242,14 @@ public final class McpService {
         try {
             validate(req);
             var method = req.getMethod();
+            var versionError = unsupportedProtocolVersion(method, req);
+            if (versionError != null) {
+                return versionError;
+            }
             return switch (method) {
                 case "initialize" -> handleInitialize(req);
                 case "ping" -> handlePing(req);
+                case "server/discover" -> handleServerDiscover(req);
                 default -> {
                     initializeProxies(rpcResponse -> {});
                     yield switch (method) {
@@ -326,7 +342,11 @@ public final class McpService {
         String pv = null;
         if (maybeVersion != null) {
             var protocolVersion = ProtocolVersion.version(maybeVersion.asString());
-            if (!(protocolVersion instanceof ProtocolVersion.UnknownVersion)) {
+            if (protocolVersion instanceof ProtocolVersion.UnknownVersion) {
+                // Per the MCP spec, a server that does not support the requested protocol
+                // version must respond with the latest version it supports.
+                pv = ProtocolVersion.latestVersion().identifier();
+            } else {
                 pv = protocolVersion.identifier();
             }
         }
@@ -337,14 +357,8 @@ public final class McpService {
         }
 
         var result = builder
-                .capabilities(Capabilities.builder()
-                        .tools(Tools.builder().listChanged(true).build())
-                        .prompts(Prompts.builder().listChanged(true).build())
-                        .build())
-                .serverInfo(ServerInfo.builder()
-                        .name(serviceName)
-                        .version(version)
-                        .build())
+                .capabilities(serverCapabilities())
+                .serverInfo(serverInfo())
                 .build();
 
         return createSuccessResponse(req.getId(), result);
@@ -354,6 +368,83 @@ public final class McpService {
         return JsonRpcResponse.builder()
                 .id(req.getId())
                 .result(Document.of(Map.of()))
+                .jsonrpc("2.0")
+                .build();
+    }
+
+    /**
+     * Handles {@code server/discover} (MCP 2026-07-28), which servers must implement to advertise
+     * their supported protocol versions, capabilities, and identity. As the negotiation bootstrap
+     * it is answered regardless of the protocol version the request carries. Until the modern
+     * (2026-07-28) era is fully supported, the advertised versions are all handshake-era —
+     * an explicit legacy advertisement that dual-era clients answer by falling back to the
+     * {@code initialize} handshake.
+     */
+    private JsonRpcResponse handleServerDiscover(JsonRpcRequest req) {
+        var result = DiscoverResult.builder()
+                .supportedVersions(ProtocolVersion.supportedIdentifiers())
+                .capabilities(serverCapabilities())
+                .meta(Document.of(Map.of(SERVER_INFO_META_KEY, Document.of(serverInfo()))))
+                .build();
+        return createSuccessResponse(req.getId(), result);
+    }
+
+    private static Capabilities serverCapabilities() {
+        return Capabilities.builder()
+                .tools(Tools.builder().listChanged(true).build())
+                .prompts(Prompts.builder().listChanged(true).build())
+                .build();
+    }
+
+    private ServerInfo serverInfo() {
+        return ServerInfo.builder()
+                .name(serviceName)
+                .version(version)
+                .build();
+    }
+
+    /**
+     * Per MCP 2026-07-28, a request that names a protocol version this server does not implement
+     * (via the {@code io.modelcontextprotocol/protocolVersion} key of {@code params._meta}) must
+     * receive an UnsupportedProtocolVersionError (-32022) listing the versions the server does
+     * support. Returns {@code null} when the request may proceed: the method is a negotiation
+     * bootstrap ({@code initialize}, {@code server/discover}), no version was requested, the
+     * version is supported, or the message is a notification (JSON-RPC forbids responding).
+     */
+    private static JsonRpcResponse unsupportedProtocolVersion(String method, JsonRpcRequest req) {
+        if ("initialize".equals(method) || "server/discover".equals(method)) {
+            return null;
+        }
+        var params = req.getParams();
+        if (params == null) {
+            return null;
+        }
+        var meta = params.getMember("_meta");
+        if (meta == null) {
+            return null;
+        }
+        var requestedMember = meta.getMember(PROTOCOL_VERSION_META_KEY);
+        if (requestedMember == null || !requestedMember.isType(ShapeType.STRING)) {
+            return null;
+        }
+        var requested = requestedMember.asString();
+        if (!(ProtocolVersion.version(requested) instanceof ProtocolVersion.UnknownVersion)) {
+            return null;
+        }
+        if (req.getId() == null) {
+            return null;
+        }
+        var error = JsonRpcErrorResponse.builder()
+                .code(UNSUPPORTED_PROTOCOL_VERSION_ERROR_CODE)
+                .message("Unsupported protocol version")
+                .data(Document.of(UnsupportedProtocolVersionErrorData.builder()
+                        .supported(ProtocolVersion.supportedIdentifiers())
+                        .requested(requested)
+                        .build()))
+                .build();
+        return JsonRpcResponse.builder()
+                .id(req.getId())
+                .error(error)
                 .jsonrpc("2.0")
                 .build();
     }

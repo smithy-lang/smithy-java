@@ -156,6 +156,29 @@ public class McpServerTest {
     }
 
     @Test
+    public void initializeWithUnknownProtocolVersionAnswersLatestSupported() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Per the MCP spec, a server answers a request for a version it does not support with
+        // the latest version it supports — not the oldest.
+        write("initialize", Document.of(Map.of("protocolVersion", Document.of("2026-07-28"))));
+        var pv = read().getResult().getMember("protocolVersion").asString();
+        assertEquals("2025-11-25", pv);
+    }
+
+    @Test
     public void noOutputSchemaWithUnsupportedProtocolVersion() {
         server = McpServer.builder()
                 .name("smithy-mcp-server")
@@ -781,9 +804,9 @@ public class McpServerTest {
         assertTrue(response.getError().getMessage().contains("nonexistent/method"));
 
         // String ids must be echoed back with their original type
-        write("server/discover", Document.of(Map.of()), Document.of("discover-1"));
+        write("server/does-not-exist", Document.of(Map.of()), Document.of("unknown-1"));
         response = read();
-        assertEquals("discover-1", response.getId().asString());
+        assertEquals("unknown-1", response.getId().asString());
         assertNull(response.getResult());
         assertEquals(-32601, response.getError().getCode());
 
@@ -824,6 +847,152 @@ public class McpServerTest {
         var response = read();
         assertEquals(7, response.getId().asNumber().intValue());
         assertNotNull(response.getResult());
+    }
+
+    @Test
+    void testServerDiscoverReturnsDiscoverResult() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("server/discover", modernMeta("2026-07-28"), Document.of("discover-1"));
+        var response = read();
+        assertEquals("2.0", response.getJsonrpc());
+        assertEquals("discover-1", response.getId().asString());
+        assertNull(response.getError());
+
+        var result = response.getResult().asStringMap();
+        assertEquals("complete", result.get("resultType").asString());
+        assertEquals(0, result.get("ttlMs").asNumber().longValue());
+        assertEquals("private", result.get("cacheScope").asString());
+
+        // Newest first, so a client picks the most recent mutually supported version
+        var versions = result.get("supportedVersions").asList().stream().map(Document::asString).toList();
+        assertEquals(List.of("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"), versions);
+
+        var capabilities = result.get("capabilities").asStringMap();
+        assertTrue(capabilities.get("tools").asStringMap().get("listChanged").asBoolean());
+        assertTrue(capabilities.get("prompts").asStringMap().get("listChanged").asBoolean());
+
+        var serverInfo = result.get("_meta")
+                .asStringMap()
+                .get("io.modelcontextprotocol/serverInfo")
+                .asStringMap();
+        assertEquals("smithy-mcp-server", serverInfo.get("name").asString());
+        assertEquals("1.0.0", serverInfo.get("version").asString());
+    }
+
+    @Test
+    void testServerDiscoverIsAnsweredWithoutMeta() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Discover is the negotiation bootstrap: it answers with or without the modern envelope
+        write("server/discover", Document.of(Map.of()), Document.of(11));
+        var response = read();
+        assertEquals(11, response.getId().asNumber().intValue());
+        assertNull(response.getError());
+        assertNotNull(response.getResult().getMember("supportedVersions"));
+    }
+
+    @Test
+    void testUnsupportedProtocolVersionReturnsError() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("tools/list", modernMeta("2026-07-28"), Document.of(21));
+        var response = read();
+        assertEquals("2.0", response.getJsonrpc());
+        assertEquals(21, response.getId().asNumber().intValue());
+        assertNull(response.getResult());
+        assertEquals(-32022, response.getError().getCode());
+        assertEquals("Unsupported protocol version", response.getError().getMessage());
+
+        var data = response.getError().getData().asStringMap();
+        assertEquals("2026-07-28", data.get("requested").asString());
+        var supported = data.get("supported").asList().stream().map(Document::asString).toList();
+        assertEquals(List.of("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"), supported);
+
+        // The version rung fires before the method rung, mirroring the reference implementation
+        write("no/such/method", modernMeta("2026-07-28"), Document.of(22));
+        response = read();
+        assertEquals(-32022, response.getError().getCode());
+
+        // A supported version in _meta is served normally
+        write("tools/list", modernMeta("2025-11-25"), Document.of(23));
+        response = read();
+        assertEquals(23, response.getId().asNumber().intValue());
+        assertNull(response.getError());
+        assertNotNull(response.getResult().getMember("tools"));
+    }
+
+    @Test
+    void testUnsupportedProtocolVersionNotificationIsDropped() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // JSON-RPC forbids responding to notifications, even with an unsupported version
+        writeNotification("notifications/does-not-exist", modernMeta("2026-07-28"));
+        output.assertNoOutput();
+
+        write("ping", Document.of(Map.of()), Document.of(31));
+        var response = read();
+        assertEquals(31, response.getId().asNumber().intValue());
+        assertNotNull(response.getResult());
+    }
+
+    private static Document modernMeta(String version) {
+        return Document.of(Map.of("_meta",
+                Document.of(Map.of(
+                        "io.modelcontextprotocol/protocolVersion",
+                        Document.of(version),
+                        "io.modelcontextprotocol/clientInfo",
+                        Document.of(Map.of("name", Document.of("test-client"), "version", Document.of("0.0.1"))),
+                        "io.modelcontextprotocol/clientCapabilities",
+                        Document.of(Map.of())))));
     }
 
     @Test
