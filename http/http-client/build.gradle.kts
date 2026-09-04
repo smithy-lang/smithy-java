@@ -41,18 +41,18 @@ dependencies {
     testImplementation("io.netty:netty-all:4.2.17.Final")
     testImplementation("org.bouncycastle:bcpkix-jdk18on:1.85")
     // Jackson for HPACK test suite JSON parsing
-    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.22.1")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.22.2")
 
     // Jazzer for fuzz testing
     testImplementation(libs.jazzer.junit)
     testImplementation(libs.jazzer.api)
 
     // Add Apache HttpClient for benchmarking comparison
-    jmh("org.apache.httpcomponents.client5:httpclient5:5.6.3")
+    jmh("org.apache.httpcomponents.client5:httpclient5:5.6.4")
 
     // Helidon WebClient for benchmarking comparison
-    jmh("io.helidon.webclient:helidon-webclient:4.5.2")
-    jmh("io.helidon.webclient:helidon-webclient-http2:4.5.2")
+    jmh("io.helidon.webclient:helidon-webclient:4.5.3")
+    jmh("io.helidon.webclient:helidon-webclient-http2:4.5.3")
 
     // Netty for raw HTTP/2 benchmarking
     jmh("io.netty:netty-all:4.2.17.Final")
