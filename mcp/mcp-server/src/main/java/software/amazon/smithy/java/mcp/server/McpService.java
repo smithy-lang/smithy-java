@@ -326,7 +326,11 @@ public final class McpService {
         String pv = null;
         if (maybeVersion != null) {
             var protocolVersion = ProtocolVersion.version(maybeVersion.asString());
-            if (!(protocolVersion instanceof ProtocolVersion.UnknownVersion)) {
+            if (protocolVersion instanceof ProtocolVersion.UnknownVersion) {
+                // Per the MCP spec, a server that does not support the requested protocol
+                // version must respond with the latest version it supports.
+                pv = ProtocolVersion.latestVersion().identifier();
+            } else {
                 pv = protocolVersion.identifier();
             }
         }

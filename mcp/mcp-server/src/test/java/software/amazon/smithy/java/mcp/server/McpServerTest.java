@@ -156,6 +156,29 @@ public class McpServerTest {
     }
 
     @Test
+    public void initializeWithUnknownProtocolVersionAnswersLatestSupported() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Per the MCP spec, a server answers a request for a version it does not support with
+        // the latest version it supports — not the oldest.
+        write("initialize", Document.of(Map.of("protocolVersion", Document.of("2026-07-28"))));
+        var pv = read().getResult().getMember("protocolVersion").asString();
+        assertEquals("2025-11-25", pv);
+    }
+
+    @Test
     public void noOutputSchemaWithUnsupportedProtocolVersion() {
         server = McpServer.builder()
                 .name("smithy-mcp-server")
