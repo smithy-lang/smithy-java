@@ -125,6 +125,10 @@ structure JsonObjectSchema {
 
     description: String
 
+    /// Present when the object is a discriminated polymorphic type (see the smithy.mcp#oneOf
+    /// trait): the instance must additionally match exactly one of these variant schemas.
+    oneOf: JsonSchemaList
+
     @jsonName("$schema")
     schema: String = "http://json-schema.org/draft-07/schema#"
 }
