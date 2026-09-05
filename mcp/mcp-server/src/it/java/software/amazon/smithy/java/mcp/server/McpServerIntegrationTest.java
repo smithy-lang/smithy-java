@@ -133,13 +133,18 @@ class McpServerIntegrationTest {
     private ToolSchemas getMcpEchoToolSchemas() {
         write("tools/list", Document.of(Map.of()));
         var responseJson = readRawResponse();
-        var toolNode = OBJECT_MAPPER.readTree(responseJson).path("result").path("tools").get(0);
-        var inputSchemaNode = toolNode.path("inputSchema");
-        var outputSchemaNode = toolNode.path("outputSchema");
-        return new ToolSchemas(
-                SCHEMA_FACTORY.getSchema(inputSchemaNode),
-                SCHEMA_FACTORY.getSchema(outputSchemaNode),
-                toolNode);
+        var toolsNode = OBJECT_MAPPER.readTree(responseJson).path("result").path("tools");
+        for (var toolNode : toolsNode) {
+            if (toolNode.path("name").asString().equals("McpEcho")) {
+                var inputSchemaNode = toolNode.path("inputSchema");
+                var outputSchemaNode = toolNode.path("outputSchema");
+                return new ToolSchemas(
+                        SCHEMA_FACTORY.getSchema(inputSchemaNode),
+                        SCHEMA_FACTORY.getSchema(outputSchemaNode),
+                        toolNode);
+            }
+        }
+        throw new AssertionError("McpEcho tool not found");
     }
 
     private ToolSchemas getCalculateAreaToolSchemas() {
@@ -161,6 +166,19 @@ class McpServerIntegrationTest {
 
     private String readRawResponse() {
         return assertTimeoutPreemptively(Duration.ofSeconds(5), output::read, "No response within 5 seconds");
+    }
+
+    /** Returns the McpEcho tool's outputSchema node, located by name rather than list position. */
+    private JsonNode mcpEchoOutputSchemaNode() {
+        write("tools/list", Document.of(Map.of()));
+        var responseJson = readRawResponse();
+        var toolsNode = OBJECT_MAPPER.readTree(responseJson).path("result").path("tools");
+        for (var toolNode : toolsNode) {
+            if (toolNode.path("name").asString().equals("McpEcho")) {
+                return toolNode.path("outputSchema");
+            }
+        }
+        throw new AssertionError("McpEcho tool not found");
     }
 
     // ========== Protocol Version Tests ==========
@@ -862,14 +880,7 @@ class McpServerIntegrationTest {
         initializeLatestProtocol();
 
         // Get output schema from raw JSON (using Jackson directly)
-        write("tools/list", Document.of(Map.of()));
-        var toolsResponseJson = readRawResponse();
-        var toolsResponseNode = OBJECT_MAPPER.readTree(toolsResponseJson);
-        var outputSchemaNode = toolsResponseNode
-                .path("result")
-                .path("tools")
-                .get(0)
-                .path("outputSchema");
+        var outputSchemaNode = mcpEchoOutputSchemaNode();
 
         // Create input with the document value
         var echoData = new HashMap<String, Document>();
@@ -1347,14 +1358,7 @@ class McpServerIntegrationTest {
         initializeLatestProtocol();
 
         // Get output schema from raw JSON (using Jackson directly, not Smithy serializers)
-        write("tools/list", Document.of(Map.of()));
-        var toolsResponseJson = readRawResponse();
-        var toolsResponseNode = OBJECT_MAPPER.readTree(toolsResponseJson);
-        var outputSchemaNode = toolsResponseNode
-                .path("result")
-                .path("tools")
-                .get(0)
-                .path("outputSchema");
+        var outputSchemaNode = mcpEchoOutputSchemaNode();
 
         // Create comprehensive input
         var base64Blob = Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8));
@@ -1396,14 +1400,7 @@ class McpServerIntegrationTest {
         initializeLatestProtocol();
 
         // Get output schema from raw JSON (using Jackson directly)
-        write("tools/list", Document.of(Map.of()));
-        var toolsResponseJson = readRawResponse();
-        var toolsResponseNode = OBJECT_MAPPER.readTree(toolsResponseJson);
-        var outputSchemaNode = toolsResponseNode
-                .path("result")
-                .path("tools")
-                .get(0)
-                .path("outputSchema");
+        var outputSchemaNode = mcpEchoOutputSchemaNode();
 
         // Create input with all types
         var base64Blob = Base64.getEncoder().encodeToString("binary data".getBytes(StandardCharsets.UTF_8));

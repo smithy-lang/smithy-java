@@ -1,5 +1,99 @@
 # Change Log
 
+## 1.6.1 (9/2/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+* Added a configurable per-request timeout to the MCP stdio proxy.
+  ([#1336](https://github.com/smithy-lang/smithy-java/pull/1336))
+
+### Bug Fixes
+
+* Fixed AWS Query and EC2 Query serialization issues affecting long Unicode
+  strings, arbitrary-length `BigInteger` values, nested collection indexes,
+  and pooled serializer reuse.
+  ([#1343](https://github.com/smithy-lang/smithy-java/pull/1343))
+* Fixed GZIP request compression appending unused buffer capacity as trailing
+  zero bytes.
+  ([#1342](https://github.com/smithy-lang/smithy-java/pull/1342))
+* Fixed MCP `tools/list` and `prompts/list` pagination and made tool, prompt,
+  and proxy registries thread-safe to prevent `tools/list_changed` refresh
+  deadlocks.
+  ([#1336](https://github.com/smithy-lang/smithy-java/pull/1336))
+* Fixed unknown MCP JSON-RPC methods returning an empty response instead of a
+  `-32601` method-not-found error.
+  ([#1338](https://github.com/smithy-lang/smithy-java/pull/1338))
+
+### Improvements
+
+* Improved Query serialization performance for mixed Unicode strings and
+  oversized buffers.
+  ([#1343](https://github.com/smithy-lang/smithy-java/pull/1343))
+* Improved MCP registry safety by returning immutable proxy snapshots and
+  preserving deterministic tool and prompt insertion order.
+  ([#1336](https://github.com/smithy-lang/smithy-java/pull/1336))
+
+## 1.6.0 (8/25/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+* Added event stream support to the dynamic client, allowing event-stream
+  operations to be invoked without code generation.
+  ([#1328](https://github.com/smithy-lang/smithy-java/pull/1328))
+* Updated the dynamic client to resolve authentication per operation, honoring
+  `@auth` overrides, `@auth([])`, and `@optionalAuth` so that auth resolution
+  matches a code-generated client.
+  ([#1328](https://github.com/smithy-lang/smithy-java/pull/1328))
+
+### Bug Fixes
+
+* Fixed XML `isNull()` misclassifying structure list members as null.
+  ([#1330](https://github.com/smithy-lang/smithy-java/pull/1330))
+* Fixed a bug where the validator for unions produced an incorrect path.
+  ([#1314](https://github.com/smithy-lang/smithy-java/pull/1314))
+
+### Improvements
+
+* Improved XML string serialization by writing from compact Latin-1 storage.
+  ([#1327](https://github.com/smithy-lang/smithy-java/pull/1327))
+* Improved CBOR text serialization by writing from compact Latin-1 storage.
+  ([#1326](https://github.com/smithy-lang/smithy-java/pull/1326))
+* Improved JSON string serialization by writing compact strings in a single
+  validate-and-copy pass without requiring JVM flags.
+  ([#1324](https://github.com/smithy-lang/smithy-java/pull/1324))
+* Improved JSON deserialization performance, including faster in-order field
+  name matching, faster JSON string scanning, reading whole-number doubles
+  without the floating-point parser, and parsing ten-digit epoch seconds with a
+  single word compare.
+  ([#1323](https://github.com/smithy-lang/smithy-java/pull/1323),
+  [#1322](https://github.com/smithy-lang/smithy-java/pull/1322),
+  [#1321](https://github.com/smithy-lang/smithy-java/pull/1321),
+  [#1320](https://github.com/smithy-lang/smithy-java/pull/1320))
+* Improved generated builder performance by inlining presence tracking.
+  ([#1319](https://github.com/smithy-lang/smithy-java/pull/1319))
+* Improved JSON string serialization by reserving the exact encoded size and
+  escaping special characters in field names.
+  ([#1318](https://github.com/smithy-lang/smithy-java/pull/1318),
+  [#1317](https://github.com/smithy-lang/smithy-java/pull/1317))
+
+### Documentation
+
+* Updated the closure types example to demonstrate combined, types-only, and
+  no-types generation modes.
+  ([#1311](https://github.com/smithy-lang/smithy-java/pull/1311))
+
 ## 1.5.1 (8/7/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including

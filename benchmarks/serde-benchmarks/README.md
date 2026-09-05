@@ -39,7 +39,9 @@ happens once and is not measured.
 
 JMH is run in `SampleTime` mode so per-invocation latency samples are recorded;
 this gives the percentile distribution (p50/p90/p95/p99) needed by the shared
-serde benchmark output schema.
+serde benchmark output schema. A JMH profiler also measures process CPU time
+and reports `ops_per_cpu_sec`. The score is total operations divided by total
+process CPU time across the measurement iterations.
 
 ## Running
 
@@ -101,7 +103,8 @@ The resulting JSON conforms to the shared schema:
       "p90": 960.0,
       "p95": 994.0,
       "p99": 1116.0,
-      "std_dev": 15.0
+      "std_dev": 15.0,
+      "ops_per_cpu_sec": 1054852.0
     }
   ]
 }

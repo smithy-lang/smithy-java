@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import software.amazon.smithy.java.benchmarks.ProcessCpuTime;
 
 abstract class BenchmarkSupport {
 
@@ -46,14 +47,18 @@ abstract class BenchmarkSupport {
             }
 
             long startNs = System.nanoTime();
+            long totalCpuDuration = 0;
             int lastSampleCount = 0;
             for (int i = 0; i < config.measurementBatches(); i++) {
                 System.out.println("\nMeasurement batch " + (i + 1) + "/" + config.measurementBatches());
                 int operationsBefore = measuredCount.get();
                 long batchStart = System.nanoTime();
+                long batchCpuStart = ProcessCpuTime.now();
                 executeBatch(pool, action, true);
+                long batchCpuDuration = ProcessCpuTime.now() - batchCpuStart;
+                totalCpuDuration += batchCpuDuration;
                 long batchDuration = System.nanoTime() - batchStart;
-                printBatchResults(operationsBefore, batchDuration);
+                printBatchResults(operationsBefore, batchDuration, batchCpuDuration);
 
                 if (config.collectMetrics()) {
                     int now = monitor.sampleCount();
@@ -68,7 +73,7 @@ abstract class BenchmarkSupport {
             }
 
             System.out.println("\n=== OVERALL RESULTS ===");
-            printOverall(totalDuration);
+            printOverall(totalDuration, totalCpuDuration);
         }
     }
 
@@ -138,7 +143,7 @@ abstract class BenchmarkSupport {
         System.out.println("  Actions per batch: " + config.batchActions());
     }
 
-    private void printBatchResults(int startIndex, long batchDurationNs) {
+    private void printBatchResults(int startIndex, long batchDurationNs, long batchCpuDurationNs) {
         int endIndex = measuredCount.get();
         if (endIndex <= startIndex) {
             System.out.println("  No operations in this batch");
@@ -159,6 +164,7 @@ abstract class BenchmarkSupport {
                 count,
                 batchSec,
                 gbps);
+        printOpsPerCpuSecond("  ", count, batchCpuDurationNs);
         System.out.printf("  Latency (ms) - Avg: %.2f, P50: %.2f, P90: %.2f, P99: %.2f, Max: %.2f%n",
                 avgNs / 1e6,
                 p50 / 1e6,
@@ -167,7 +173,7 @@ abstract class BenchmarkSupport {
                 max / 1e6);
     }
 
-    private void printOverall(long totalDurationNs) {
+    private void printOverall(long totalDurationNs, long totalCpuDurationNs) {
         int count = measuredCount.get();
         if (count == 0) {
             System.out.println("No measurements collected");
@@ -186,6 +192,8 @@ abstract class BenchmarkSupport {
         System.out.println("Total operations: " + count);
         System.out.printf("Total data transferred: %.2f MiB%n", totalBytes / 1024.0 / 1024.0);
         System.out.printf("Total duration: %.2f seconds%n", totalSec);
+        System.out.printf("Process CPU time: %.2f seconds%n", totalCpuDurationNs / 1e9);
+        printOpsPerCpuSecond("", count, totalCpuDurationNs);
         System.out.printf("Throughput: %.2f Gbps%n", gbps);
         System.out.println("\nLatency (milliseconds):");
         System.out.printf("  Average: %.2f%n", avgNs / 1e6);
@@ -202,6 +210,16 @@ abstract class BenchmarkSupport {
             sum += values[i];
         }
         return count == 0 ? 0 : (double) sum / count;
+    }
+
+    private static void printOpsPerCpuSecond(String prefix, long operations, long cpuDurationNs) {
+        if (cpuDurationNs <= 0) {
+            System.out.println(prefix + "ops_per_cpu_sec: unavailable (CPU timer resolution too coarse)");
+        } else {
+            System.out.printf("%sops_per_cpu_sec: %.2f%n",
+                    prefix,
+                    ProcessCpuTime.operationsPerSecond(operations, cpuDurationNs));
+        }
     }
 
     @FunctionalInterface

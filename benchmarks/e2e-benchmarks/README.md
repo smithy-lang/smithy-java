@@ -2,6 +2,11 @@
 
 A small fixed-workload runner that exercises the smithy-java SDK against live AWS services.
 
+Each measurement reports `ops_per_cpu_sec` using process CPU time. Because
+these benchmarks call live AWS services, their results are not comparable to
+in-process serde benchmarks. Set `-De2e.collectMetrics=false` to exclude
+resource-monitoring overhead.
+
 ## Scope
 
 | Service  | Operation | Variant   |

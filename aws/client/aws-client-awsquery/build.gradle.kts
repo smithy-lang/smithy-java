@@ -1,5 +1,6 @@
 plugins {
     id("smithy-java.module-conventions")
+    id("smithy-java.jmh-conventions")
     id("smithy-java.protocol-testing-conventions")
 }
 

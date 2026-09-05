@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import software.amazon.smithy.java.benchmarks.OpsPerCpuSecondProfiler;
 import software.amazon.smithy.java.core.Version;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.Node;
@@ -58,7 +59,8 @@ import software.amazon.smithy.model.node.ObjectNode;
  *       "p90": <ns>,
  *       "p95": <ns>,
  *       "p99": <ns>,
- *       "std_dev": <ns>
+ *       "std_dev": <ns>,
+ *       "ops_per_cpu_sec": <operations per process CPU-second>
  *     }
  *   ]
  * }
@@ -184,6 +186,17 @@ public final class JmhResultConverter {
 
             var primary = result.getObjectMember("primaryMetric").orElse(Node.objectNode());
             var percentiles = primary.getObjectMember("scorePercentiles").orElse(Node.objectNode());
+            var opsPerCpuSec = result.getObjectMember("secondaryMetrics")
+                    .flatMap(metrics -> metrics.getObjectMember(OpsPerCpuSecondProfiler.METRIC_NAME))
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Missing JMH secondary metric '" + OpsPerCpuSecondProfiler.METRIC_NAME
+                                    + "' for benchmark case '" + id + "'"));
+            double opsPerCpuSecScore = opsPerCpuSec.getNumberMember("score")
+                    .map(NumberNode::getValue)
+                    .map(Number::doubleValue)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "JMH secondary metric '" + OpsPerCpuSecondProfiler.METRIC_NAME
+                                    + "' has no numeric score for benchmark case '" + id + "'"));
 
             entries.add(Node.objectNodeBuilder()
                     .withMember("id", id)
@@ -194,6 +207,7 @@ public final class JmhResultConverter {
                     .withMember("p95", doubleOf(percentiles, "95.0"))
                     .withMember("p99", doubleOf(percentiles, "99.0"))
                     .withMember("std_dev", doubleOf(primary, "scoreError"))
+                    .withMember("ops_per_cpu_sec", opsPerCpuSecScore)
                     .build());
         }
         return ArrayNode.fromNodes(entries.toArray(new ObjectNode[0]));
@@ -257,8 +271,8 @@ public final class JmhResultConverter {
             pw.println("Args: " + jvm.getStringMemberOrDefault("args", ""));
             pw.println("```");
 
-            pw.println("|id|n|mean|p50|p90|p95|p99|std_dev|");
-            pw.println("|----:|----:|----:|----:|----:|----:|----:|----:|");
+            pw.println("|id|n|mean|p50|p90|p95|p99|std_dev|ops_per_cpu_sec|");
+            pw.println("|----:|----:|----:|----:|----:|----:|----:|----:|----:|");
             for (Node bm : entries.getElements()) {
                 if (!bm.isObjectNode()) {
                     continue;
@@ -272,6 +286,7 @@ public final class JmhResultConverter {
                         + "|" + nf.format(Math.round(doubleOf(entry, "p95")))
                         + "|" + nf.format(Math.round(doubleOf(entry, "p99")))
                         + "|" + nf.format(Math.round(doubleOf(entry, "std_dev")))
+                        + "|" + nf.format(Math.round(doubleOf(entry, "ops_per_cpu_sec")))
                         + "|");
             }
         }

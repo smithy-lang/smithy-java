@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.mcp.server;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -751,6 +752,77 @@ public class McpServerTest {
         // Send a regular request to verify the server is still functioning
         write("tools/list", Document.of(Map.of()));
         var response = read();
+        assertNotNull(response.getResult());
+    }
+
+    @Test
+    void testUnknownMethodReturnsMethodNotFound() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("nonexistent/method", Document.of(Map.of()), Document.of(42));
+        var response = read();
+        assertEquals("2.0", response.getJsonrpc());
+        assertEquals(42, response.getId().asNumber().intValue());
+        assertNull(response.getResult());
+        assertNotNull(response.getError());
+        assertEquals(-32601, response.getError().getCode());
+        assertTrue(response.getError().getMessage().contains("nonexistent/method"));
+
+        // String ids must be echoed back with their original type
+        write("server/discover", Document.of(Map.of()), Document.of("discover-1"));
+        response = read();
+        assertEquals("discover-1", response.getId().asString());
+        assertNull(response.getResult());
+        assertEquals(-32601, response.getError().getCode());
+
+        // Known methods are unaffected
+        write("ping", Document.of(Map.of()), Document.of(43));
+        response = read();
+        assertEquals(43, response.getId().asNumber().intValue());
+        assertNull(response.getError());
+        assertNotNull(response.getResult());
+    }
+
+    @Test
+    void testUnknownNotificationIsSilentlyDropped() {
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        // Unknown notifications (no id) must not receive a Method not found error
+        writeNotification("notifications/does-not-exist", Document.of(Map.of()));
+        output.assertNoOutput();
+
+        // Known notifications remain silently dropped
+        writeNotification("notifications/initialized", Document.of(Map.of()));
+        output.assertNoOutput();
+
+        // The next response on the wire belongs to the follow-up request, not a late error
+        write("tools/list", Document.of(Map.of()), Document.of(7));
+        var response = read();
+        assertEquals(7, response.getId().asNumber().intValue());
         assertNotNull(response.getResult());
     }
 
@@ -1601,7 +1673,7 @@ public class McpServerTest {
     }
 
     @Test
-    void testToolsListChangedNotificationInvalidatesCache() {
+    void testToolsListChangedNotificationInvalidatesCache() throws InterruptedException {
         var callCounter = new AtomicInteger(0);
         var mockProxy = new CacheTestProxy(callCounter);
 
@@ -1626,7 +1698,7 @@ public class McpServerTest {
         assertTrue(mockProxy.getSentNotifications().contains("notifications/initialized"),
                 "notifications/initialized should be sent during initialization");
 
-        // First tools/list - fetches from proxy
+        // First tools/list - reads the tool set fetched from the proxy during initialize.
         var toolsRequest = JsonRpcRequest.builder()
                 .method("tools/list")
                 .id(Document.of(2))
@@ -1634,13 +1706,15 @@ public class McpServerTest {
                 .jsonrpc("2.0")
                 .build();
         service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
-        assertEquals(1, callCounter.get(), "First call should fetch from proxy");
+        assertEquals(1, callCounter.get(), "Only initialize should have fetched from the proxy so far");
 
-        // Second tools/list - uses cache
+        // Second tools/list - still just reads the registry, no proxy fetch.
         service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
-        assertEquals(1, callCounter.get(), "Second call should use cache");
+        assertEquals(1, callCounter.get(), "tools/list must not fetch from the proxy on its own");
 
-        // Send tools/list_changed notification
+        // Send tools/list_changed notification. The refresh runs asynchronously off the notifying
+        // thread (so the transport reader thread can't deadlock), so it fetches from the proxy a
+        // little later rather than inline.
         var notification = JsonRpcRequest.builder()
                 .method("notifications/tools/list_changed")
                 .params(Document.of(Map.of()))
@@ -1652,13 +1726,17 @@ public class McpServerTest {
         assertEquals(1, notifications.size());
         assertEquals("notifications/tools/list_changed", notifications.get(0).getMethod());
 
-        // Third tools/list - should refresh from proxy
-        service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
-        assertEquals(2, callCounter.get(), "Third call should refresh after notification");
+        // The async refresh must eventually fetch from the proxy exactly once.
+        long deadline = System.nanoTime() + SECONDS.toNanos(5);
+        while (callCounter.get() < 2 && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertEquals(2, callCounter.get(), "list_changed should trigger exactly one refresh fetch");
 
-        // Fourth tools/list - uses cache again (counter should NOT increment)
+        // Further tools/list calls just read the refreshed registry, no additional proxy fetch.
         service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
-        assertEquals(2, callCounter.get(), "Fourth call should use cache (not increment to 3)");
+        service.handleRequest(toolsRequest, r -> {}, ProtocolVersion.defaultVersion());
+        assertEquals(2, callCounter.get(), "tools/list must not fetch from the proxy after the refresh");
     }
 
     @Test

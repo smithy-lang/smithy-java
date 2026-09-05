@@ -134,5 +134,6 @@ include(":model-bundle:model-bundle-api")
 
 // Benchmarks (not published)
 include(":benchmarks")
+include(":benchmarks:benchmark-commons")
 include(":benchmarks:serde-benchmarks")
 include(":benchmarks:e2e-benchmarks")

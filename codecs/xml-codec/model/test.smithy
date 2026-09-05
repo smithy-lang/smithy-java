@@ -272,3 +272,35 @@ structure AllListsStruct {
     blobs: BlobList
     timestamps: TimestampList
 }
+
+structure DenseListStruct {
+    structs: StructItemList
+    strings: PlainStringList
+}
+
+structure SparseListStruct {
+    structs: SparseStructItemList
+    strings: SparsePlainStringList
+}
+
+structure StructItem {
+    id: String
+}
+
+list StructItemList {
+    member: StructItem
+}
+
+@sparse
+list SparseStructItemList {
+    member: StructItem
+}
+
+list PlainStringList {
+    member: String
+}
+
+@sparse
+list SparsePlainStringList {
+    member: String
+}
