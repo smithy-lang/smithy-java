@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public final class ByteBufferUtils {
+    private static final Base64.Encoder BASE64_ENCODER = Base64.getEncoder();
 
     private ByteBufferUtils() {}
 
@@ -22,7 +23,9 @@ public final class ByteBufferUtils {
     }
 
     public static byte[] base64EncodeToBytes(ByteBuffer buffer) {
-        return Base64.getEncoder().encode(buffer.duplicate()).array();
+        return isExact(buffer)
+                ? BASE64_ENCODER.encode(buffer.array())
+                : BASE64_ENCODER.encode(buffer.duplicate()).array();
     }
 
     public static String getUTF8String(ByteBuffer buffer) {
