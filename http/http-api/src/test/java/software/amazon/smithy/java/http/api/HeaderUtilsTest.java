@@ -97,5 +97,11 @@ public class HeaderUtilsTest {
     void normalizeValue_allowsObsText() {
         // obs-text (0x80-0xFF) is allowed
         assertEquals("foo\u0080bar", HeaderUtils.normalizeValue("foo\u0080bar"));
+        assertEquals("caf\u00e9", HeaderUtils.normalizeValue("caf\u00e9"));
+    }
+
+    @Test
+    void normalizeValue_rejectsCharactersOutsideLatin1() {
+        assertThrows(IllegalArgumentException.class, () -> HeaderUtils.normalizeValue("not-http-\u20ac"));
     }
 }

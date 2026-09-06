@@ -10,4 +10,5 @@ extra["moduleName"] = "software.amazon.smithy.java.http.api"
 
 dependencies {
     api(project(":io"))
+    implementation(project(":codecs:codec-commons", configuration = "shadow"))
 }
