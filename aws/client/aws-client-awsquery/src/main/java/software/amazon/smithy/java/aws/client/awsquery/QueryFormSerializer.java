@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
@@ -74,6 +75,7 @@ final class QueryFormSerializer implements ShapeSerializer {
     private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
 
     private static final int MAX_BYTES_PER_CHAR = 9;
+    private static final int MAX_BYTES_PER_LATIN1_BYTE = 6;
 
     record AcquireContext(QueryVariant variant, String action, String version) {}
 
@@ -230,8 +232,30 @@ final class QueryFormSerializer implements ShapeSerializer {
         }
     }
 
+    @SuppressWarnings("deprecation")
     private void writeUrlEncoded(String s) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(s);
+        if (latin1 != null) {
+            writeUrlEncodedLatin1(latin1);
+            return;
+        }
+
         int len = s.length();
+        boolean allUnreserved = true;
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c >= 0x80) {
+                allUnreserved = false;
+                break;
+            }
+            allUnreserved &= UNRESERVED[c];
+        }
+        if (allUnreserved) {
+            s.getBytes(0, len, buf, pos);
+            pos += len;
+            return;
+        }
+
         int next = pos;
         for (int i = 0; i < len; i++) {
             char c = s.charAt(i);
@@ -252,6 +276,46 @@ final class QueryFormSerializer implements ShapeSerializer {
             }
         }
         pos = next;
+    }
+
+    private void writeUrlEncodedLatin1(byte[] value) {
+        boolean allUnreserved = true;
+        boolean hasNonAscii = false;
+        for (byte current : value) {
+            int c = current & 0xff;
+            hasNonAscii |= c >= 0x80;
+            allUnreserved &= c < 0x80 && UNRESERVED[c];
+        }
+        if (allUnreserved) {
+            System.arraycopy(value, 0, buf, pos, value.length);
+            pos += value.length;
+            return;
+        }
+        if (hasNonAscii) {
+            ensureCapacity(value.length * MAX_BYTES_PER_LATIN1_BYTE);
+        }
+
+        for (byte current : value) {
+            int c = current & 0xff;
+            if (c < 0x80) {
+                if (UNRESERVED[c]) {
+                    buf[pos++] = current;
+                } else {
+                    int off = c * 3;
+                    buf[pos] = PERCENT_ENCODED[off];
+                    buf[pos + 1] = PERCENT_ENCODED[off + 1];
+                    buf[pos + 2] = PERCENT_ENCODED[off + 2];
+                    pos += 3;
+                }
+            } else {
+                int b0 = 0xC0 | (c >> 6);
+                int b1 = 0x80 | (c & 0x3F);
+                System.arraycopy(PERCENT_ENCODED, b0 * 3, buf, pos, 3);
+                pos += 3;
+                System.arraycopy(PERCENT_ENCODED, b1 * 3, buf, pos, 3);
+                pos += 3;
+            }
+        }
     }
 
     // Encodes the remaining arbitrary characters. The caller must reserve nine bytes per char.

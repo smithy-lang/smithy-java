@@ -400,6 +400,12 @@ class QueryFormSerializerTest {
         }
 
         @Test
+        void compactLatin1StringIsWrittenAsUtf8() {
+            String out = serializeString("caféÿ");
+            assertThat(out, equalTo(header() + "&String=caf%C3%A9%C3%BF"));
+        }
+
+        @Test
         void longSurrogatePairStringIsWrittenInFull() {
             String out = serializeString("🎉".repeat(LONG));
             assertThat(out, equalTo(header() + "&String=" + "%F0%9F%8E%89".repeat(LONG)));
