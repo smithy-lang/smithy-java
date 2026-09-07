@@ -30,6 +30,9 @@ public class RestJson1SerializeBenchmark {
             ShapeId.from("com.amazonaws.sdk.benchmark#AwsRestJsonDataPlane");
 
     @Param({
+            "restJson1_WideTypesRequest_S",
+            "restJson1_WideTypesRequest_M",
+            "restJson1_WideTypesRequest_L",
             "restJson1_CopyObjectRequest_Baseline",
             "restJson1_CopyObjectRequest_M",
             "restJson1_PutObject_S",

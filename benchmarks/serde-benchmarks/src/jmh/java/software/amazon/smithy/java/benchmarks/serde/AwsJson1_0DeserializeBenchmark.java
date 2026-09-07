@@ -42,6 +42,9 @@ public class AwsJson1_0DeserializeBenchmark {
             "awsJson1_0_GetItemOutputBinary_M",
             "awsJson1_0_GetItemOutputBinary_L",
             "awsJson1_0_HealthcheckResponse_Example",
+            "awsJson1_0_WideTypesResponse_S",
+            "awsJson1_0_WideTypesResponse_M",
+            "awsJson1_0_WideTypesResponse_L",
     })
     public String testCaseId;
 

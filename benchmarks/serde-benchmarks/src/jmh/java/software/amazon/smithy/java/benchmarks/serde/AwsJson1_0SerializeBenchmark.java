@@ -34,6 +34,9 @@ public class AwsJson1_0SerializeBenchmark {
     @Param({
             "awsJson1_0_GetItemInput_Baseline",
             "awsJson1_0_HealthcheckRequest_Example",
+            "awsJson1_0_WideTypesRequest_S",
+            "awsJson1_0_WideTypesRequest_M",
+            "awsJson1_0_WideTypesRequest_L",
             "awsJson1_0_PutItemRequest_Baseline",
             "awsJson1_0_PutItemRequest_ShallowMap_S",
             "awsJson1_0_PutItemRequest_ShallowMap_M",
