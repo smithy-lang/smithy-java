@@ -36,6 +36,9 @@ public class RestXmlDeserializeBenchmark {
     private static final String CONTENT_TYPE = "application/xml";
 
     @Param({
+            "restXml_WideTypesResponse_S",
+            "restXml_WideTypesResponse_M",
+            "restXml_WideTypesResponse_L",
             "restXml_CopyObjectOutput_Baseline",
             "restXml_CopyObjectOutput_M",
             "restXml_CopyObjectOutput_OutOfOrder",
