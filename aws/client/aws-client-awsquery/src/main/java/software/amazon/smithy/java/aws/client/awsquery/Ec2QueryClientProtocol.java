@@ -70,16 +70,25 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
-        QueryFormSerializer serializer = QueryFormSerializer.acquire(
-                QueryFormSerializer.QueryVariant.EC2_QUERY,
-                operationName,
-                version);
+        boolean unit = operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT);
+        ByteBuffer body = unit
+                ? null
+                : SmithyGeneratedQuerySerde.serialize(
+                        QueryFormSerializer.QueryVariant.EC2_QUERY,
+                        input,
+                        operationName,
+                        version);
 
-        if (!operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
-            input.serializeMembers(serializer);
+        if (body == null) {
+            QueryFormSerializer serializer = QueryFormSerializer.acquire(
+                    QueryFormSerializer.QueryVariant.EC2_QUERY,
+                    operationName,
+                    version);
+            if (!unit) {
+                input.serializeMembers(serializer);
+            }
+            body = serializer.finish();
         }
-
-        ByteBuffer body = serializer.finish();
 
         return HttpRequest.create()
                 .setMethod("POST")
