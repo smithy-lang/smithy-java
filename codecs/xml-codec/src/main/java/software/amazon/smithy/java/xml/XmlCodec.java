@@ -12,7 +12,13 @@ import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -24,7 +30,7 @@ import software.amazon.smithy.model.traits.XmlNamespaceTrait;
  *
  * <p>This codec honors the xmlName, xmlAttribute, xmlFlattened, and xmlNamespace traits.
  */
-public final class XmlCodec implements Codec {
+public final class XmlCodec implements Codec, MemberSubsetCodec {
 
     private static final boolean USE_SMITHY_NATIVE =
             "smithy".equals(System.getProperty("smithy-java.xml-provider"));
@@ -37,15 +43,115 @@ public final class XmlCodec implements Codec {
     private final XmlNamespaceTrait defaultNamespace;
     private final boolean useNative;
     private final boolean strictRootElement;
+    private final XmlSettings settings;
+
+    /** The process-wide generated serde, or null when runtime code generation is off for this codec. */
+    private final SmithyGeneratedXmlSerde generated;
 
     private XmlCodec(Builder builder) {
         this.wrapperElements = builder.wrapperElements;
         this.defaultNamespace = builder.defaultNamespace;
         this.strictRootElement = builder.strictRootElement;
         this.useNative = builder.useNative != null ? builder.useNative : USE_SMITHY_NATIVE;
+        this.settings = XmlSettings.of(wrapperElements, defaultNamespace, strictRootElement);
+        this.generated = runtimeCodegen(builder.runtimeCodegen, useNative)
+                ? SmithyGeneratedXmlSerde.INSTANCE
+                : null;
         if (!useNative) {
             initStax();
         }
+    }
+
+    /**
+     * Generated codecs reproduce the native serializer's bytes, so they can only stand in for the
+     * native serializer.
+     *
+     * <p>When codegen was requested through the system property and the StAX provider is selected, this
+     * quietly returns false rather than failing: the property is process-wide, while the provider is
+     * per codec, so a suite that exercises both providers would otherwise be unable to run with codegen
+     * on at all. An explicit {@code runtimeCodegen(true)} is a narrower statement of intent and does
+     * fail, because silently ignoring it would be indistinguishable from the feature not working.
+     */
+    private static boolean runtimeCodegen(Boolean requested, boolean useNative) {
+        if (requested == null) {
+            return RuntimeCodegenFeature.enabled("xml") && useNative;
+        }
+        if (!requested) {
+            return false;
+        }
+        if (!useNative) {
+            throw new IllegalStateException(
+                    "XML runtime code generation replaces only the native Smithy serializer; select it "
+                            + "with -Dsmithy-java.xml-provider=smithy or with useNative(true)");
+        }
+        return RuntimeCodegenFeature.available();
+    }
+
+    @Override
+    public ByteBuffer serialize(SerializableShape shape) {
+        if (generated != null && shape instanceof SerializableStruct struct) {
+            ByteBuffer result = generated.serialize(struct, struct.schema(), settings);
+            if (result != null) {
+                return result;
+            }
+        }
+        return Codec.super.serialize(shape);
+    }
+
+    /**
+     * Writes only the members {@code subset} includes, using a codec generated for that subset.
+     *
+     * <p>Returns null unless runtime code generation is enabled and succeeded for this shape, so an HTTP
+     * binding keeps its proxy for the shapes generation cannot reach. Getting the real structure rather
+     * than a proxy is what makes generation possible at all here: a generated writer reaches into the
+     * shape's own class, which a proxy is not.
+     */
+    @Override
+    public ByteBuffer serialize(SerializableStruct struct, MemberSubset subset) {
+        return generated == null ? null : generated.serialize(struct, struct.schema(), settings, subset);
+    }
+
+    @Override
+    public boolean deserialize(
+            Schema schema,
+            ShapeBuilder<?> builder,
+            ByteBuffer source,
+            MemberSubset subset
+    ) {
+        return deserializeGenerated(schema, builder, source, subset);
+    }
+
+    @Override
+    public <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
+        if (deserializeGenerated(builder.schema(), builder, ByteBuffer.wrap(source), null)) {
+            return builder.errorCorrection().build();
+        }
+        return Codec.super.deserializeShape(source, builder);
+    }
+
+    @Override
+    public <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
+        if (deserializeGenerated(builder.schema(), builder, source, null)) {
+            return builder.errorCorrection().build();
+        }
+        return Codec.super.deserializeShape(source, builder);
+    }
+
+    private boolean deserializeGenerated(
+            Schema schema,
+            ShapeBuilder<?> builder,
+            ByteBuffer source,
+            MemberSubset subset
+    ) {
+        if (generated == null || source == null || !source.hasRemaining()) {
+            return false;
+        }
+        return smithyDeserializer(source).readStructGenerated(
+                schema,
+                builder,
+                generated,
+                settings,
+                subset);
     }
 
     private void initStax() {
@@ -70,7 +176,7 @@ public final class XmlCodec implements Codec {
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
         if (useNative) {
-            return new LazyXmlSerializer(defaultNamespace, xmlInfo, sink);
+            return new LazyXmlSerializer(defaultNamespace, xmlInfo, sink, generated, settings);
         }
         try {
             return new XmlSerializer(xmlOutputFactory.createXMLStreamWriter(sink), xmlInfo, defaultNamespace);
@@ -86,23 +192,7 @@ public final class XmlCodec implements Codec {
         }
 
         if (useNative) {
-            byte[] bytes;
-            int offset;
-            int length = source.remaining();
-            if (source.hasArray()) {
-                bytes = source.array();
-                offset = source.arrayOffset() + source.position();
-            } else {
-                bytes = ByteBufferUtils.getBytes(source);
-                offset = 0;
-            }
-            return new SmithyXmlDeserializer(bytes,
-                    offset,
-                    length,
-                    xmlInfo,
-                    true,
-                    wrapperElements,
-                    strictRootElement);
+            return smithyDeserializer(source);
         }
 
         try {
@@ -118,6 +208,27 @@ public final class XmlCodec implements Codec {
         }
     }
 
+    private SmithyXmlDeserializer smithyDeserializer(ByteBuffer source) {
+        byte[] bytes;
+        int offset;
+        int length = source.remaining();
+        if (source.hasArray()) {
+            bytes = source.array();
+            offset = source.arrayOffset() + source.position();
+        } else {
+            bytes = ByteBufferUtils.getBytes(source);
+            offset = 0;
+        }
+        return new SmithyXmlDeserializer(
+                bytes,
+                offset,
+                length,
+                xmlInfo,
+                true,
+                wrapperElements,
+                strictRootElement);
+    }
+
     /**
      * Builder used to create an XML codec.
      */
@@ -125,6 +236,7 @@ public final class XmlCodec implements Codec {
         private List<String> wrapperElements = List.of();
         private XmlNamespaceTrait defaultNamespace;
         private Boolean useNative;
+        private Boolean runtimeCodegen;
         private boolean strictRootElement = true;
 
         private Builder() {}
@@ -182,6 +294,17 @@ public final class XmlCodec implements Codec {
          */
         Builder useNative(boolean useNative) {
             this.useNative = useNative;
+            return this;
+        }
+
+        /**
+         * Override the {@code smithy-java.runtime-codegen} property for this codec.
+         *
+         * <p>Requires the native serializer, and requires a runtime that supports class generation;
+         * on an older runtime this stays off.
+         */
+        Builder runtimeCodegen(boolean runtimeCodegen) {
+            this.runtimeCodegen = runtimeCodegen;
             return this;
         }
 
