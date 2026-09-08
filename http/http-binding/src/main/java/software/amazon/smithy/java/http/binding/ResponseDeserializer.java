@@ -119,10 +119,9 @@ public final class ResponseDeserializer {
             throw new IllegalStateException("Either errorShapeBuilder or outputShapeBuilder must be set");
         }
 
-        deserBuilder.isResponse(true);
-
-        HttpBindingDeserializer deserializer = deserBuilder.build();
         var target = outputShapeBuilder != null ? outputShapeBuilder : errorShapeBuilder;
+        deserBuilder.isResponse(true).directBodyBuilder(target);
+        HttpBindingDeserializer deserializer = deserBuilder.build();
         Throwable failure = null;
         try {
             target.deserialize(deserializer);

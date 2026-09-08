@@ -16,12 +16,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -105,6 +108,73 @@ public class HttpBindingDeserializerTest {
 
         Assertions.assertSame(body, builder.body);
         Assertions.assertEquals(0, body.discardCount);
+    }
+
+    @Test
+    void directBodyDeserializationRequiresExplicitBuilderOptIn() {
+        var codec = new SubsetCodec(true);
+        var builder = new BodyOutput.Builder();
+        var deserializer = HttpBindingDeserializer.builder()
+                .payloadCodec(codec)
+                .headers(HttpHeaders.of(Map.of()))
+                .body(DataStream.ofString("body"))
+                .isResponse(true)
+                .build();
+
+        builder.deserialize(deserializer);
+
+        Assertions.assertEquals(0, codec.directCalls);
+        Assertions.assertEquals(1, codec.fallbackCalls);
+        Assertions.assertEquals("fallback", builder.value);
+    }
+
+    @Test
+    void declinedDirectBodyDeserializationLeavesFallbackBufferReusable() {
+        var codec = new SubsetCodec(false);
+        var builder = new BodyOutput.Builder();
+
+        new ResponseDeserializer()
+                .payloadCodec(codec)
+                .response(response(DataStream.ofString("body")))
+                .outputShapeBuilder(builder)
+                .deserialize();
+
+        Assertions.assertEquals(1, codec.directCalls);
+        Assertions.assertEquals(1, codec.fallbackCalls);
+        Assertions.assertEquals(0, codec.fallbackPosition);
+        Assertions.assertEquals("fallback", builder.value);
+    }
+
+    @Test
+    void explicitlyOptedInBuilderCanBePopulatedDirectly() {
+        var codec = new SubsetCodec(true);
+        var builder = new BodyOutput.Builder();
+
+        new ResponseDeserializer()
+                .payloadCodec(codec)
+                .response(response(DataStream.ofString("body")))
+                .outputShapeBuilder(builder)
+                .deserialize();
+
+        Assertions.assertEquals(1, codec.directCalls);
+        Assertions.assertEquals(0, codec.fallbackCalls);
+        Assertions.assertEquals("direct", builder.value);
+    }
+
+    @Test
+    void structuredPayloadCanPopulateItsConcreteBuilderDirectly() {
+        var codec = new WholeShapeCodec();
+        var builder = new PayloadOutput.Builder();
+
+        new ResponseDeserializer()
+                .payloadCodec(codec)
+                .response(response(DataStream.ofString("{\"value\":\"direct\"}")))
+                .outputShapeBuilder(builder)
+                .deserialize();
+
+        Assertions.assertEquals(1, codec.directCalls);
+        Assertions.assertEquals(0, codec.fallbackCalls);
+        Assertions.assertEquals("direct", builder.payload.value());
     }
 
     private static HttpResponse response(DataStream body) {
@@ -226,6 +296,184 @@ public class HttpBindingDeserializerTest {
             public Schema schema() {
                 return SCHEMA;
             }
+        }
+    }
+
+    private record BodyOutput(String value) implements SerializableStruct {
+        static final Schema SCHEMA = Schema.structureBuilder(ShapeId.from("smithy.example#BodyOutput"))
+                .shapeClass(BodyOutput.class)
+                .putMember("value", PreludeSchemas.STRING)
+                .builderSupplier(Builder::new)
+                .build();
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {}
+
+        @Override
+        public <T> T getMemberValue(Schema member) {
+            return null;
+        }
+
+        private static final class Builder implements ShapeBuilder<BodyOutput> {
+            private String value;
+
+            @Override
+            public BodyOutput build() {
+                return new BodyOutput(value);
+            }
+
+            @Override
+            public ShapeBuilder<BodyOutput> deserialize(ShapeDeserializer decoder) {
+                decoder.readStruct(SCHEMA,
+                        this,
+                        (builder, member, deserializer) -> builder.value = deserializer.readString(member));
+                return this;
+            }
+
+            @Override
+            public Schema schema() {
+                return SCHEMA;
+            }
+        }
+    }
+
+    private record PayloadOutput(BodyOutput payload) implements SerializableStruct {
+        static final Schema SCHEMA = Schema.structureBuilder(ShapeId.from("smithy.example#PayloadOutput"))
+                .putMember("payload", BodyOutput.SCHEMA, new HttpPayloadTrait())
+                .builderSupplier(Builder::new)
+                .build();
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {}
+
+        @Override
+        public <T> T getMemberValue(Schema member) {
+            return null;
+        }
+
+        private static final class Builder implements ShapeBuilder<PayloadOutput> {
+            private BodyOutput payload;
+
+            @Override
+            public PayloadOutput build() {
+                return new PayloadOutput(payload);
+            }
+
+            @Override
+            public ShapeBuilder<PayloadOutput> deserialize(ShapeDeserializer decoder) {
+                decoder.readStruct(SCHEMA, this, (builder, member, deserializer) -> {
+                    var payloadBuilder = new BodyOutput.Builder();
+                    payloadBuilder.deserialize(deserializer);
+                    builder.payload = payloadBuilder.build();
+                });
+                return this;
+            }
+
+            @Override
+            public Schema schema() {
+                return SCHEMA;
+            }
+        }
+    }
+
+    private static final class WholeShapeCodec implements Codec, MemberSubsetCodec {
+        private int directCalls;
+        private int fallbackCalls;
+
+        @Override
+        public ByteBuffer serialize(SerializableStruct struct, MemberSubset subset) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean deserialize(Schema schema, ShapeBuilder<?> builder, ByteBuffer source) {
+            directCalls++;
+            ((BodyOutput.Builder) builder).value = "direct";
+            return true;
+        }
+
+        @Override
+        public ShapeSerializer createSerializer(OutputStream sink) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer(ByteBuffer source) {
+            fallbackCalls++;
+            return new SpecificShapeDeserializer() {
+                @Override
+                public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
+                    consumer.accept(state, schema.member("value"), new SpecificShapeDeserializer() {
+                        @Override
+                        public String readString(Schema schema) {
+                            return "fallback";
+                        }
+                    });
+                }
+            };
+        }
+    }
+
+    private static final class SubsetCodec implements Codec, MemberSubsetCodec {
+        private final boolean directResult;
+        private int directCalls;
+        private int fallbackCalls;
+        private int fallbackPosition = -1;
+
+        private SubsetCodec(boolean directResult) {
+            this.directResult = directResult;
+        }
+
+        @Override
+        public ByteBuffer serialize(SerializableStruct struct, MemberSubset subset) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean deserialize(
+                Schema schema,
+                ShapeBuilder<?> builder,
+                ByteBuffer source,
+                MemberSubset subset
+        ) {
+            directCalls++;
+            if (directResult) {
+                source.get();
+                ((BodyOutput.Builder) builder).value = "direct";
+            }
+            return directResult;
+        }
+
+        @Override
+        public ShapeSerializer createSerializer(OutputStream sink) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer(ByteBuffer source) {
+            return new SpecificShapeDeserializer() {
+                @Override
+                public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
+                    fallbackCalls++;
+                    fallbackPosition = source.position();
+                    consumer.accept(state, schema.member("value"), new SpecificShapeDeserializer() {
+                        @Override
+                        public String readString(Schema schema) {
+                            return "fallback";
+                        }
+                    });
+                }
+            };
         }
     }
 }
