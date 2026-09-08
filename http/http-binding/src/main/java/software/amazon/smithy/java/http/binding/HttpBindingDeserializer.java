@@ -11,8 +11,10 @@ import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
@@ -44,6 +46,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final DataStream body;
     private final EventDecoderFactory<?> eventDecoderFactory;
     private final String payloadMediaType;
+    private final ShapeBuilder<?> directBodyBuilder;
 
     private HttpBindingDeserializer(Builder builder) {
         this.payloadCodec = Objects.requireNonNull(builder.payloadCodec, "payloadSerializer not set");
@@ -55,6 +58,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         this.responseStatus = builder.responseStatus;
         this.requestPathLabels = builder.requestPathLabels;
         this.payloadMediaType = builder.payloadMediaType;
+        this.directBodyBuilder = builder.directBodyBuilder;
     }
 
     static Builder builder() {
@@ -203,6 +207,15 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     ) {
         validateMediaType();
         ByteBuffer bb = bodyAsByteBuffer();
+        if (state == directBodyBuilder
+                && payloadCodec instanceof MemberSubsetCodec subsetCodec
+                && subsetCodec.deserialize(
+                        schema,
+                        directBodyBuilder,
+                        bb,
+                        BodyMemberSubset.of(isResponse))) {
+            return;
+        }
         // The codec's readStruct callback receives every member; filter to body members using the direction-specific
         // bindings array (which was already chosen by the caller).
         payloadCodec.createDeserializer(bb).readStruct(schema, bindings, (body, m, de) -> {
@@ -233,7 +246,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             // Read the payload into a byte buffer to deserialize a shape in the body.
             ByteBuffer bb = bodyAsByteBuffer();
             if (bb.remaining() > 0) {
-                structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
+                structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
             }
         } else if (body != null && body.contentLength() != 0) {
             structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
@@ -305,6 +318,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private EventDecoderFactory<?> eventDecoderFactory;
         private String payloadMediaType;
         private boolean isResponse;
+        private ShapeBuilder<?> directBodyBuilder;
 
         private Builder() {}
 
@@ -397,6 +411,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
         Builder isResponse(boolean isResponse) {
             this.isResponse = isResponse;
+            return this;
+        }
+
+        Builder directBodyBuilder(ShapeBuilder<?> directBodyBuilder) {
+            this.directBodyBuilder = directBodyBuilder;
             return this;
         }
     }

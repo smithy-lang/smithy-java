@@ -11,7 +11,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -31,6 +33,10 @@ final class PayloadDeserializer implements ShapeDeserializer {
 
     private ShapeDeserializer createDeserializer() {
         return payloadCodec.createDeserializer(resolveBodyBytes());
+    }
+
+    private ShapeDeserializer createDeserializer(ByteBuffer source) {
+        return payloadCodec.createDeserializer(source);
     }
 
     @Override
@@ -154,7 +160,13 @@ final class PayloadDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
         if (!isNull()) {
-            try (var deser = createDeserializer()) {
+            ByteBuffer source = resolveBodyBytes();
+            if (state instanceof ShapeBuilder<?> builder
+                    && payloadCodec instanceof MemberSubsetCodec direct
+                    && direct.deserialize(schema, builder, source.duplicate())) {
+                return;
+            }
+            try (var deser = createDeserializer(source)) {
                 deser.readStruct(schema, state, consumer);
             }
         }
