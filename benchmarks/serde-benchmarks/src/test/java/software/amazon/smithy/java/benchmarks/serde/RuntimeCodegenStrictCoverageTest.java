@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openjdk.jmh.annotations.Param;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
+import software.amazon.smithy.java.client.rpcv2.RpcV2CborProtocol;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -30,9 +31,15 @@ class RuntimeCodegenStrictCoverageTest {
             "software.amazon.smithy.java.benchmarks.serde.generated.awsjson10.model";
     private static final ShapeId AWS_JSON_SERVICE =
             ShapeId.from("com.amazonaws.sdk.benchmark#AwsJsonRpc10DataPlane");
+    private static final String RPCV2_CBOR_PACKAGE =
+            "software.amazon.smithy.java.benchmarks.serde.generated.rpcv2cbor.model";
+    private static final ShapeId RPCV2_CBOR_SERVICE =
+            ShapeId.from("com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane");
     private static final byte[] EMPTY_JSON_BODY = "{}".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] EMPTY_CBOR_BODY = new byte[] {(byte) 0xa0};
     private static final String REST_JSON_CONTENT_TYPE = "application/json";
     private static final String AWS_JSON_CONTENT_TYPE = "application/x-amz-json-1.0";
+    private static final String CBOR_CONTENT_TYPE = "application/cbor";
 
     private static String previousCodegen;
     private static String previousProvider;
@@ -63,6 +70,14 @@ class RuntimeCodegenStrictCoverageTest {
 
     static List<String> awsJsonDeserializeCases() throws Exception {
         return benchmarkCases(AwsJson1_0DeserializeBenchmark.class);
+    }
+
+    static List<String> rpcv2CborSerializeCases() throws Exception {
+        return benchmarkCases(RpcV2CborSerializeBenchmark.class);
+    }
+
+    static List<String> rpcv2CborDeserializeCases() throws Exception {
+        return benchmarkCases(RpcV2CborDeserializeBenchmark.class);
     }
 
     @ParameterizedTest
@@ -111,6 +126,33 @@ class RuntimeCodegenStrictCoverageTest {
                 EMPTY_JSON_BODY,
                 AWS_JSON_CONTENT_TYPE,
                 false);
+        assertNotNull(protocol.deserializeResponse(
+                operation(state.operation),
+                state.context,
+                state.typeRegistry,
+                state.request,
+                state.response));
+    }
+
+    @ParameterizedTest
+    @MethodSource("rpcv2CborSerializeCases")
+    void rpcv2CborSerialize(String testCaseId) {
+        var protocol = new RpcV2CborProtocol(RPCV2_CBOR_SERVICE);
+        var state = SerializeState.forTestCase(testCaseId, RPCV2_CBOR_PACKAGE, RPCV2_CBOR_SERVICE);
+        assertNotNull(protocol.createRequest(operation(state.operation), state.input, state.context, state.endpoint));
+    }
+
+    @ParameterizedTest
+    @MethodSource("rpcv2CborDeserializeCases")
+    void rpcv2CborDeserialize(String testCaseId) throws Exception {
+        var protocol = new RpcV2CborProtocol(RPCV2_CBOR_SERVICE);
+        var state = DeserializeState.forTestCase(
+                testCaseId,
+                RPCV2_CBOR_PACKAGE,
+                RPCV2_CBOR_SERVICE,
+                EMPTY_CBOR_BODY,
+                CBOR_CONTENT_TYPE,
+                true);
         assertNotNull(protocol.deserializeResponse(
                 operation(state.operation),
                 state.context,
