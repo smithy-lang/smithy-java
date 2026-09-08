@@ -28,6 +28,10 @@ dependencies {
 protocolTestRuns {
     run("native") { systemProperty("smithy-java.json-provider", "smithy") }
     run("jackson") { systemProperty("smithy-java.json-provider", "jackson") }
+    run("codegen") {
+        systemProperty("smithy-java.json-provider", "smithy")
+        systemProperty("smithy-java.runtime-codegen", "enabled")
+    }
 }
 
 val generator = "software.amazon.smithy.java.protocoltests.generators.ProtocolTestGenerator"

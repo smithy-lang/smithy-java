@@ -658,11 +658,13 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
     void nonStructDocumentRoundtrip(JsonSerdeProvider ser, JsonSerdeProvider de, Document original) {
         try (var serCodec = JsonCodec.builder()
                 .overrideSerdeProvider(ser)
+                .runtimeCodegen(false)
                 .useJsonName(true)
                 .useTimestampFormat(true)
                 .build();
                 var deCodec = JsonCodec.builder()
                         .overrideSerdeProvider(de)
+                        .runtimeCodegen(false)
                         .useJsonName(true)
                         .useTimestampFormat(true)
                         .build()) {
@@ -745,7 +747,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
 
     static Stream<Arguments> invalidInputs() {
         List<Arguments> arguments = new ArrayList<>();
-        for (var provider : List.of(JACKSON, SMITHY)) {
+        for (var provider : providerInstances()) {
             arguments.add(Arguments.of(provider,
                     "eyJ2YWx1ZSI6e2JpdWUiOntiaW50VmE6e2JpbnRWYXJpnm50VmE6e2JpbnRWYXJpnpF0IjotMjA3fQ==",
                     true));

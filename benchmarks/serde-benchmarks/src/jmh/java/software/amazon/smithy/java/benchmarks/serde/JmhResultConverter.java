@@ -25,10 +25,7 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.benchmarks.OpsPerCpuSecondProfiler;
 import software.amazon.smithy.java.core.Version;
-import software.amazon.smithy.model.node.ArrayNode;
-import software.amazon.smithy.model.node.Node;
-import software.amazon.smithy.model.node.NumberNode;
-import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.model.node.*;
 
 /**
  * Converts a JMH JSON result file (produced by {@code jmh -rf json -rff
@@ -176,11 +173,20 @@ public final class JmhResultConverter {
                 continue;
             }
             var result = element.expectObjectNode();
-            String id = result.getObjectMember("params")
-                    .flatMap(p -> p.getStringMember("testCaseId"))
-                    .map(s -> s.getValue())
+            var params = result.getObjectMember("params").orElse(Node.objectNode());
+            String testCaseId = params.getStringMember("testCaseId")
+                    .map(StringNode::getValue)
                     .orElse(null);
-            if (id == null || !seen.add(id)) {
+            if (testCaseId == null) {
+                continue;
+            }
+            String implementation = params.getStringMember("implementation")
+                    .map(StringNode::getValue)
+                    .orElse(null);
+            String id = implementation == null || implementation.equals("generic")
+                    ? testCaseId
+                    : testCaseId + "+" + implementation;
+            if (!seen.add(id)) {
                 continue;
             }
 
