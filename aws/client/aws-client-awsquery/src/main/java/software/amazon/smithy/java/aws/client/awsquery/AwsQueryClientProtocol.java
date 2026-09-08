@@ -70,16 +70,25 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
-        QueryFormSerializer serializer = QueryFormSerializer.acquire(
-                QueryFormSerializer.QueryVariant.AWS_QUERY,
-                operationName,
-                version);
+        boolean unit = operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT);
+        ByteBuffer body = unit
+                ? null
+                : SmithyGeneratedQuerySerde.serialize(
+                        QueryFormSerializer.QueryVariant.AWS_QUERY,
+                        input,
+                        operationName,
+                        version);
 
-        if (!operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
-            input.serializeMembers(serializer);
+        if (body == null) {
+            QueryFormSerializer serializer = QueryFormSerializer.acquire(
+                    QueryFormSerializer.QueryVariant.AWS_QUERY,
+                    operationName,
+                    version);
+            if (!unit) {
+                input.serializeMembers(serializer);
+            }
+            body = serializer.finish();
         }
-
-        ByteBuffer body = serializer.finish();
 
         return HttpRequest.create()
                 .setMethod("POST")

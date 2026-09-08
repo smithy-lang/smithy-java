@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.aws.client.awsquery;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import software.amazon.smithy.aws.traits.protocols.Ec2QueryNameTrait;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaExtensionKey;
@@ -158,7 +159,7 @@ public final class AwsQuerySchemaExtensions
         boolean needsEncoding = false;
         for (int i = 0; i < len; i++) {
             char c = name.charAt(i);
-            if (c >= 128 || !QueryFormSerializer.UNRESERVED[c]) {
+            if (c >= 128 || !QueryUrlEncoding.UNRESERVED[c]) {
                 needsEncoding = true;
                 break;
             }
@@ -170,57 +171,9 @@ public final class AwsQuerySchemaExtensions
             return result;
         }
 
-        // Member names that need encoding are rare (non-ASCII names).
-        // Use a simple byte array builder for this cold path.
-        // Max 12 bytes per char (4-byte UTF-8, each byte percent-encoded to 3 bytes)
-        byte[] buf = new byte[len * 12];
-        int pos = 0;
-        for (int i = 0; i < len; i++) {
-            char c = name.charAt(i);
-            if (c < 128 && QueryFormSerializer.UNRESERVED[c]) {
-                buf[pos++] = (byte) c;
-            } else if (c < 0x80) {
-                int off = c * 3;
-                buf[pos++] = QueryFormSerializer.PERCENT_ENCODED[off];
-                buf[pos++] = QueryFormSerializer.PERCENT_ENCODED[off + 1];
-                buf[pos++] = QueryFormSerializer.PERCENT_ENCODED[off + 2];
-            } else if (c < 0x800) {
-                int b0 = 0xC0 | (c >> 6);
-                int b1 = 0x80 | (c & 0x3F);
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b0 * 3, buf, pos, 3);
-                pos += 3;
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b1 * 3, buf, pos, 3);
-                pos += 3;
-            } else if (Character.isHighSurrogate(c) && i + 1 < len
-                    && Character.isLowSurrogate(name.charAt(i + 1))) {
-                char low = name.charAt(++i);
-                int cp = Character.toCodePoint(c, low);
-                int b0 = 0xF0 | (cp >> 18);
-                int b1 = 0x80 | ((cp >> 12) & 0x3F);
-                int b2 = 0x80 | ((cp >> 6) & 0x3F);
-                int b3 = 0x80 | (cp & 0x3F);
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b0 * 3, buf, pos, 3);
-                pos += 3;
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b1 * 3, buf, pos, 3);
-                pos += 3;
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b2 * 3, buf, pos, 3);
-                pos += 3;
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b3 * 3, buf, pos, 3);
-                pos += 3;
-            } else {
-                int b0 = 0xE0 | (c >> 12);
-                int b1 = 0x80 | ((c >> 6) & 0x3F);
-                int b2 = 0x80 | (c & 0x3F);
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b0 * 3, buf, pos, 3);
-                pos += 3;
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b1 * 3, buf, pos, 3);
-                pos += 3;
-                System.arraycopy(QueryFormSerializer.PERCENT_ENCODED, b2 * 3, buf, pos, 3);
-                pos += 3;
-            }
-        }
-        byte[] result = new byte[pos];
-        System.arraycopy(buf, 0, result, 0, pos);
-        return result;
+        // Names needing encoding are rare, and this runs once per schema, so the scratch array is
+        // sized for the worst case and the result trimmed rather than measured first.
+        byte[] buf = new byte[len * QueryUrlEncoding.MAX_BYTES_PER_CHAR];
+        return Arrays.copyOf(buf, QueryUrlEncoding.writeUrlEncoded(buf, 0, name));
     }
 }
