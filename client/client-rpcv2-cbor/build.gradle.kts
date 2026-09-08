@@ -15,9 +15,15 @@ dependencies {
 
     implementation(libs.smithy.protocol.traits)
 
-    // Protocol test dependencies
     testImplementation(libs.smithy.protocol.tests)
     itImplementation(testFixtures(project(":codecs:cbor-codec")))
+}
+
+protocolTestRuns {
+    run("default") {}
+    run("codegen") {
+        systemProperty("smithy-java.runtime-codegen", "enabled")
+    }
 }
 
 val generator = "software.amazon.smithy.java.protocoltests.generators.ProtocolTestGenerator"
