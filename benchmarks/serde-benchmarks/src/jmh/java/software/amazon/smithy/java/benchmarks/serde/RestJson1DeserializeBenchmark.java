@@ -32,6 +32,9 @@ public class RestJson1DeserializeBenchmark {
     private static final byte[] EMPTY_JSON_BODY = "{}".getBytes(StandardCharsets.UTF_8);
     private static final String CONTENT_TYPE = "application/json";
 
+    @Param("generic")
+    public String implementation;
+
     @Param({
             "restJson1_WideTypesResponse_S",
             "restJson1_WideTypesResponse_M",
@@ -50,6 +53,12 @@ public class RestJson1DeserializeBenchmark {
 
     @Setup
     public void setup() {
+        boolean generated = "generated".equals(implementation);
+        if (generated && Runtime.version().feature() < 25) {
+            throw new IllegalStateException("Runtime codegen unavailable on " + Runtime.version());
+        }
+        System.setProperty("smithy-java.runtime-codegen", generated ? "enabled" : "disabled");
+        System.setProperty("smithy-java.json-provider", "smithy");
         protocol = new RestJsonClientProtocol(SERVICE_ID);
         state = DeserializeState
                 .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE, false);
@@ -57,10 +66,17 @@ public class RestJson1DeserializeBenchmark {
 
     @Benchmark
     public void deserialize(Blackhole bh) {
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        ApiOperation<SerializableStruct, SerializableStruct> op =
-                (ApiOperation) state.operation;
         bh.consume(
-                protocol.deserializeResponse(op, state.context, state.typeRegistry, state.request, state.response));
+                protocol.deserializeResponse(
+                        operation(),
+                        state.context,
+                        state.typeRegistry,
+                        state.request,
+                        state.response));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ApiOperation<SerializableStruct, SerializableStruct> operation() {
+        return (ApiOperation) state.operation;
     }
 }
