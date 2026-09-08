@@ -69,6 +69,10 @@ dependencies {
     // model instead of codegen, selected via -Dsmithy-java.benchmark.client=dynamic.
     jmh(project(":client:dynamic-client"))
     jmh(project(":dynamic-schemas"))
+
+    testImplementation(sourceSets["jmh"].output)
+    testImplementation(sourceSets["jmh"].compileClasspath)
+    testRuntimeOnly(sourceSets["jmh"].runtimeClasspath)
 }
 
 // Smithy benchmark model files (tagged @httpRequestTests / @httpResponseTests
@@ -101,6 +105,22 @@ abstract class GenerateSmithyManifest : DefaultTask() {
         entries.sort()
 
         smithyDir.resolve("manifest").writeText(entries.joinToString("\n", postfix = "\n"))
+    }
+}
+
+abstract class WriteJmhClasspath : DefaultTask() {
+    @get:Classpath
+    abstract val classpath: ConfigurableFileCollection
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun run() {
+        outputFile.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(classpath.asPath)
+        }
     }
 }
 
@@ -167,9 +187,20 @@ tasks.named("compileJmhJava") {
     dependsOn("smithyBuild")
 }
 
+tasks.register<WriteJmhClasspath>("writeJmhClasspath") {
+    group = "benchmarks"
+    description = "Write the JMH runtime classpath for external JDK launches."
+    dependsOn("jmhCompileGeneratedClasses")
+    classpath.from(sourceSets["jmh"].runtimeClasspath)
+    classpath.from(layout.buildDirectory.dir("jmh-generated-classes"))
+    classpath.from(layout.buildDirectory.dir("jmh-generated-resources"))
+    outputFile.set(layout.buildDirectory.file("runtime-codegen/jmh-classpath.txt"))
+}
+
 // Test case:  -Pjmh.testCaseId=rpcv2Cbor_PutItemRequest_BinaryData_S
 val fast = providers.gradleProperty("jmh.fast").isPresent
 jmh {
+    includeTests.set(false)
     benchmarkMode.set(listOf("sample"))
     profilers.add("software.amazon.smithy.java.benchmarks.OpsPerCpuSecondProfiler")
     if (!fast) {
@@ -190,6 +221,11 @@ jmh {
         prop.add(id)
         benchmarkParameters.put("testCaseId", prop)
     }
+    providers.gradleProperty("jmh.implementation").orNull?.let { impl ->
+        val prop = objects.listProperty(String::class.java)
+        impl.split(',').forEach { prop.add(it.trim()) }
+        benchmarkParameters.put("implementation", prop)
+    }
     resultFormat = "json"
     resultsFile = layout.buildDirectory.file("results/jmh/results.json")
 }
@@ -204,6 +240,7 @@ tasks.jmhJar {
     }
     mergeServiceFiles()
     append("META-INF/smithy/manifest")
+    configurations = listOf(project.configurations["jmhRuntimeClasspath"])
 }
 
 // Run the cross-language result converter. Reads the JMH JSON written by the

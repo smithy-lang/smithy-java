@@ -13,8 +13,13 @@
 #
 # Options:
 #   --fast                    Fast mode (1 warmup @ 5s, 3 measurement @ 5s)
+#   --warmup-iterations <n>   Override the warmup iteration count
+#   --iterations <n>          Override the measurement iteration count
+#   --warmup-time <t>         Override the per-warmup-iteration time (e.g. 2s)
+#   --iteration-time <t>      Override the per-measurement-iteration time (e.g. 3s)
 #   --includes <regex>        JMH benchmark filter (e.g. RpcV2CborSerialize)
 #   --test-case-id <id>       Filter to a single test case ID
+#   --implementation <list>   Runtime codegen arms, e.g. generic,generated
 #   --profilers <list>        Comma-separated JMH profilers (e.g. gc,stack)
 #   --skip-build              Skip local jar build (use existing jar)
 #   --remote-java <path>      Path to java on remote host (default: java)
@@ -30,8 +35,13 @@ LOCAL_RESULTS="$PROJECT_ROOT/benchmarks/serde-benchmarks/build/results/jmh"
 
 # Defaults
 FAST=false
+WARMUP_ITERS=""
+MEASURE_ITERS=""
+WARMUP_TIME=""
+MEASURE_TIME=""
 INCLUDES=""
 TEST_CASE_ID=""
+IMPLEMENTATION=""
 PROFILERS=""
 SKIP_BUILD=false
 REMOTE_JAVA="java"
@@ -49,8 +59,13 @@ SSH_HOST="$1"; shift
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --fast)           FAST=true; shift ;;
+        --warmup-iterations) WARMUP_ITERS="$2"; shift 2 ;;
+        --iterations)     MEASURE_ITERS="$2"; shift 2 ;;
+        --warmup-time)    WARMUP_TIME="$2"; shift 2 ;;
+        --iteration-time) MEASURE_TIME="$2"; shift 2 ;;
         --includes)       INCLUDES="$2"; shift 2 ;;
         --test-case-id)   TEST_CASE_ID="$2"; shift 2 ;;
+        --implementation) IMPLEMENTATION="$2"; shift 2 ;;
         --profilers)      PROFILERS="$2"; shift 2 ;;
         --skip-build)     SKIP_BUILD=true; shift ;;
         --remote-java)    REMOTE_JAVA="$2"; shift 2 ;;
@@ -95,13 +110,14 @@ JVM_ARGS="-Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch -Dsmithy-java.json-prov
 JMH_ARGS="-bm sample -tu ns -f 1 -rf json -rff $REMOTE_DIR/results.json"
 JMH_ARGS="$JMH_ARGS -jvmArgs \"$JVM_ARGS\""
 if [[ "$FAST" == true ]]; then
-    JMH_ARGS="$JMH_ARGS -wi 1 -w 5s -i 3 -r 5s"
+    JMH_ARGS="$JMH_ARGS -wi ${WARMUP_ITERS:-1} -w ${WARMUP_TIME:-5s} -i ${MEASURE_ITERS:-3} -r ${MEASURE_TIME:-5s}"
 else
-    JMH_ARGS="$JMH_ARGS -wi 5 -w 2s -i 10 -r 5s"
+    JMH_ARGS="$JMH_ARGS -wi ${WARMUP_ITERS:-5} -w ${WARMUP_TIME:-2s} -i ${MEASURE_ITERS:-10} -r ${MEASURE_TIME:-5s}"
 fi
 
 [[ -n "$INCLUDES" ]] && JMH_ARGS="$JMH_ARGS $INCLUDES"
 [[ -n "$TEST_CASE_ID" ]] && JMH_ARGS="$JMH_ARGS -p testCaseId=$TEST_CASE_ID"
+[[ -n "$IMPLEMENTATION" ]] && JMH_ARGS="$JMH_ARGS -p implementation=$IMPLEMENTATION"
 [[ -n "$PROFILERS" ]] && JMH_ARGS="$JMH_ARGS -prof $PROFILERS"
 # Register this last so its measurement excludes other profilers' setup and
 # teardown, matching the Gradle JMH configuration.

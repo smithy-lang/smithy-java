@@ -334,7 +334,8 @@ public class JsonSerializerTest extends ProviderTestBase {
     @Test
     public void testPrettyPrinting() throws Exception {
         // Pretty printing delegates to Jackson regardless of provider, so test once
-        try (var codec = JsonCodec.builder().prettyPrint(true).build(); var output = new ByteArrayOutputStream()) {
+        try (var codec = JsonCodec.builder().runtimeCodegen(false).prettyPrint(true).build();
+                var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
                         JsonTestData.BIRD,
@@ -740,6 +741,7 @@ public class JsonSerializerTest extends ProviderTestBase {
                     try (var codec = JsonCodec.builder()
                             .overrideSerdeProvider(
                                     new SmithyJsonSerdeProvider())
+                            .runtimeCodegen(false)
                             .build();
                             var output = new ByteArrayOutputStream()) {
                         try (var serializer = codec.createSerializer(output)) {

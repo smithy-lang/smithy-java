@@ -1,0 +1,2624 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.json.smithy;
+
+import static software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenBytecode.emitAcceptsBuilder;
+import static software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenBytecode.emitDefaultConstructor;
+import static software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenBytecode.emitThrow;
+import static software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenBytecode.fieldHash;
+import static software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenBytecode.findBuild;
+import static software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenBytecode.invoke;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodecBackend;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodecPlan;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.UnsupportedSchemaException;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.classfile.ClassWriter;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.classfile.Label;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.classfile.MethodVisitor;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.classfile.Opcodes;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.classfile.Type;
+import software.amazon.smithy.java.core.error.ModeledException;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
+import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.json.JsonFieldMapper;
+import software.amazon.smithy.java.json.JsonSettings;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
+
+final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJsonCodec>, Opcodes {
+    private static final String CODEC = Type.getInternalName(GeneratedJsonCodec.class);
+    private static final String WRITER = Type.getInternalName(JsonCodegenWriter.class);
+    private static final String MAP_CONSUMER = Type.getInternalName(MapWriteConsumer.class);
+    private static final String READER = Type.getInternalName(SmithyJsonDeserializer.class);
+    private static final String SETTINGS = Type.getInternalName(JsonSettings.class);
+    private static final String SERIALIZABLE_SHAPE = Type.getInternalName(SerializableShape.class);
+    private static final String SHAPE_BUILDER = Type.getInternalName(ShapeBuilder.class);
+    private static final String DOCUMENT = Type.getInternalName(Document.class);
+    private static final String SMITHY_ENUM = Type.getInternalName(SmithyEnum.class);
+    private static final String SMITHY_INT_ENUM = Type.getInternalName(SmithyIntEnum.class);
+    private static final String BYTE_BUFFER = Type.getInternalName(ByteBuffer.class);
+
+    private static final String TYPE_DISCRIMINATOR = "__type";
+
+    private static final String MISSING_UNION_MEMBER = "Union object must contain one member";
+
+    private final boolean useJsonName;
+    private final boolean forbidUnknownUnionMembers;
+    private final JsonSettings settings;
+
+    JsonRuntimeCodegenBackend(JsonSettings settings) {
+        this.settings = settings;
+        this.useJsonName = settings.fieldMapper() instanceof JsonFieldMapper.UseJsonNameTrait;
+        this.forbidUnknownUnionMembers = settings.forbidUnknownUnionMembers();
+    }
+
+    @Override
+    public String id() {
+        return "json";
+    }
+
+    @Override
+    public String variant() {
+        return useJsonName ? "Names" : "Members";
+    }
+
+    @Override
+    public Class<GeneratedJsonCodec> codecType() {
+        return GeneratedJsonCodec.class;
+    }
+
+    @Override
+    public Class<?> lookupHost() {
+        return GeneratedJsonCodec.class;
+    }
+
+    @Override
+    public Budgets budgets() {
+        return new Budgets(220, 300, 8, 8);
+    }
+
+    @Override
+    public Emission emit(RuntimeCodecPlan plan, String generatedName) {
+        validate(plan);
+        var generator = new Generator(plan, generatedName, settings, useJsonName, forbidUnknownUnionMembers);
+        return generator.generate();
+    }
+
+    private static void validate(RuntimeCodecPlan plan) {
+        for (RuntimeCodecPlan.StructPlan structure : plan.structures()) {
+            if (structure.builderFactory() == null && structure.schema() != plan.root()) {
+                if (!structure.union()) {
+                    throw new UnsupportedSchemaException("No public builder factory for " + structure.schema().id());
+                }
+            }
+            rejectModeledException(structure);
+            requireAccessible(structure.shapeClass(), structure.schema());
+            if (structure.builderClass() != null) {
+                requireAccessible(structure.builderClass(), structure.schema());
+            }
+            for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                validateAggregate(member.target(), new HashSet<>());
+                switch (member.target().type()) {
+                    case BOOLEAN, BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL,
+                            STRING, ENUM, INT_ENUM, BLOB, TIMESTAMP, DOCUMENT, LIST, SET, MAP, STRUCTURE,
+                            UNION ->
+                        {
+                        }
+                    default -> throw new UnsupportedSchemaException(
+                            "JSON runtime codegen does not yet lower " + member.target().type()
+                                    + " at " + member.schema().id());
+                }
+            }
+        }
+    }
+
+    private static void validateAggregate(Schema schema, Set<ShapeId> visited) {
+        Schema target = schema.isMember() ? schema.memberTarget() : schema;
+        if (!visited.add(target.id())) {
+            return;
+        }
+        switch (target.type()) {
+            case LIST, SET -> validateAggregate(target.listMember(), visited);
+            case MAP -> {
+                if (target.mapKeyMember().memberTarget().type() != ShapeType.STRING) {
+                    throw new UnsupportedSchemaException(
+                            "JSON runtime codegen requires string map keys at " + target.id());
+                }
+                validateAggregate(target.mapValueMember(), visited);
+            }
+            default -> {
+            }
+        }
+    }
+
+    // Generated setters cannot mark ModeledException instances as deserialized.
+    private static void rejectModeledException(RuntimeCodecPlan.StructPlan structure) {
+        Class<?> shapeClass = structure.shapeClass();
+        if (shapeClass != null && ModeledException.class.isAssignableFrom(shapeClass)) {
+            throw new UnsupportedSchemaException(
+                    "JSON runtime codegen does not support modeled exceptions: " + structure.schema().id());
+        }
+    }
+
+    // Reject inaccessible classes during generation rather than failing later with IllegalAccessError.
+    private static void requireAccessible(Class<?> type, Schema schema) {
+        for (Class<?> current = type; current != null; current = current.getEnclosingClass()) {
+            if (!Modifier.isPublic(current.getModifiers())) {
+                throw new UnsupportedSchemaException(
+                        "Cannot reach " + type.getName() + " for " + schema.id() + " from generated code");
+            }
+        }
+    }
+
+    private static final class Generator {
+        private final RuntimeCodecPlan plan;
+        private final String className;
+        private final JsonSettings settings;
+        private final boolean useJsonName;
+        private final boolean forbidUnknownUnionMembers;
+        private final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+        private final IdentityHashMap<RuntimeCodecPlan.StructPlan, Integer> structureIds = new IdentityHashMap<>();
+        private final IdentityHashMap<RuntimeCodecPlan.MemberPlan, Integer> memberIds = new IdentityHashMap<>();
+        private final List<RuntimeCodecPlan.MemberPlan> orderedMembers = new ArrayList<>();
+        private final Map<ShapeId, RuntimeCodecPlan.StructPlan> structuresBySchema = new LinkedHashMap<>();
+        private final Map<ShapeId, Integer> aggregateIds = new LinkedHashMap<>();
+        private final List<Schema> orderedAggregates = new ArrayList<>();
+        private final Map<Class<?>, Integer> enumIds = new LinkedHashMap<>();
+        private final Map<Class<?>, Integer> intEnumIds = new LinkedHashMap<>();
+        private int methodCount;
+
+        Generator(
+                RuntimeCodecPlan plan,
+                String className,
+                JsonSettings settings,
+                boolean useJsonName,
+                boolean forbidUnknownUnionMembers
+        ) {
+            this.plan = plan;
+            this.className = className;
+            this.settings = settings;
+            this.useJsonName = useJsonName;
+            this.forbidUnknownUnionMembers = forbidUnknownUnionMembers;
+            for (int i = 0; i < plan.structures().size(); i++) {
+                RuntimeCodecPlan.StructPlan structure = plan.structures().get(i);
+                structureIds.put(structure, i);
+                structuresBySchema.put(structure.schema().id(), structure);
+                for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                    memberIds.put(member, memberIds.size());
+                    orderedMembers.add(member);
+                    collectTarget(member.target());
+                }
+            }
+        }
+
+        private void collectTarget(Schema schema) {
+            schema = schema.isMember() ? schema.memberTarget() : schema;
+            switch (schema.type()) {
+                case LIST, SET -> {
+                    ShapeId key = schema.id();
+                    if (!aggregateIds.containsKey(key)) {
+                        aggregateIds.put(key, aggregateIds.size());
+                        orderedAggregates.add(schema);
+                        collectTarget(schema.listMember());
+                    }
+                }
+                case MAP -> {
+                    ShapeId key = schema.id();
+                    if (!aggregateIds.containsKey(key)) {
+                        aggregateIds.put(key, aggregateIds.size());
+                        orderedAggregates.add(schema);
+                        collectTarget(schema.mapValueMember());
+                    }
+                }
+                case ENUM -> enumIds.computeIfAbsent(schema.shapeClass(), ignored -> enumIds.size());
+                case INT_ENUM -> intEnumIds.computeIfAbsent(schema.shapeClass(), ignored -> intEnumIds.size());
+                default -> {
+                }
+            }
+        }
+
+        Emission generate() {
+            writer.visit(V17, ACC_FINAL | ACC_SUPER, className, null, "java/lang/Object", new String[] {CODEC});
+            emitFields();
+            emitConstructor();
+            emitClassInitializer();
+            emitEnumReaders();
+            emitIntEnumReaders();
+            emitAggregateMethods();
+            emitWriteMapValueDispatch();
+            RuntimeCodecPlan.StructPlan root = plan.rootStructure();
+            for (RuntimeCodecPlan.StructPlan structure : plan.structures()) {
+                emitWriter(structure);
+                boolean hasReaderBody = false;
+                if (structure == root) {
+                    emitReader(structure);
+                    hasReaderBody = true;
+                }
+                if (structure.union()) {
+                    emitUnionValueReader(structure);
+                } else if (structure.builderFactory() != null && needsStructureValueReader(structure, root)) {
+                    emitStructureValueReader(structure);
+                    hasReaderBody = true;
+                }
+                if (hasReaderBody) {
+                    emitReaderBuckets(structure);
+                }
+            }
+            emitWriteEntry();
+            emitAcceptsBuilder(writer, plan.rootStructure().builderClass());
+            methodCount++;
+            emitReadEntry();
+            emitScanEntry();
+            writer.visitEnd();
+            return new Emission(writer.toByteArray(), methodCount);
+        }
+
+        private boolean needsStructureValueReader(
+                RuntimeCodecPlan.StructPlan structure,
+                RuntimeCodecPlan.StructPlan root
+        ) {
+            if (structure != root) {
+                return true;
+            }
+            ShapeId target = structure.schema().id();
+            for (RuntimeCodecPlan.StructPlan candidate : plan.structures()) {
+                for (RuntimeCodecPlan.MemberPlan member : candidate.members()) {
+                    if (containsStructure(member.target(), target)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private boolean containsStructure(Schema schema, ShapeId target) {
+            Schema value = schema.isMember() ? schema.memberTarget() : schema;
+            if (value.id().equals(target)) {
+                return true;
+            }
+            return switch (value.type()) {
+                case LIST, SET -> containsStructure(value.listMember(), target);
+                case MAP -> containsStructure(value.mapValueMember(), target);
+                default -> false;
+            };
+        }
+
+        private void emitFields() {
+            for (RuntimeCodecPlan.MemberPlan member : orderedMembers) {
+                int id = memberIds.get(member);
+                writer.visitField(ACC_PRIVATE | ACC_STATIC | ACC_FINAL, "N" + id, "[B", null, null).visitEnd();
+                writer.visitField(ACC_PRIVATE | ACC_STATIC | ACC_FINAL, "W" + id, "[B", null, null).visitEnd();
+            }
+        }
+
+        private void emitConstructor() {
+            emitDefaultConstructor(writer);
+            methodCount++;
+        }
+
+        private void emitClassInitializer() {
+            MethodVisitor method = writer.visitMethod(ACC_STATIC, "<clinit>", "()V", null, null);
+            method.visitCode();
+            for (RuntimeCodecPlan.MemberPlan member : orderedMembers) {
+                int id = memberIds.get(member);
+                emitUtf8(method, wireName(member));
+                method.visitFieldInsn(PUTSTATIC, className, "N" + id, "[B");
+                var extension = member.schema().getExtension(SmithyJsonSchemaExtensions.KEY);
+                byte[] fieldToken = useJsonName
+                        ? extension.jsonNameBytes()
+                        : extension.memberNameBytes();
+                emitUtf8(method, new String(fieldToken, StandardCharsets.UTF_8));
+                method.visitFieldInsn(PUTSTATIC, className, "W" + id, "[B");
+            }
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitEnumReaders() {
+            for (Map.Entry<Class<?>, Integer> entry : enumIds.entrySet()) {
+                Class<?> enumClass = entry.getKey();
+                Method unknown;
+                try {
+                    unknown = enumClass.getMethod("unknown", String.class);
+                } catch (NoSuchMethodException e) {
+                    throw new UnsupportedSchemaException("Generated enum lacks unknown method: "
+                            + enumClass.getName());
+                }
+                List<EnumConstant> constants = enumConstants(enumClass);
+                MethodVisitor method = writer.visitMethod(
+                        ACC_PRIVATE,
+                        enumReaderName(enumClass),
+                        "(L" + READER + ";)L" + Type.getInternalName(enumClass) + ";",
+                        null,
+                        null);
+                method.visitCode();
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedReadStringKey",
+                        "()I",
+                        false);
+                method.visitVarInsn(ISTORE, 2);
+                Map<Integer, List<EnumConstant>> groups = new LinkedHashMap<>();
+                for (EnumConstant constant : constants) {
+                    groups.computeIfAbsent(enumSwitchKey(constant.value()), ignored -> new ArrayList<>())
+                            .add(constant);
+                }
+                List<Integer> hashes = groups.keySet().stream().sorted().toList();
+                int[] keys = hashes.stream().mapToInt(Integer::intValue).toArray();
+                Label unknownValue = new Label();
+                Label[] labels = hashes.stream().map(ignored -> new Label()).toArray(Label[]::new);
+                method.visitVarInsn(ILOAD, 2);
+                method.visitLookupSwitchInsn(unknownValue, keys, labels);
+                for (int i = 0; i < hashes.size(); i++) {
+                    method.visitLabel(labels[i]);
+                    for (EnumConstant constant : groups.get(hashes.get(i))) {
+                        Label next = new Label();
+                        emitEnumValueEquals(method, constant.value());
+                        method.visitJumpInsn(IFEQ, next);
+                        method.visitFieldInsn(
+                                GETSTATIC,
+                                Type.getInternalName(enumClass),
+                                constant.field().getName(),
+                                "L" + Type.getInternalName(enumClass) + ";");
+                        method.visitInsn(ARETURN);
+                        method.visitLabel(next);
+                    }
+                    method.visitJumpInsn(GOTO, unknownValue);
+                }
+                method.visitLabel(unknownValue);
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedFieldName",
+                        "()Ljava/lang/String;",
+                        false);
+                invoke(method, unknown);
+                method.visitInsn(ARETURN);
+                method.visitMaxs(0, 0);
+                method.visitEnd();
+                methodCount++;
+            }
+        }
+
+        private void emitIntEnumReaders() {
+            for (Map.Entry<Class<?>, Integer> entry : intEnumIds.entrySet()) {
+                Class<?> enumClass = entry.getKey();
+                Method unknown;
+                try {
+                    unknown = enumClass.getMethod("unknown", int.class);
+                } catch (NoSuchMethodException e) {
+                    throw new UnsupportedSchemaException("Generated intEnum lacks unknown method: "
+                            + enumClass.getName());
+                }
+                List<IntEnumConstant> constants = intEnumConstants(enumClass);
+                MethodVisitor method = writer.visitMethod(
+                        ACC_PRIVATE,
+                        intEnumReaderName(enumClass),
+                        "(L" + READER + ";)L" + Type.getInternalName(enumClass) + ";",
+                        null,
+                        null);
+                method.visitCode();
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedReadInteger",
+                        "()I",
+                        false);
+                method.visitVarInsn(ISTORE, 2);
+                Label unknownValue = new Label();
+                if (!constants.isEmpty()) {
+                    int[] keys = constants.stream().mapToInt(IntEnumConstant::value).toArray();
+                    Label[] labels = constants.stream().map(ignored -> new Label()).toArray(Label[]::new);
+                    method.visitVarInsn(ILOAD, 2);
+                    method.visitLookupSwitchInsn(unknownValue, keys, labels);
+                    for (int i = 0; i < constants.size(); i++) {
+                        method.visitLabel(labels[i]);
+                        method.visitFieldInsn(
+                                GETSTATIC,
+                                Type.getInternalName(enumClass),
+                                constants.get(i).field().getName(),
+                                "L" + Type.getInternalName(enumClass) + ";");
+                        method.visitInsn(ARETURN);
+                    }
+                }
+                method.visitLabel(unknownValue);
+                method.visitVarInsn(ILOAD, 2);
+                invoke(method, unknown);
+                method.visitInsn(ARETURN);
+                method.visitMaxs(0, 0);
+                method.visitEnd();
+                methodCount++;
+            }
+        }
+
+        private List<IntEnumConstant> intEnumConstants(Class<?> enumClass) {
+            List<IntEnumConstant> result = new ArrayList<>();
+            Set<Integer> seen = new HashSet<>();
+            for (var field : enumClass.getFields()) {
+                if (Modifier.isStatic(field.getModifiers()) && field.getType() == enumClass) {
+                    int value;
+                    try {
+                        value = ((SmithyIntEnum) field.get(null)).getValue();
+                    } catch (IllegalAccessException e) {
+                        throw new UnsupportedSchemaException("Cannot access intEnum constant "
+                                + enumClass.getName() + "." + field.getName());
+                    }
+                    // Duplicate switch keys would make the generated class fail verification.
+                    if (seen.add(value)) {
+                        result.add(new IntEnumConstant(field, value));
+                    }
+                }
+            }
+            result.sort(Comparator.comparingInt(IntEnumConstant::value));
+            return result;
+        }
+
+        private List<EnumConstant> enumConstants(Class<?> enumClass) {
+            List<EnumConstant> result = new ArrayList<>();
+            for (var field : enumClass.getFields()) {
+                if (Modifier.isStatic(field.getModifiers()) && field.getType() == enumClass) {
+                    try {
+                        result.add(new EnumConstant(field, ((SmithyEnum) field.get(null)).getValue()));
+                    } catch (IllegalAccessException e) {
+                        throw new UnsupportedSchemaException("Cannot access enum constant "
+                                + enumClass.getName() + "." + field.getName());
+                    }
+                }
+            }
+            result.sort(Comparator.comparing(constant -> constant.field().getName()));
+            return result;
+        }
+
+        private void emitEnumValueEquals(MethodVisitor method, String value) {
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            method.visitVarInsn(ALOAD, 1);
+            if (bytes.length <= Long.BYTES) {
+                method.visitLdcInsn(packLittleEndian(bytes, 0, bytes.length));
+                method.visitLdcInsn(lowByteMask(bytes.length));
+                method.visitLdcInsn(bytes.length);
+                method.visitLdcInsn(value);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedStringEquals8",
+                        "(JJILjava/lang/String;)Z",
+                        false);
+            } else if (bytes.length <= Long.BYTES * 2) {
+                method.visitLdcInsn(packLittleEndian(bytes, 0, Long.BYTES));
+                method.visitLdcInsn(packLittleEndian(bytes, Long.BYTES, bytes.length - Long.BYTES));
+                method.visitLdcInsn(lowByteMask(bytes.length - Long.BYTES));
+                method.visitLdcInsn(bytes.length);
+                method.visitLdcInsn(value);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedStringEquals16",
+                        "(JJJILjava/lang/String;)Z",
+                        false);
+            } else {
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedFieldName",
+                        "()Ljava/lang/String;",
+                        false);
+                method.visitLdcInsn(value);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        "java/lang/String",
+                        "equals",
+                        "(Ljava/lang/Object;)Z",
+                        false);
+            }
+        }
+
+        private static int enumSwitchKey(String value) {
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            int prefix = Math.min(bytes.length, Long.BYTES);
+            return SmithyJsonDeserializer.stringKey(packLittleEndian(bytes, 0, prefix), bytes.length);
+        }
+
+        private record EnumConstant(Field field, String value) {}
+
+        private record IntEnumConstant(Field field, int value) {}
+
+        private void emitAggregateMethods() {
+            for (var schema : orderedAggregates) {
+                if (schema.type() == ShapeType.MAP) {
+                    emitMapWriter(schema);
+                    emitMapReader(schema);
+                } else {
+                    emitListWriter(schema);
+                    emitListReader(schema);
+                }
+            }
+        }
+
+        private void emitListWriter(Schema schema) {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    aggregateWriterName(schema),
+                    "(Ljava/util/List;L" + WRITER + ";)V",
+                    null,
+                    null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "beginArray", "()V", false);
+            method.visitInsn(ICONST_0);
+            method.visitVarInsn(ISTORE, 3);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "size", "()I", true);
+            method.visitVarInsn(ISTORE, 4);
+            Label loop = new Label();
+            Label done = new Label();
+            method.visitLabel(loop);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitVarInsn(ILOAD, 4);
+            method.visitJumpInsn(IF_ICMPGE, done);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitMethodInsn(
+                    INVOKEINTERFACE,
+                    "java/util/List",
+                    "get",
+                    "(I)Ljava/lang/Object;",
+                    true);
+            method.visitVarInsn(ASTORE, 5);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "element", "(I)V", false);
+            Label nonNull = new Label();
+            Label next = new Label();
+            method.visitVarInsn(ALOAD, 5);
+            method.visitJumpInsn(IFNONNULL, nonNull);
+            if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+                method.visitVarInsn(ALOAD, 2);
+                method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeNull", "()V", false);
+            } else {
+                emitThrow(method, "Null value found in dense list");
+            }
+            method.visitJumpInsn(GOTO, next);
+            method.visitLabel(nonNull);
+            emitWriteTarget(method, schema.listMember(), 5, 2);
+            method.visitLabel(next);
+            method.visitIincInsn(3, 1);
+            method.visitJumpInsn(GOTO, loop);
+            method.visitLabel(done);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "endArray", "()V", false);
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitListReader(Schema schema) {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    aggregateReaderName(schema),
+                    "(L" + READER + ";)Ljava/util/List;",
+                    null,
+                    null);
+            method.visitCode();
+            method.visitInsn(ACONST_NULL);
+            method.visitVarInsn(ASTORE, 2);
+            method.visitInsn(ICONST_0);
+            method.visitVarInsn(ISTORE, 3);
+            for (int local = 5; local <= 8; local++) {
+                method.visitInsn(ACONST_NULL);
+                method.visitVarInsn(ASTORE, local);
+            }
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedBeginArray", "()Z", false);
+            Label done = new Label();
+            Label loop = new Label();
+            method.visitJumpInsn(IFEQ, done);
+            method.visitLabel(loop);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedTryReadNull", "()Z", false);
+            Label value = new Label();
+            Label decoded = new Label();
+            method.visitJumpInsn(IFEQ, value);
+            if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+                method.visitInsn(ACONST_NULL);
+            } else {
+                emitThrow(method, "Null value found in dense list");
+            }
+            method.visitJumpInsn(GOTO, decoded);
+            method.visitLabel(value);
+            emitReadTarget(method, schema.listMember(), 1);
+            method.visitLabel(decoded);
+            method.visitVarInsn(ASTORE, 4);
+
+            Label append = new Label();
+            Label added = new Label();
+            method.visitVarInsn(ALOAD, 2);
+            method.visitJumpInsn(IFNONNULL, append);
+            Label spill = new Label();
+            Label[] slots = {new Label(), new Label(), new Label(), new Label()};
+            method.visitVarInsn(ILOAD, 3);
+            method.visitLookupSwitchInsn(spill, new int[] {0, 1, 2, 3}, slots);
+            for (int i = 0; i < slots.length; i++) {
+                method.visitLabel(slots[i]);
+                method.visitVarInsn(ALOAD, 4);
+                method.visitVarInsn(ASTORE, 5 + i);
+                method.visitJumpInsn(GOTO, added);
+            }
+            method.visitLabel(spill);
+            emitNewArrayList(method, 8);
+            method.visitVarInsn(ASTORE, 2);
+            for (int local = 5; local <= 8; local++) {
+                emitArrayListAdd(method, 2, local);
+            }
+            emitArrayListAdd(method, 2, 4);
+            method.visitJumpInsn(GOTO, added);
+
+            method.visitLabel(append);
+            emitArrayListAdd(method, 2, 4);
+            method.visitLabel(added);
+            method.visitIincInsn(3, 1);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedArrayHasNext", "()Z", false);
+            method.visitJumpInsn(IFNE, loop);
+            method.visitLabel(done);
+
+            Label result = new Label();
+            method.visitVarInsn(ALOAD, 2);
+            method.visitJumpInsn(IFNONNULL, result);
+            method.visitTypeInsn(NEW, "java/util/ArrayList");
+            method.visitInsn(DUP);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    "java/util/ArrayList",
+                    "<init>",
+                    "(I)V",
+                    false);
+            method.visitVarInsn(ASTORE, 2);
+            Label impossible = new Label();
+            Label[] sizes = {new Label(), new Label(), new Label(), new Label(), new Label()};
+            method.visitVarInsn(ILOAD, 3);
+            method.visitLookupSwitchInsn(impossible, new int[] {0, 1, 2, 3, 4}, sizes);
+            for (int size = 0; size < sizes.length; size++) {
+                method.visitLabel(sizes[size]);
+                for (int local = 5; local < 5 + size; local++) {
+                    emitArrayListAdd(method, 2, local);
+                }
+                method.visitJumpInsn(GOTO, result);
+            }
+            method.visitLabel(impossible);
+            emitThrow(method, "Invalid staged list size");
+            method.visitLabel(result);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitInsn(ARETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private static void emitNewArrayList(MethodVisitor method, int capacity) {
+            method.visitTypeInsn(NEW, "java/util/ArrayList");
+            method.visitInsn(DUP);
+            method.visitLdcInsn(capacity);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    "java/util/ArrayList",
+                    "<init>",
+                    "(I)V",
+                    false);
+        }
+
+        private static void emitArrayListAdd(
+                MethodVisitor method,
+                int listLocal,
+                int valueLocal
+        ) {
+            method.visitVarInsn(ALOAD, listLocal);
+            method.visitVarInsn(ALOAD, valueLocal);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    "java/util/ArrayList",
+                    "add",
+                    "(Ljava/lang/Object;)Z",
+                    false);
+            method.visitInsn(POP);
+        }
+
+        private void emitMapWriter(Schema schema) {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    aggregateWriterName(schema),
+                    "(Ljava/util/Map;L" + WRITER + ";)V",
+                    null,
+                    null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "beginObject", "()V", false);
+            Schema target = schema.isMember() ? schema.memberTarget() : schema;
+            method.visitVarInsn(ALOAD, 1);
+            method.visitTypeInsn(NEW, MAP_CONSUMER);
+            method.visitInsn(DUP);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitLdcInsn(aggregateIds.get(target.id()));
+            method.visitInsn(schema.hasTrait(TraitKey.SPARSE_TRAIT) ? ICONST_1 : ICONST_0);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    MAP_CONSUMER,
+                    "<init>",
+                    "(L" + CODEC + ";L" + WRITER + ";IZ)V",
+                    false);
+            method.visitMethodInsn(
+                    INVOKEINTERFACE,
+                    "java/util/Map",
+                    "forEach",
+                    "(Ljava/util/function/BiConsumer;)V",
+                    true);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "endObject", "()V", false);
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitWriteMapValueDispatch() {
+            List<Schema> maps = new ArrayList<>();
+            for (Schema aggregate : orderedAggregates) {
+                if (aggregate.type() == ShapeType.MAP) {
+                    maps.add(aggregate);
+                }
+            }
+            if (maps.isEmpty()) {
+                return;
+            }
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PUBLIC,
+                    "writeMapValue",
+                    "(ILjava/lang/Object;L" + WRITER + ";)V",
+                    null,
+                    null);
+            method.visitCode();
+            int[] keys = new int[maps.size()];
+            Label[] labels = new Label[maps.size()];
+            for (int i = 0; i < maps.size(); i++) {
+                keys[i] = aggregateIds.get(maps.get(i).id());
+                labels[i] = new Label();
+            }
+            Label unknown = new Label();
+            method.visitVarInsn(ILOAD, 1);
+            method.visitLookupSwitchInsn(unknown, keys, labels);
+            for (int i = 0; i < maps.size(); i++) {
+                method.visitLabel(labels[i]);
+                emitWriteTarget(method, maps.get(i).mapValueMember(), 2, 3);
+                method.visitInsn(RETURN);
+            }
+            method.visitLabel(unknown);
+            emitThrow(method, "Unknown map aggregate id");
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitMapReader(Schema schema) {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    aggregateReaderName(schema),
+                    "(L" + READER + ";)Ljava/util/Map;",
+                    null,
+                    null);
+            method.visitCode();
+            method.visitTypeInsn(NEW, "java/util/LinkedHashMap");
+            method.visitInsn(DUP);
+            method.visitMethodInsn(INVOKESPECIAL, "java/util/LinkedHashMap", "<init>", "()V", false);
+            method.visitVarInsn(ASTORE, 2);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedBeginObject", "()Z", false);
+            Label done = new Label();
+            Label loop = new Label();
+            method.visitJumpInsn(IFEQ, done);
+            method.visitLabel(loop);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    READER,
+                    "generatedReadMapKey",
+                    "()Ljava/lang/String;",
+                    false);
+            method.visitVarInsn(ASTORE, 3);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitVarInsn(ALOAD, 3);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedTryReadNull", "()Z", false);
+            Label value = new Label();
+            Label put = new Label();
+            method.visitJumpInsn(IFEQ, value);
+            if (schema.hasTrait(TraitKey.SPARSE_TRAIT)) {
+                method.visitInsn(ACONST_NULL);
+            } else {
+                emitThrow(method, "Null value found in dense map");
+            }
+            method.visitJumpInsn(GOTO, put);
+            method.visitLabel(value);
+            emitReadTarget(method, schema.mapValueMember(), 1);
+            method.visitLabel(put);
+            method.visitMethodInsn(
+                    INVOKEINTERFACE,
+                    "java/util/Map",
+                    "put",
+                    "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                    true);
+            method.visitInsn(POP);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedObjectHasNext", "()Z", false);
+            method.visitJumpInsn(IFNE, loop);
+            method.visitLabel(done);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitInsn(ARETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private static void emitUtf8(MethodVisitor method, String value) {
+            method.visitLdcInsn(value);
+            method.visitFieldInsn(
+                    GETSTATIC,
+                    Type.getInternalName(StandardCharsets.class),
+                    "UTF_8",
+                    "Ljava/nio/charset/Charset;");
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    "java/lang/String",
+                    "getBytes",
+                    "(Ljava/nio/charset/Charset;)[B",
+                    false);
+        }
+
+        private void emitWriteEntry() {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PUBLIC,
+                    "write",
+                    "(L" + SERIALIZABLE_SHAPE + ";L" + WRITER + ";)V",
+                    null,
+                    null);
+            method.visitCode();
+            RuntimeCodecPlan.StructPlan root = plan.rootStructure();
+            if (root.union()) {
+                Label supported = new Label();
+                method.visitVarInsn(ALOAD, 1);
+                method.visitTypeInsn(INSTANCEOF, Type.getInternalName(findUnknownUnionClass(root.shapeClass())));
+                method.visitJumpInsn(IFEQ, supported);
+                emitThrow(method, "Unsupported or unknown union variant for " + root.schema().id());
+                method.visitLabel(supported);
+            }
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitTypeInsn(CHECKCAST, Type.getInternalName(root.shapeClass()));
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    className,
+                    writerName(root),
+                    writerDescriptor(root),
+                    false);
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitReadEntry() {
+            RuntimeCodecPlan.StructPlan root = plan.rootStructure();
+            String builderName = Type.getInternalName(root.builderClass());
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PUBLIC,
+                    "readInto",
+                    "([BIIL" + SHAPE_BUILDER + ";L" + SETTINGS + ";)V",
+                    null,
+                    null);
+            method.visitCode();
+            method.visitTypeInsn(NEW, READER);
+            method.visitInsn(DUP);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitVarInsn(ILOAD, 2);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitVarInsn(ALOAD, 5);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    READER,
+                    "<init>",
+                    "([BIIL" + SETTINGS + ";)V",
+                    false);
+            method.visitVarInsn(ASTORE, 6);
+
+            Label start = new Label();
+            Label end = new Label();
+            Label handler = new Label();
+            method.visitTryCatchBlock(start, end, handler, "java/lang/Throwable");
+            method.visitLabel(start);
+            Label empty = new Label();
+            method.visitVarInsn(ALOAD, 6);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedAtEnd", "()Z", false);
+            method.visitJumpInsn(IFNE, empty);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 6);
+            method.visitVarInsn(ALOAD, 4);
+            method.visitTypeInsn(CHECKCAST, builderName);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    className,
+                    readerName(root),
+                    readerDescriptor(root),
+                    false);
+            method.visitLabel(empty);
+            method.visitVarInsn(ALOAD, 6);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "close", "()V", false);
+            method.visitLabel(end);
+            method.visitInsn(RETURN);
+            method.visitLabel(handler);
+            method.visitVarInsn(ASTORE, 7);
+            method.visitVarInsn(ALOAD, 6);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedAbort", "()V", false);
+            method.visitVarInsn(ALOAD, 7);
+            method.visitInsn(ATHROW);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitScanEntry() {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PUBLIC,
+                    "scan",
+                    "([BL" + SETTINGS + ";)I",
+                    null,
+                    null);
+            method.visitCode();
+            method.visitTypeInsn(NEW, READER);
+            method.visitInsn(DUP);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitInsn(ICONST_0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitInsn(ARRAYLENGTH);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    READER,
+                    "<init>",
+                    "([BIIL" + SETTINGS + ";)V",
+                    false);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedScan", "()I", false);
+            method.visitInsn(IRETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitWriter(RuntimeCodecPlan.StructPlan structure) {
+            if (structure.union()) {
+                emitUnionWriter(structure);
+                return;
+            }
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    writerName(structure),
+                    writerDescriptor(structure),
+                    null,
+                    null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "beginObject", "()V", false);
+            method.visitInsn(ICONST_0);
+            method.visitVarInsn(ISTORE, 3);
+            List<RuntimeCodecPlan.MemberPlan> members = structure.members();
+            List<RuntimeCodecPlan.MethodRange> chunks = structure.writerChunks();
+            for (int chunk = 0; chunk < chunks.size(); chunk++) {
+                method.visitVarInsn(ALOAD, 0);
+                method.visitVarInsn(ALOAD, 1);
+                method.visitVarInsn(ALOAD, 2);
+                method.visitVarInsn(ILOAD, 3);
+                method.visitMethodInsn(
+                        INVOKESPECIAL,
+                        className,
+                        writerChunkName(structure, chunk),
+                        writerChunkDescriptor(structure),
+                        false);
+                method.visitVarInsn(ISTORE, 3);
+            }
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "endObject", "()V", false);
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+
+            for (int chunk = 0; chunk < chunks.size(); chunk++) {
+                RuntimeCodecPlan.MethodRange range = chunks.get(chunk);
+                MethodVisitor chunkMethod = writer.visitMethod(
+                        ACC_PRIVATE,
+                        writerChunkName(structure, chunk),
+                        writerChunkDescriptor(structure),
+                        null,
+                        null);
+                chunkMethod.visitCode();
+                for (int i = range.startInclusive(); i < range.endExclusive(); i++) {
+                    emitWriteMember(chunkMethod, members.get(i), 3, 4);
+                }
+                chunkMethod.visitVarInsn(ILOAD, 3);
+                chunkMethod.visitInsn(IRETURN);
+                chunkMethod.visitMaxs(0, 0);
+                chunkMethod.visitEnd();
+                methodCount++;
+            }
+        }
+
+        private void emitUnionWriter(RuntimeCodecPlan.StructPlan structure) {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    writerName(structure),
+                    writerDescriptor(structure),
+                    null,
+                    null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "beginObject", "()V", false);
+            for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                Label next = new Label();
+                method.visitVarInsn(ALOAD, 1);
+                method.visitTypeInsn(INSTANCEOF, Type.getInternalName(member.unionVariant()));
+                method.visitJumpInsn(IFEQ, next);
+                emitField(method, member, -1);
+                Method accessor = member.unionAccessor();
+                Class<?> valueType = accessor.getReturnType();
+                if (valueType.isPrimitive()) {
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitTypeInsn(CHECKCAST, Type.getInternalName(member.unionVariant()));
+                    invoke(method, accessor);
+                    emitWriteTargetOnStack(method, member.schema(), valueType);
+                } else {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitTypeInsn(CHECKCAST, Type.getInternalName(member.unionVariant()));
+                    invoke(method, accessor);
+                    method.visitVarInsn(ASTORE, 3);
+                    emitWriteTarget(method, member.schema(), 3, 2);
+                }
+                method.visitVarInsn(ALOAD, 2);
+                method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "endObject", "()V", false);
+                method.visitInsn(RETURN);
+                method.visitLabel(next);
+            }
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "endObject", "()V", false);
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitWriteMember(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                int indexLocal,
+                int valueLocal
+        ) {
+            Label skip = new Label();
+            Method presence = member.presence();
+            if (presence != null) {
+                method.visitVarInsn(ALOAD, 1);
+                invoke(method, presence);
+                method.visitJumpInsn(IFEQ, skip);
+            }
+
+            Class<?> returnType = member.getter().getReturnType();
+            if (!returnType.isPrimitive()) {
+                method.visitVarInsn(ALOAD, 1);
+                invoke(method, member.getter());
+                method.visitVarInsn(ASTORE, valueLocal);
+                method.visitVarInsn(ALOAD, valueLocal);
+                method.visitJumpInsn(IFNULL, skip);
+                if (member.target().type() == ShapeType.STRING) {
+                    emitStringField(method, member, indexLocal, valueLocal);
+                    method.visitLabel(skip);
+                    return;
+                }
+                emitField(method, member, indexLocal);
+                if (member.target().type() == ShapeType.STRUCTURE
+                        || member.target().type() == ShapeType.UNION) {
+                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(member.target().id());
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, valueLocal);
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            writerName(nested),
+                            writerDescriptor(nested),
+                            false);
+                } else if (member.target().type() == ShapeType.LIST
+                        || member.target().type() == ShapeType.SET) {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, valueLocal);
+                    method.visitTypeInsn(CHECKCAST, "java/util/List");
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            aggregateWriterName(member.target()),
+                            "(Ljava/util/List;L" + WRITER + ";)V",
+                            false);
+                } else if (member.target().type() == ShapeType.MAP) {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, valueLocal);
+                    method.visitTypeInsn(CHECKCAST, "java/util/Map");
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            aggregateWriterName(member.target()),
+                            "(Ljava/util/Map;L" + WRITER + ";)V",
+                            false);
+                } else {
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitVarInsn(ALOAD, valueLocal);
+                    emitWriteValue(method, member, returnType);
+                }
+                method.visitLabel(skip);
+                return;
+            }
+            emitField(method, member, indexLocal);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitVarInsn(ALOAD, 1);
+            invoke(method, member.getter());
+            emitWriteValue(method, member, returnType);
+            method.visitLabel(skip);
+        }
+
+        private void emitStringField(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                int indexLocal,
+                int valueLocal
+        ) {
+            method.visitVarInsn(ALOAD, 2);
+            method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
+            method.visitVarInsn(ILOAD, indexLocal);
+            method.visitVarInsn(ALOAD, valueLocal);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    WRITER,
+                    "fieldString",
+                    "([BILjava/lang/String;)V",
+                    false);
+            method.visitIincInsn(indexLocal, 1);
+        }
+
+        private void emitField(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                int indexLocal
+        ) {
+            method.visitVarInsn(ALOAD, 2);
+            method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
+            if (indexLocal < 0) {
+                method.visitInsn(ICONST_0);
+            } else {
+                method.visitVarInsn(ILOAD, indexLocal);
+            }
+            method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "field", "([BI)V", false);
+            if (indexLocal >= 0) {
+                method.visitIincInsn(indexLocal, 1);
+            }
+        }
+
+        private void emitWriteValue(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                Class<?> javaType
+        ) {
+            ShapeType type = member.target().type();
+            String descriptor;
+            switch (type) {
+                case BOOLEAN -> {
+                    unbox(method, javaType, Boolean.class, "booleanValue", "()Z");
+                    descriptor = "(Z)V";
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeBoolean", descriptor, false);
+                }
+                case BYTE -> {
+                    unbox(method, javaType, Byte.class, "byteValue", "()B");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeByte", "(B)V", false);
+                }
+                case SHORT -> {
+                    unbox(method, javaType, Short.class, "shortValue", "()S");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeShort", "(S)V", false);
+                }
+                case INTEGER -> {
+                    unbox(method, javaType, Integer.class, "intValue", "()I");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeInteger", "(I)V", false);
+                }
+                case LONG -> {
+                    unbox(method, javaType, Long.class, "longValue", "()J");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeLong", "(J)V", false);
+                }
+                case FLOAT -> {
+                    unbox(method, javaType, Float.class, "floatValue", "()F");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeFloat", "(F)V", false);
+                }
+                case DOUBLE -> {
+                    unbox(method, javaType, Double.class, "doubleValue", "()D");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeDouble", "(D)V", false);
+                }
+                case BIG_INTEGER -> method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        WRITER,
+                        "writeBigInteger",
+                        "(Ljava/math/BigInteger;)V",
+                        false);
+                case BIG_DECIMAL -> method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        WRITER,
+                        "writeBigDecimal",
+                        "(Ljava/math/BigDecimal;)V",
+                        false);
+                case STRING -> method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        WRITER,
+                        "writeString",
+                        "(Ljava/lang/String;)V",
+                        false);
+                case BLOB -> method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        WRITER,
+                        "writeBlob",
+                        "(L" + BYTE_BUFFER + ";)V",
+                        false);
+                case TIMESTAMP -> {
+                    method.visitLdcInsn(timestampFormat(member));
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeTimestamp",
+                            "(L" + Type.getInternalName(Instant.class) + ";I)V",
+                            false);
+                }
+                case DOCUMENT -> method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        WRITER,
+                        "writeDocument",
+                        "(L" + DOCUMENT + ";)V",
+                        false);
+                case ENUM -> {
+                    method.visitTypeInsn(CHECKCAST, SMITHY_ENUM);
+                    method.visitMethodInsn(
+                            INVOKEINTERFACE,
+                            SMITHY_ENUM,
+                            "getValue",
+                            "()Ljava/lang/String;",
+                            true);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeString",
+                            "(Ljava/lang/String;)V",
+                            false);
+                }
+                case INT_ENUM -> {
+                    method.visitTypeInsn(CHECKCAST, SMITHY_INT_ENUM);
+                    method.visitMethodInsn(INVOKEINTERFACE, SMITHY_INT_ENUM, "getValue", "()I", true);
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeInteger", "(I)V", false);
+                }
+                case LIST, SET, MAP, UNION -> throw new AssertionError("Aggregate writes are emitted by the caller");
+                case STRUCTURE -> throw new AssertionError("Structure writes are emitted by the caller");
+                // Unsupported types decline generation rather than reporting an emitter failure.
+                default -> throw new UnsupportedSchemaException(
+                        "JSON runtime codegen cannot write " + type + " at " + member.schema().id());
+            }
+        }
+
+        private static void unbox(
+                MethodVisitor method,
+                Class<?> actual,
+                Class<?> boxed,
+                String name,
+                String descriptor
+        ) {
+            if (!actual.isPrimitive()) {
+                method.visitTypeInsn(CHECKCAST, Type.getInternalName(boxed));
+                method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(boxed), name, descriptor, false);
+            }
+        }
+
+        private void emitWriteTarget(
+                MethodVisitor method,
+                Schema schema,
+                int valueLocal,
+                int writerLocal
+        ) {
+            var target = schema.isMember() ? schema.memberTarget() : schema;
+            switch (target.type()) {
+                case STRUCTURE, UNION -> {
+                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target.id());
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, valueLocal);
+                    method.visitTypeInsn(CHECKCAST, Type.getInternalName(nested.shapeClass()));
+                    method.visitVarInsn(ALOAD, writerLocal);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            writerName(nested),
+                            writerDescriptor(nested),
+                            false);
+                }
+                case LIST, SET -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, valueLocal);
+                    method.visitTypeInsn(CHECKCAST, "java/util/List");
+                    method.visitVarInsn(ALOAD, writerLocal);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            aggregateWriterName(target),
+                            "(Ljava/util/List;L" + WRITER + ";)V",
+                            false);
+                }
+                case MAP -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, valueLocal);
+                    method.visitTypeInsn(CHECKCAST, "java/util/Map");
+                    method.visitVarInsn(ALOAD, writerLocal);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            aggregateWriterName(target),
+                            "(Ljava/util/Map;L" + WRITER + ";)V",
+                            false);
+                }
+                default -> {
+                    method.visitVarInsn(ALOAD, writerLocal);
+                    method.visitVarInsn(ALOAD, valueLocal);
+                    emitWriteTargetOnStack(method, schema, Object.class);
+                }
+            }
+        }
+
+        private void emitWriteTargetOnStack(
+                MethodVisitor method,
+                Schema schema,
+                Class<?> javaType
+        ) {
+            var target = schema.isMember() ? schema.memberTarget() : schema;
+            switch (target.type()) {
+                case BOOLEAN -> {
+                    castAndUnbox(method, javaType, Boolean.class, "booleanValue", "()Z");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeBoolean", "(Z)V", false);
+                }
+                case BYTE -> {
+                    castAndUnbox(method, javaType, Byte.class, "byteValue", "()B");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeByte", "(B)V", false);
+                }
+                case SHORT -> {
+                    castAndUnbox(method, javaType, Short.class, "shortValue", "()S");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeShort", "(S)V", false);
+                }
+                case INTEGER -> {
+                    castAndUnbox(method, javaType, Integer.class, "intValue", "()I");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeInteger", "(I)V", false);
+                }
+                case LONG -> {
+                    castAndUnbox(method, javaType, Long.class, "longValue", "()J");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeLong", "(J)V", false);
+                }
+                case FLOAT -> {
+                    castAndUnbox(method, javaType, Float.class, "floatValue", "()F");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeFloat", "(F)V", false);
+                }
+                case DOUBLE -> {
+                    castAndUnbox(method, javaType, Double.class, "doubleValue", "()D");
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeDouble", "(D)V", false);
+                }
+                case BIG_INTEGER -> {
+                    method.visitTypeInsn(CHECKCAST, "java/math/BigInteger");
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeBigInteger",
+                            "(Ljava/math/BigInteger;)V",
+                            false);
+                }
+                case BIG_DECIMAL -> {
+                    method.visitTypeInsn(CHECKCAST, "java/math/BigDecimal");
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeBigDecimal",
+                            "(Ljava/math/BigDecimal;)V",
+                            false);
+                }
+                case STRING -> {
+                    method.visitTypeInsn(CHECKCAST, "java/lang/String");
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeString",
+                            "(Ljava/lang/String;)V",
+                            false);
+                }
+                case ENUM -> {
+                    method.visitTypeInsn(CHECKCAST, SMITHY_ENUM);
+                    method.visitMethodInsn(
+                            INVOKEINTERFACE,
+                            SMITHY_ENUM,
+                            "getValue",
+                            "()Ljava/lang/String;",
+                            true);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeString",
+                            "(Ljava/lang/String;)V",
+                            false);
+                }
+                case BLOB -> {
+                    method.visitTypeInsn(CHECKCAST, BYTE_BUFFER);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeBlob",
+                            "(L" + BYTE_BUFFER + ";)V",
+                            false);
+                }
+                case TIMESTAMP -> {
+                    method.visitTypeInsn(CHECKCAST, Type.getInternalName(Instant.class));
+                    method.visitLdcInsn(timestampFormat(schema));
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeTimestamp",
+                            "(L" + Type.getInternalName(Instant.class) + ";I)V",
+                            false);
+                }
+                case DOCUMENT -> {
+                    method.visitTypeInsn(CHECKCAST, DOCUMENT);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            WRITER,
+                            "writeDocument",
+                            "(L" + DOCUMENT + ";)V",
+                            false);
+                }
+                case INT_ENUM -> {
+                    method.visitTypeInsn(CHECKCAST, SMITHY_INT_ENUM);
+                    method.visitMethodInsn(INVOKEINTERFACE, SMITHY_INT_ENUM, "getValue", "()I", true);
+                    method.visitMethodInsn(INVOKEVIRTUAL, WRITER, "writeInteger", "(I)V", false);
+                }
+                // Unsupported types decline generation rather than reporting an emitter failure.
+                default -> throw new UnsupportedSchemaException(
+                        "JSON runtime codegen cannot write " + target.type() + " at " + schema.id());
+            }
+        }
+
+        private static void castAndUnbox(
+                MethodVisitor method,
+                Class<?> actual,
+                Class<?> boxed,
+                String name,
+                String descriptor
+        ) {
+            if (!actual.isPrimitive()) {
+                method.visitTypeInsn(CHECKCAST, Type.getInternalName(boxed));
+                method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(boxed), name, descriptor, false);
+            }
+        }
+
+        private void emitReader(RuntimeCodecPlan.StructPlan structure) {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    readerName(structure),
+                    readerDescriptor(structure),
+                    null,
+                    null);
+            method.visitCode();
+            emitReaderBody(method, structure);
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitReaderBuckets(RuntimeCodecPlan.StructPlan structure) {
+            int buckets = readerBucketCount(structure);
+            if (buckets > 1) {
+                for (int bucket = 0; bucket < buckets; bucket++) {
+                    emitReaderBucket(structure, bucket, buckets);
+                }
+            }
+        }
+
+        private void emitReaderBody(MethodVisitor method, RuntimeCodecPlan.StructPlan structure) {
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedBeginObject", "()Z", false);
+            Label done = new Label();
+            method.visitJumpInsn(IFEQ, done);
+            Label loop = new Label();
+            if (canFuseOrderedObjectFraming(structure)) {
+                Label fallback = new Label();
+                RuntimeCodecPlan.MemberPlan first = structure.members().getFirst();
+                emitTryReadField(method, first, false);
+                method.visitJumpInsn(IFEQ, fallback);
+                emitReadMember(method, first);
+                for (int i = 1; i < structure.members().size(); i++) {
+                    RuntimeCodecPlan.MemberPlan member = structure.members().get(i);
+                    Label next = new Label();
+                    emitTryReadField(method, member, true);
+                    method.visitJumpInsn(IFEQ, next);
+                    emitReadMember(method, member);
+                    method.visitLabel(next);
+                }
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        "generatedObjectHasNext",
+                        "()Z",
+                        false);
+                method.visitJumpInsn(IFEQ, done);
+                method.visitLabel(fallback);
+            } else {
+                for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                    Label next = new Label();
+                    emitTryReadField(method, member, false);
+                    method.visitJumpInsn(IFEQ, next);
+                    emitReadMember(method, member);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedObjectHasNext",
+                            "()Z",
+                            false);
+                    method.visitJumpInsn(IFEQ, done);
+                    method.visitLabel(next);
+                }
+            }
+            method.visitLabel(loop);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedReadFieldHash", "()I", false);
+            method.visitVarInsn(ISTORE, 3);
+            int buckets = readerBucketCount(structure);
+            if (buckets == 1) {
+                emitReadDispatch(method, structure);
+            } else {
+                Label dispatched = new Label();
+                Label unknown = new Label();
+                Map<Integer, Integer> hashBuckets = new LinkedHashMap<>();
+                for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                    int hash = fieldHash(wireName(member));
+                    hashBuckets.put(hash, Math.floorMod(hash, buckets));
+                }
+                List<Integer> hashes = hashBuckets.keySet().stream().sorted().toList();
+                int[] switchKeys = hashes.stream().mapToInt(Integer::intValue).toArray();
+                Label[] bucketLabels = new Label[buckets];
+                for (int bucket = 0; bucket < buckets; bucket++) {
+                    bucketLabels[bucket] = new Label();
+                }
+                Label[] switchLabels = new Label[hashes.size()];
+                for (int i = 0; i < hashes.size(); i++) {
+                    switchLabels[i] = bucketLabels[hashBuckets.get(hashes.get(i))];
+                }
+                method.visitVarInsn(ILOAD, 3);
+                method.visitLookupSwitchInsn(unknown, switchKeys, switchLabels);
+                for (int bucket = 0; bucket < buckets; bucket++) {
+                    method.visitLabel(bucketLabels[bucket]);
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitVarInsn(ILOAD, 3);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            readerBucketName(structure, bucket),
+                            readerBucketDescriptor(structure),
+                            false);
+                    method.visitJumpInsn(IFEQ, unknown);
+                    method.visitJumpInsn(GOTO, dispatched);
+                }
+                method.visitLabel(unknown);
+                emitUnknownField(method, structure);
+                method.visitLabel(dispatched);
+            }
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedObjectHasNext", "()Z", false);
+            method.visitJumpInsn(IFNE, loop);
+            method.visitLabel(done);
+        }
+
+        private void emitStructureValueReader(RuntimeCodecPlan.StructPlan structure) {
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    structureValueReaderName(structure),
+                    structureValueReaderDescriptor(structure),
+                    null,
+                    null);
+            method.visitCode();
+            invoke(method, structure.builderFactory());
+            method.visitVarInsn(ASTORE, 2);
+            emitReaderBody(method, structure);
+            method.visitVarInsn(ALOAD, 2);
+            invoke(method, findBuild(structure.builderClass(), structure.shapeClass()));
+            method.visitInsn(ARETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private boolean canFuseOrderedObjectFraming(RuntimeCodecPlan.StructPlan structure) {
+            return !structure.union()
+                    && !structure.members().isEmpty()
+                    && structure.members().getFirst().required();
+        }
+
+        // Scan the full object so null/discriminator fields are skipped and duplicate members fail.
+        private void emitUnionValueReader(RuntimeCodecPlan.StructPlan structure) {
+            String unionName = Type.getInternalName(structure.shapeClass());
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    unionValueReaderName(structure),
+                    "(L" + READER + ";)L" + unionName + ";",
+                    null,
+                    null);
+            method.visitCode();
+            method.visitInsn(ACONST_NULL);
+            method.visitVarInsn(ASTORE, 3);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedBeginObject", "()Z", false);
+            Label dispatch = new Label();
+            method.visitJumpInsn(IFNE, dispatch);
+            emitThrow(method, MISSING_UNION_MEMBER);
+
+            Label advance = new Label();
+            Label multiple = new Label();
+
+            method.visitLabel(dispatch);
+            for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                Label next = new Label();
+                emitTryReadField(method, member);
+                method.visitJumpInsn(IFEQ, next);
+                emitUnionValue(method, member, advance, multiple);
+                method.visitLabel(next);
+            }
+
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedReadFieldHash", "()I", false);
+            method.visitVarInsn(ISTORE, 2);
+
+            Map<Integer, List<RuntimeCodecPlan.MemberPlan>> groups = new LinkedHashMap<>();
+            for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                groups.computeIfAbsent(fieldHash(wireName(member)), ignored -> new ArrayList<>())
+                        .add(member);
+            }
+            List<Integer> keys = groups.keySet().stream().sorted().toList();
+            int[] switchKeys = keys.stream().mapToInt(Integer::intValue).toArray();
+            Label unknown = new Label();
+            Label[] labels = keys.stream().map(ignored -> new Label()).toArray(Label[]::new);
+            method.visitVarInsn(ILOAD, 2);
+            method.visitLookupSwitchInsn(unknown, switchKeys, labels);
+            for (int i = 0; i < keys.size(); i++) {
+                method.visitLabel(labels[i]);
+                for (RuntimeCodecPlan.MemberPlan member : groups.get(keys.get(i))) {
+                    Label next = new Label();
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitFieldInsn(GETSTATIC, className, "N" + memberIds.get(member), "[B");
+                    method.visitLdcInsn(wireName(member));
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedFieldEquals",
+                            "([BLjava/lang/String;)Z",
+                            false);
+                    method.visitJumpInsn(IFEQ, next);
+                    emitUnionValue(method, member, advance, multiple);
+                    method.visitLabel(next);
+                }
+                method.visitJumpInsn(GOTO, unknown);
+            }
+
+            method.visitLabel(unknown);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    READER,
+                    "generatedFieldName",
+                    "()Ljava/lang/String;",
+                    false);
+            method.visitVarInsn(ASTORE, 4);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedSkipValue", "()V", false);
+            emitTypeDiscriminatorEquals(method, 4);
+            method.visitJumpInsn(IFNE, advance);
+            if (forbidUnknownUnionMembers) {
+                emitThrow(method, "Unknown union member");
+            } else {
+                method.visitVarInsn(ALOAD, 3);
+                method.visitJumpInsn(IFNONNULL, multiple);
+                Class<?> unknownClass = findUnknownUnionClass(structure.shapeClass());
+                method.visitTypeInsn(NEW, Type.getInternalName(unknownClass));
+                method.visitInsn(DUP);
+                method.visitVarInsn(ALOAD, 4);
+                method.visitMethodInsn(
+                        INVOKESPECIAL,
+                        Type.getInternalName(unknownClass),
+                        "<init>",
+                        "(Ljava/lang/String;)V",
+                        false);
+                method.visitVarInsn(ASTORE, 3);
+                method.visitJumpInsn(GOTO, advance);
+            }
+
+            method.visitLabel(multiple);
+            emitThrow(method, "Union object contains multiple members");
+
+            method.visitLabel(advance);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedObjectHasNext", "()Z", false);
+            method.visitJumpInsn(IFNE, dispatch);
+            method.visitVarInsn(ALOAD, 3);
+            Label found = new Label();
+            method.visitJumpInsn(IFNONNULL, found);
+            emitThrow(method, MISSING_UNION_MEMBER);
+            method.visitLabel(found);
+            method.visitVarInsn(ALOAD, 3);
+            // The merged frame type is the variants' common superclass, so the verifier needs this cast.
+            method.visitTypeInsn(CHECKCAST, unionName);
+            method.visitInsn(ARETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitUnionValue(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                Label advance,
+                Label multiple
+        ) {
+            // Null-valued fields do not select a union member.
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedTryReadNull", "()Z", false);
+            method.visitJumpInsn(IFNE, advance);
+            method.visitVarInsn(ALOAD, 3);
+            method.visitJumpInsn(IFNONNULL, multiple);
+            String variant = Type.getInternalName(member.unionVariant());
+            method.visitTypeInsn(NEW, variant);
+            method.visitInsn(DUP);
+            emitReadTarget(method, member.schema(), 1);
+            Class<?> parameter = member.unionAccessor().getReturnType();
+            unboxIfPrimitive(method, parameter);
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    variant,
+                    "<init>",
+                    Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(parameter)),
+                    false);
+            method.visitVarInsn(ASTORE, 3);
+            method.visitJumpInsn(GOTO, advance);
+        }
+
+        private static void emitTypeDiscriminatorEquals(MethodVisitor method, int nameLocal) {
+            method.visitLdcInsn(TYPE_DISCRIMINATOR);
+            method.visitVarInsn(ALOAD, nameLocal);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    "java/lang/String",
+                    "equals",
+                    "(Ljava/lang/Object;)Z",
+                    false);
+        }
+
+        private static Class<?> findUnknownUnionClass(Class<?> unionClass) {
+            for (Class<?> nested : unionClass.getDeclaredClasses()) {
+                if (nested.getSimpleName().equals("$Unknown")) {
+                    return nested;
+                }
+            }
+            throw new UnsupportedSchemaException("No unknown union variant on " + unionClass.getName());
+        }
+
+        private static Method findUnknownMemberHook(Class<?> builderClass) {
+            try {
+                return builderClass.getMethod("$unknownMember", String.class);
+            } catch (NoSuchMethodException e) {
+                throw new UnsupportedSchemaException(
+                        "No unknown member hook on union builder " + builderClass.getName());
+            }
+        }
+
+        private static void unboxIfPrimitive(MethodVisitor method, Class<?> type) {
+            if (!type.isPrimitive()) {
+                return;
+            }
+            if (type == boolean.class) {
+                method.visitTypeInsn(CHECKCAST, "java/lang/Boolean");
+                method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false);
+            } else if (type == byte.class) {
+                method.visitTypeInsn(CHECKCAST, "java/lang/Byte");
+                method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Byte", "byteValue", "()B", false);
+            } else if (type == short.class) {
+                method.visitTypeInsn(CHECKCAST, "java/lang/Short");
+                method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Short", "shortValue", "()S", false);
+            } else if (type == int.class) {
+                method.visitTypeInsn(CHECKCAST, "java/lang/Integer");
+                method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false);
+            } else if (type == long.class) {
+                method.visitTypeInsn(CHECKCAST, "java/lang/Long");
+                method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false);
+            } else if (type == float.class) {
+                method.visitTypeInsn(CHECKCAST, "java/lang/Float");
+                method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false);
+            } else if (type == double.class) {
+                method.visitTypeInsn(CHECKCAST, "java/lang/Double");
+                method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false);
+            }
+        }
+
+        private void emitReadDispatch(MethodVisitor method, RuntimeCodecPlan.StructPlan structure) {
+            Map<Integer, List<RuntimeCodecPlan.MemberPlan>> groups = new LinkedHashMap<>();
+            for (RuntimeCodecPlan.MemberPlan member : structure.members()) {
+                groups.computeIfAbsent(fieldHash(wireName(member)), ignored -> new ArrayList<>())
+                        .add(member);
+            }
+            List<Integer> keys = groups.keySet().stream().sorted(Comparator.naturalOrder()).toList();
+            int[] switchKeys = keys.stream().mapToInt(Integer::intValue).toArray();
+            Label unknown = new Label();
+            Label after = new Label();
+            Label[] labels = keys.stream().map(ignored -> new Label()).toArray(Label[]::new);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitLookupSwitchInsn(unknown, switchKeys, labels);
+            for (int i = 0; i < keys.size(); i++) {
+                method.visitLabel(labels[i]);
+                List<RuntimeCodecPlan.MemberPlan> collisions = groups.get(keys.get(i));
+                for (RuntimeCodecPlan.MemberPlan member : collisions) {
+                    Label next = new Label();
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitFieldInsn(GETSTATIC, className, "N" + memberIds.get(member), "[B");
+                    method.visitLdcInsn(wireName(member));
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedFieldEquals",
+                            "([BLjava/lang/String;)Z",
+                            false);
+                    method.visitJumpInsn(IFEQ, next);
+                    emitReadMember(method, member);
+                    method.visitJumpInsn(GOTO, after);
+                    method.visitLabel(next);
+                }
+                method.visitJumpInsn(GOTO, unknown);
+            }
+            method.visitLabel(unknown);
+            emitUnknownField(method, structure);
+            method.visitLabel(after);
+        }
+
+        // Unknown union fields must reach the builder hook; structures simply skip them.
+        private void emitUnknownField(MethodVisitor method, RuntimeCodecPlan.StructPlan structure) {
+            if (!structure.union()) {
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedSkipValue", "()V", false);
+                return;
+            }
+            Method unknownMember = findUnknownMemberHook(structure.builderClass());
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    READER,
+                    "generatedFieldName",
+                    "()Ljava/lang/String;",
+                    false);
+            method.visitVarInsn(ASTORE, 4);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedSkipValue", "()V", false);
+            Label done = new Label();
+            emitTypeDiscriminatorEquals(method, 4);
+            method.visitJumpInsn(IFNE, done);
+            if (forbidUnknownUnionMembers) {
+                emitThrow(method, "Unknown union member");
+            } else {
+                method.visitVarInsn(ALOAD, 2);
+                method.visitVarInsn(ALOAD, 4);
+                invoke(method, unknownMember);
+                if (unknownMember.getReturnType() != void.class) {
+                    method.visitInsn(POP);
+                }
+            }
+            method.visitLabel(done);
+        }
+
+        private void emitTryReadField(MethodVisitor method, RuntimeCodecPlan.MemberPlan member) {
+            emitTryReadField(method, member, false);
+        }
+
+        private void emitTryReadField(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                boolean afterValue
+        ) {
+            byte[] token = fieldToken(member);
+            method.visitVarInsn(ALOAD, 1);
+            if (token.length <= Long.BYTES) {
+                long mask = lowByteMask(token.length);
+                method.visitLdcInsn(packLittleEndian(token, 0, token.length) & mask);
+                method.visitLdcInsn(mask);
+                method.visitLdcInsn(token.length);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        afterValue ? "generatedTryReadNextField8" : "generatedTryReadField8",
+                        "(JJI)Z",
+                        false);
+            } else if (token.length <= Long.BYTES * 2) {
+                int suffixLength = token.length - Long.BYTES;
+                long suffixMask = lowByteMask(suffixLength);
+                method.visitLdcInsn(packLittleEndian(token, 0, Long.BYTES));
+                method.visitLdcInsn(packLittleEndian(token, Long.BYTES, suffixLength) & suffixMask);
+                method.visitLdcInsn(suffixMask);
+                method.visitLdcInsn(token.length);
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        afterValue ? "generatedTryReadNextField16" : "generatedTryReadField16",
+                        "(JJJI)Z",
+                        false);
+            } else {
+                method.visitFieldInsn(GETSTATIC, className, "W" + memberIds.get(member), "[B");
+                method.visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        READER,
+                        afterValue ? "generatedTryReadNextField" : "generatedTryReadField",
+                        "([B)Z",
+                        false);
+            }
+        }
+
+        private byte[] fieldToken(RuntimeCodecPlan.MemberPlan member) {
+            var extension = member.schema().getExtension(SmithyJsonSchemaExtensions.KEY);
+            return useJsonName ? extension.jsonNameBytes() : extension.memberNameBytes();
+        }
+
+        private static long packLittleEndian(byte[] value, int offset, int length) {
+            long packed = 0;
+            for (int i = 0; i < length; i++) {
+                packed |= (long) (value[offset + i] & 0xFF) << (i << 3);
+            }
+            return packed;
+        }
+
+        private static long lowByteMask(int length) {
+            return length == Long.BYTES ? -1L : (1L << (length << 3)) - 1;
+        }
+
+        private void emitReaderBucket(
+                RuntimeCodecPlan.StructPlan structure,
+                int bucket,
+                int bucketCount
+        ) {
+            List<RuntimeCodecPlan.MemberPlan> members = structure.members()
+                    .stream()
+                    .filter(member -> Math.floorMod(fieldHash(wireName(member)), bucketCount) == bucket)
+                    .toList();
+            MethodVisitor method = writer.visitMethod(
+                    ACC_PRIVATE,
+                    readerBucketName(structure, bucket),
+                    readerBucketDescriptor(structure),
+                    null,
+                    null);
+            method.visitCode();
+            Map<Integer, List<RuntimeCodecPlan.MemberPlan>> groups = new LinkedHashMap<>();
+            for (RuntimeCodecPlan.MemberPlan member : members) {
+                groups.computeIfAbsent(fieldHash(wireName(member)), ignored -> new ArrayList<>())
+                        .add(member);
+            }
+            List<Integer> keys = groups.keySet().stream().sorted(Comparator.naturalOrder()).toList();
+            int[] switchKeys = keys.stream().mapToInt(Integer::intValue).toArray();
+            Label unknown = new Label();
+            Label[] labels = keys.stream().map(ignored -> new Label()).toArray(Label[]::new);
+            method.visitVarInsn(ILOAD, 3);
+            method.visitLookupSwitchInsn(unknown, switchKeys, labels);
+            for (int i = 0; i < keys.size(); i++) {
+                method.visitLabel(labels[i]);
+                for (RuntimeCodecPlan.MemberPlan member : groups.get(keys.get(i))) {
+                    Label next = new Label();
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitFieldInsn(GETSTATIC, className, "N" + memberIds.get(member), "[B");
+                    method.visitLdcInsn(wireName(member));
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedFieldEquals",
+                            "([BLjava/lang/String;)Z",
+                            false);
+                    method.visitJumpInsn(IFEQ, next);
+                    emitReadMember(method, member);
+                    method.visitInsn(ICONST_1);
+                    method.visitInsn(IRETURN);
+                    method.visitLabel(next);
+                }
+                method.visitJumpInsn(GOTO, unknown);
+            }
+            method.visitLabel(unknown);
+            method.visitInsn(ICONST_0);
+            method.visitInsn(IRETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+            methodCount++;
+        }
+
+        private void emitReadMember(MethodVisitor method, RuntimeCodecPlan.MemberPlan member) {
+            Class<?> parameter = member.setter().getParameterTypes()[0];
+            Label skip = new Label();
+            // Null leaves errorCorrection() to supply defaults, including for primitive setters.
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, READER, "generatedTryReadNull", "()Z", false);
+            method.visitJumpInsn(IFNE, skip);
+            method.visitVarInsn(ALOAD, 2);
+            emitReadValue(method, member, parameter);
+            invoke(method, member.setter());
+            if (member.setter().getReturnType() != void.class) {
+                method.visitInsn(POP);
+            }
+            method.visitLabel(skip);
+        }
+
+        private void emitReadValue(
+                MethodVisitor method,
+                RuntimeCodecPlan.MemberPlan member,
+                Class<?> parameter
+        ) {
+            ShapeType type = member.target().type();
+            switch (type) {
+                case BOOLEAN -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadBoolean",
+                            "()Z",
+                            false);
+                    box(method, parameter, Boolean.class, "(Z)Ljava/lang/Boolean;");
+                }
+                case BYTE -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadByte",
+                            "()B",
+                            false);
+                    box(method, parameter, Byte.class, "(B)Ljava/lang/Byte;");
+                }
+                case SHORT -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadShort",
+                            "()S",
+                            false);
+                    box(method, parameter, Short.class, "(S)Ljava/lang/Short;");
+                }
+                case INTEGER -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadInteger",
+                            "()I",
+                            false);
+                    box(method, parameter, Integer.class, "(I)Ljava/lang/Integer;");
+                }
+                case LONG -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadLong",
+                            "()J",
+                            false);
+                    box(method, parameter, Long.class, "(J)Ljava/lang/Long;");
+                }
+                case FLOAT -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadFloat",
+                            "()F",
+                            false);
+                    box(method, parameter, Float.class, "(F)Ljava/lang/Float;");
+                }
+                case DOUBLE -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadDouble",
+                            "()D",
+                            false);
+                    box(method, parameter, Double.class, "(D)Ljava/lang/Double;");
+                }
+                case BIG_INTEGER -> readObject(method, "readBigInteger", "Ljava/math/BigInteger;");
+                case BIG_DECIMAL -> readObject(method, "readBigDecimal", "Ljava/math/BigDecimal;");
+                case STRING -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadString",
+                            "()Ljava/lang/String;",
+                            false);
+                }
+                case ENUM -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            enumReaderName(member.target().shapeClass()),
+                            "(L" + READER + ";)L" + Type.getInternalName(member.target().shapeClass()) + ";",
+                            false);
+                }
+                case INT_ENUM -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            intEnumReaderName(member.target().shapeClass()),
+                            "(L" + READER + ";)L" + Type.getInternalName(member.target().shapeClass()) + ";",
+                            false);
+                }
+                case BLOB -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadBlob",
+                            "()L" + BYTE_BUFFER + ";",
+                            false);
+                }
+                case TIMESTAMP -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            timestampReader(member.schema()),
+                            "()L" + Type.getInternalName(Instant.class) + ";",
+                            false);
+                }
+                case DOCUMENT -> {
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "readDocument",
+                            "()L" + DOCUMENT + ";",
+                            false);
+                }
+                case STRUCTURE -> emitReadStructure(method, member);
+                case UNION -> {
+                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(member.target().id());
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            unionValueReaderName(nested),
+                            "(L" + READER + ";)L" + Type.getInternalName(nested.shapeClass()) + ";",
+                            false);
+                }
+                case LIST, SET -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            aggregateReaderName(member.target()),
+                            "(L" + READER + ";)Ljava/util/List;",
+                            false);
+                }
+                case MAP -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, 1);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            aggregateReaderName(member.target()),
+                            "(L" + READER + ";)Ljava/util/Map;",
+                            false);
+                }
+                default -> throw new UnsupportedSchemaException(
+                        "JSON runtime codegen cannot read " + type + " at " + member.schema().id());
+            }
+        }
+
+        private void emitReadTarget(
+                MethodVisitor method,
+                Schema schema,
+                int readerLocal
+        ) {
+            var target = schema.isMember() ? schema.memberTarget() : schema;
+            switch (target.type()) {
+                case BOOLEAN -> {
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadBoolean", "Z");
+                    method.visitMethodInsn(
+                            INVOKESTATIC,
+                            "java/lang/Boolean",
+                            "valueOf",
+                            "(Z)Ljava/lang/Boolean;",
+                            false);
+                }
+                case BYTE -> {
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadByte", "B");
+                    method.visitMethodInsn(
+                            INVOKESTATIC,
+                            "java/lang/Byte",
+                            "valueOf",
+                            "(B)Ljava/lang/Byte;",
+                            false);
+                }
+                case SHORT -> {
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadShort", "S");
+                    method.visitMethodInsn(
+                            INVOKESTATIC,
+                            "java/lang/Short",
+                            "valueOf",
+                            "(S)Ljava/lang/Short;",
+                            false);
+                }
+                case INTEGER -> {
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadInteger", "I");
+                    method.visitMethodInsn(
+                            INVOKESTATIC,
+                            "java/lang/Integer",
+                            "valueOf",
+                            "(I)Ljava/lang/Integer;",
+                            false);
+                }
+                case LONG -> {
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadLong", "J");
+                    method.visitMethodInsn(
+                            INVOKESTATIC,
+                            "java/lang/Long",
+                            "valueOf",
+                            "(J)Ljava/lang/Long;",
+                            false);
+                }
+                case FLOAT -> {
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadFloat", "F");
+                    method.visitMethodInsn(
+                            INVOKESTATIC,
+                            "java/lang/Float",
+                            "valueOf",
+                            "(F)Ljava/lang/Float;",
+                            false);
+                }
+                case DOUBLE -> {
+                    readGeneratedPrimitive(method, readerLocal, "generatedReadDouble", "D");
+                    method.visitMethodInsn(
+                            INVOKESTATIC,
+                            "java/lang/Double",
+                            "valueOf",
+                            "(D)Ljava/lang/Double;",
+                            false);
+                }
+                case BIG_INTEGER -> readObject(method, readerLocal, "readBigInteger", "Ljava/math/BigInteger;");
+                case BIG_DECIMAL -> readObject(method, readerLocal, "readBigDecimal", "Ljava/math/BigDecimal;");
+                case STRING -> {
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadString",
+                            "()Ljava/lang/String;",
+                            false);
+                }
+                case ENUM -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            enumReaderName(target.shapeClass()),
+                            "(L" + READER + ";)L" + Type.getInternalName(target.shapeClass()) + ";",
+                            false);
+                }
+                case INT_ENUM -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            intEnumReaderName(target.shapeClass()),
+                            "(L" + READER + ";)L" + Type.getInternalName(target.shapeClass()) + ";",
+                            false);
+                }
+                case BLOB -> {
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "generatedReadBlob",
+                            "()L" + BYTE_BUFFER + ";",
+                            false);
+                }
+                case TIMESTAMP -> {
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            timestampReader(schema),
+                            "()L" + Type.getInternalName(Instant.class) + ";",
+                            false);
+                }
+                case DOCUMENT -> {
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKEVIRTUAL,
+                            READER,
+                            "readDocument",
+                            "()L" + DOCUMENT + ";",
+                            false);
+                }
+                case LIST, SET -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            aggregateReaderName(target),
+                            "(L" + READER + ";)Ljava/util/List;",
+                            false);
+                }
+                case MAP -> {
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            aggregateReaderName(target),
+                            "(L" + READER + ";)Ljava/util/Map;",
+                            false);
+                }
+                case STRUCTURE -> emitReadStructureValue(method, target, readerLocal);
+                case UNION -> {
+                    RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target.id());
+                    method.visitVarInsn(ALOAD, 0);
+                    method.visitVarInsn(ALOAD, readerLocal);
+                    method.visitMethodInsn(
+                            INVOKESPECIAL,
+                            className,
+                            unionValueReaderName(nested),
+                            "(L" + READER + ";)L" + Type.getInternalName(nested.shapeClass()) + ";",
+                            false);
+                }
+                default -> throw new UnsupportedSchemaException(
+                        "JSON runtime codegen cannot read " + target.type() + " at " + schema.id());
+            }
+        }
+
+        private void readGeneratedPrimitive(
+                MethodVisitor method,
+                int readerLocal,
+                String name,
+                String returnDescriptor
+        ) {
+            method.visitVarInsn(ALOAD, readerLocal);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    READER,
+                    name,
+                    "()" + returnDescriptor,
+                    false);
+        }
+
+        private void readObject(
+                MethodVisitor method,
+                int readerLocal,
+                String name,
+                String returnDescriptor
+        ) {
+            method.visitVarInsn(ALOAD, readerLocal);
+            method.visitInsn(ACONST_NULL);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    READER,
+                    name,
+                    "(Lsoftware/amazon/smithy/java/core/schema/Schema;)" + returnDescriptor,
+                    false);
+        }
+
+        private void readObject(MethodVisitor method, String name, String returnDescriptor) {
+            method.visitVarInsn(ALOAD, 1);
+            method.visitInsn(ACONST_NULL);
+            method.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    READER,
+                    name,
+                    "(Lsoftware/amazon/smithy/java/core/schema/Schema;)" + returnDescriptor,
+                    false);
+        }
+
+        private void emitReadStructure(MethodVisitor method, RuntimeCodecPlan.MemberPlan member) {
+            emitReadStructureValue(method, member.target(), 1);
+        }
+
+        private void emitReadStructureValue(
+                MethodVisitor method,
+                Schema schema,
+                int readerLocal
+        ) {
+            Schema target = schema.isMember() ? schema.memberTarget() : schema;
+            RuntimeCodecPlan.StructPlan nested = structuresBySchema.get(target.id());
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, readerLocal);
+            if (nested.union()) {
+                method.visitMethodInsn(
+                        INVOKESPECIAL,
+                        className,
+                        unionValueReaderName(nested),
+                        "(L" + READER + ";)L" + Type.getInternalName(nested.shapeClass()) + ";",
+                        false);
+                return;
+            }
+            method.visitMethodInsn(
+                    INVOKESPECIAL,
+                    className,
+                    structureValueReaderName(nested),
+                    structureValueReaderDescriptor(nested),
+                    false);
+        }
+
+        private static void box(
+                MethodVisitor method,
+                Class<?> parameter,
+                Class<?> boxed,
+                String descriptor
+        ) {
+            if (!parameter.isPrimitive()) {
+                method.visitMethodInsn(
+                        INVOKESTATIC,
+                        Type.getInternalName(boxed),
+                        "valueOf",
+                        descriptor,
+                        false);
+            }
+        }
+
+        private String writerName(RuntimeCodecPlan.StructPlan structure) {
+            return "writeS" + structureIds.get(structure);
+        }
+
+        private String writerChunkName(RuntimeCodecPlan.StructPlan structure, int chunk) {
+            return writerName(structure) + "C" + chunk;
+        }
+
+        private static String writerDescriptor(RuntimeCodecPlan.StructPlan structure) {
+            return "(L" + Type.getInternalName(structure.shapeClass()) + ";L" + WRITER + ";)V";
+        }
+
+        private static String writerChunkDescriptor(RuntimeCodecPlan.StructPlan structure) {
+            return "(L" + Type.getInternalName(structure.shapeClass()) + ";L" + WRITER + ";I)I";
+        }
+
+        private String readerName(RuntimeCodecPlan.StructPlan structure) {
+            return "readS" + structureIds.get(structure);
+        }
+
+        private String readerBucketName(RuntimeCodecPlan.StructPlan structure, int bucket) {
+            return readerName(structure) + "B" + bucket;
+        }
+
+        private String unionValueReaderName(RuntimeCodecPlan.StructPlan structure) {
+            return "readU" + structureIds.get(structure);
+        }
+
+        private String structureValueReaderName(RuntimeCodecPlan.StructPlan structure) {
+            return "readV" + structureIds.get(structure);
+        }
+
+        private String aggregateWriterName(Schema schema) {
+            Schema target = schema.isMember() ? schema.memberTarget() : schema;
+            return "writeA" + aggregateIds.get(target.id());
+        }
+
+        private String aggregateReaderName(Schema schema) {
+            Schema target = schema.isMember() ? schema.memberTarget() : schema;
+            return "readA" + aggregateIds.get(target.id());
+        }
+
+        private String enumReaderName(Class<?> enumClass) {
+            return "readE" + enumIds.get(enumClass);
+        }
+
+        private String intEnumReaderName(Class<?> enumClass) {
+            return "readI" + intEnumIds.get(enumClass);
+        }
+
+        private static String readerDescriptor(RuntimeCodecPlan.StructPlan structure) {
+            return "(L" + READER + ";L" + Type.getInternalName(structure.builderClass()) + ";)V";
+        }
+
+        private static String readerBucketDescriptor(RuntimeCodecPlan.StructPlan structure) {
+            return "(L" + READER + ";L" + Type.getInternalName(structure.builderClass()) + ";I)Z";
+        }
+
+        private static String structureValueReaderDescriptor(RuntimeCodecPlan.StructPlan structure) {
+            return "(L" + READER + ";)L" + Type.getInternalName(structure.shapeClass()) + ";";
+        }
+
+        private String wireName(RuntimeCodecPlan.MemberPlan member) {
+            if (useJsonName) {
+                var trait = member.schema().getTrait(TraitKey.JSON_NAME_TRAIT);
+                if (trait != null) {
+                    return trait.getValue();
+                }
+            }
+            return member.memberName();
+        }
+
+        private static int readerBucketCount(RuntimeCodecPlan.StructPlan structure) {
+            return structure.readerBuckets();
+        }
+
+        private int timestampFormat(RuntimeCodecPlan.MemberPlan member) {
+            return timestampFormat(member.schema());
+        }
+
+        private String timestampReader(Schema schema) {
+            return switch (timestampFormat(schema)) {
+                case 1 -> "generatedReadDateTimeTimestamp";
+                case 2 -> "generatedReadHttpDateTimestamp";
+                default -> "generatedReadEpochTimestamp";
+            };
+        }
+
+        private int timestampFormat(Schema schema) {
+            TimestampFormatter formatter = settings.timestampResolver().resolve(schema);
+            return switch (formatter.format()) {
+                case DATE_TIME -> 1;
+                case HTTP_DATE -> 2;
+                default -> 0;
+            };
+        }
+
+    }
+}

@@ -110,14 +110,53 @@ val compactStringsDisabledTest =
         }
     }
 
-tasks.named("check") {
-    dependsOn(compactStringAccessFallbackTest, compactStringsDisabledTest)
-}
-
 tasks.named("compileTestJava") {
     dependsOn("smithyBuild")
 }
 
 tasks.named("processTestResources") {
     dependsOn("smithyBuild")
+}
+
+val jdk25CodegenTest =
+    tasks.register<Test>("jdk25CodegenTest") {
+        description = "Run the JSON test suite with strict runtime code generation."
+        group = "verification"
+
+        testClassesDirs = sourceSets.test.get().output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        javaLauncher =
+            javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(25)
+        }
+        systemProperty("smithy-java.runtime-codegen.json", "strict")
+        systemProperty("smithy-java.json-provider", "smithy")
+        useJUnitPlatform()
+    }
+
+val runtimeCodegenPropertyValidationTest =
+    tasks.register<Test>("runtimeCodegenPropertyValidationTest") {
+        description = "Validate runtime-codegen property activation with the default JSON provider."
+        group = "verification"
+
+        testClassesDirs = sourceSets.test.get().output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        javaLauncher =
+            javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(25)
+            }
+        systemProperty("smithy-java.runtime-codegen.json", "enabled")
+        filter {
+            includeTestsMatching("*RuntimeCodegenPropertyValidationTest")
+        }
+        useJUnitPlatform()
+    }
+
+tasks.named("check") {
+    dependsOn(
+        compactStringAccessFallbackTest,
+        compactStringsDisabledTest,
+        jdk25CodegenTest,
+        runtimeCodegenPropertyValidationTest,
+    )
 }
