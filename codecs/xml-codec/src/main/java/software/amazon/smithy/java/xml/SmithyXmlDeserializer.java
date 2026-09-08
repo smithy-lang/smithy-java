@@ -5,9 +5,12 @@
 
 package software.amazon.smithy.java.xml;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -20,7 +23,9 @@ import java.util.Map;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
@@ -45,6 +50,9 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
     private static final byte[] ERROR_RESPONSE_BYTES = "ErrorResponse".getBytes(StandardCharsets.UTF_8);
     private static final byte[] ERROR_BYTES = "Error".getBytes(StandardCharsets.UTF_8);
     private static final byte[] RESPONSE_BYTES = "Response".getBytes(StandardCharsets.UTF_8);
+
+    private static final VarHandle LONG_LITTLE_ENDIAN =
+            MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
 
     private static final boolean[] NAME_CHAR = new boolean[256];
 
@@ -93,6 +101,22 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
     private final boolean isTopLevel;
     private final List<String> wrapperElements;
     private final boolean strictRootElement;
+
+    /**
+     * Formatters indexed by the codes {@link XmlCodegenWriter} already uses, so a generated reader can
+     * carry an {@code int} where the interpreted path carries a schema. Resolution is identical:
+     * {@code TimestampFormatter.of(schema, DATE_TIME)} depends on nothing but the resolved format.
+     */
+    private static final TimestampFormatter[] GENERATED_FORMATTERS = new TimestampFormatter[3];
+
+    static {
+        GENERATED_FORMATTERS[XmlCodegenWriter.FORMAT_EPOCH_SECONDS] =
+                TimestampFormatter.of(TimestampFormatTrait.Format.EPOCH_SECONDS);
+        GENERATED_FORMATTERS[XmlCodegenWriter.FORMAT_DATE_TIME] =
+                TimestampFormatter.of(TimestampFormatTrait.Format.DATE_TIME);
+        GENERATED_FORMATTERS[XmlCodegenWriter.FORMAT_HTTP_DATE] =
+                TimestampFormatter.of(TimestampFormatTrait.Format.HTTP_DATE);
+    }
 
     SmithyXmlDeserializer(
             byte[] buf,
@@ -661,7 +685,10 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
             pos++;
         }
 
-        if (pos >= limit || buf[pos + 1] != '!') {
+        // pos + 1 rather than pos: a document whose last byte is '<' leaves pos at limit - 1, and the
+        // CDATA probe would read one past the end. Falling into the fast path is right for that input;
+        // the caller then fails to find an end tag and rejects it the way it rejects any truncation.
+        if (pos + 1 >= limit || buf[pos + 1] != '!') {
             int len = pos - start;
             if (len == 0) {
                 return "";
@@ -989,14 +1016,18 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
     }
 
     private String getAttributeValueByBytes(byte[] nameBytes) {
+        return getAttributeValueByBytes(nameBytes, 0, nameBytes.length);
+    }
+
+    private String getAttributeValueByBytes(byte[] nameBytes, int offset, int length) {
         for (int i = 0; i < attrCount; i++) {
-            if (attrNameLens[i] == nameBytes.length
+            if (attrNameLens[i] == length
                     && Arrays.equals(buf,
                             attrNameStarts[i],
                             attrNameStarts[i] + attrNameLens[i],
                             nameBytes,
-                            0,
-                            nameBytes.length)) {
+                            offset,
+                            offset + length)) {
                 int vStart = attrValueStarts[i];
                 int vLen = attrValueLens[i];
                 for (int j = vStart; j < vStart + vLen; j++) {
@@ -1005,6 +1036,32 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                     }
                 }
                 return new String(buf, vStart, vLen, StandardCharsets.UTF_8);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Retries an attribute lookup with the namespace prefix stripped off the configured name.
+     *
+     * <p>The name table holds a member's {@code @xmlName} exactly as configured, prefix included, because
+     * the serializer writes those bytes verbatim. The parser stores an attribute under its local name only
+     * — it drops everything up to the first colon — so a configured name like {@code xsi:someName} can
+     * never match by full name, and the attribute was silently dropped. The branch that runs when there is
+     * no name table has always stripped the prefix, so this makes the two agree with each other, and both
+     * agree with the generated reader, which looks attributes up by local name.
+     *
+     * <p>Reached only after the full name missed, which is what happens for every absent optional
+     * attribute, so it costs a scan of a member name and nothing else unless that name is really prefixed.
+     * A prefixed name that collides with an unprefixed sibling resolves to the sibling, because the exact
+     * match is tried first.
+     *
+     * @return the value, or null if the name has no prefix or no attribute carries its local name.
+     */
+    private String getAttributeValueByLocalName(byte[] configuredName) {
+        for (int i = 0; i < configuredName.length; i++) {
+            if (configuredName[i] == ':') {
+                return getAttributeValueByBytes(configuredName, i + 1, configuredName.length - i - 1);
             }
         }
         return null;
@@ -1287,6 +1344,33 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
         validateNoTrailingContent();
     }
 
+    /**
+     * Hands the structure's children to a generated reader, or reports that there is none.
+     *
+     * <p>This is separate from {@link #readStruct}: a generated reader writes a concrete builder
+     * directly, while that method promises to invoke the caller's {@link StructMemberConsumer}.
+     * Conflating the two would make the callback disappear whenever its state happened to implement
+     * {@link ShapeBuilder}.
+     *
+     * <p>Nothing in the caller's {@link ByteBuffer} is advanced. When generation is unavailable this
+     * deserializer instance has entered the root, but the caller can discard it and create the generic
+     * fallback over the original buffer.
+     */
+    boolean readStructGenerated(
+            Schema schema,
+            ShapeBuilder<?> builder,
+            SmithyGeneratedXmlSerde generated,
+            XmlSettings settings,
+            MemberSubsetCodec.MemberSubset subset
+    ) {
+        enter(schema);
+        if (!generated.read(this, schema, builder, settings, subset)) {
+            return false;
+        }
+        validateNoTrailingContent();
+        return true;
+    }
+
     @Override
     public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
         enter(schema);
@@ -1320,6 +1404,253 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
         return null;
     }
 
+    // --------------------------------------------------------------------------------------------
+    // Generated reader support
+    //
+    // Everything below is called only from generated bytecode. Each method is a thin wrapper over the
+    // same primitive the interpreted path uses, so the two cannot drift on entity references, CDATA,
+    // end-tag validation, or number parsing. Generated code holds no parser state of its own: the
+    // element it is positioned on lives in this instance, exactly as it does for MemberDeserializer.
+    // --------------------------------------------------------------------------------------------
+
+    /**
+     * Captures the element a container reader must see closed, packed into one long so the generated
+     * reader spends one local slot pair on it instead of two.
+     *
+     * <p>The offsets point into {@code buf}, which does not move, so the pair stays valid for as long
+     * as the reader needs it even though {@code nameStart} and {@code nameLen} are overwritten by every
+     * child element.
+     */
+    long generatedEnterContainer() {
+        return ((long) nameStart << 32) | (nameLen & 0xFFFFFFFFL);
+    }
+
+    void generatedExitContainer(long container) {
+        validateContainerEndTag((int) (container >>> 32), (int) container);
+    }
+
+    boolean generatedNextElement() {
+        return nextStartElement();
+    }
+
+    int generatedNameLength() {
+        return nameLen;
+    }
+
+    boolean generatedNameEquals(byte[] expected) {
+        return nameEquals(expected);
+    }
+
+    /**
+     * Compares an element name of at most eight bytes against a value packed at generation time.
+     *
+     * <p>Generated dispatch already switched on {@link #generatedNameLength()}, so this is the
+     * comparison for a name whose length is known to match. One little-endian load and a mask replace
+     * the range compare {@link #generatedNameEquals} does, which is what makes the length switch worth
+     * having: the common case becomes a single {@code long} equality test.
+     *
+     * <p>Reading eight bytes when the name is shorter is safe and cannot leak: the mask discards
+     * everything past the name, and the bound is against {@code buf.length} rather than {@code limit}
+     * because {@code buf} may legitimately be a larger array this deserializer only owns a window of.
+     *
+     * @param expected the name's bytes packed little-endian, already masked to {@code length} bytes.
+     * @param mask keeps the low {@code length} bytes of a packed word.
+     * @param length the name's length in bytes, at most {@link Long#BYTES}.
+     */
+    boolean generatedNameEquals8(long expected, long mask, int length) {
+        if (nameLen != length) {
+            return false;
+        }
+        int start = nameStart;
+        long actual = start + Long.BYTES <= buf.length
+                ? (long) LONG_LITTLE_ENDIAN.get(buf, start) & mask
+                : packedName(start, length);
+        return actual == expected;
+    }
+
+    /**
+     * Compares an element name of nine to sixteen bytes against two values packed at generation time.
+     *
+     * <p>The first word is always complete. Only the tail needs a mask, which lets generated readers
+     * avoid the range-checking and mismatch loop used by {@link Arrays#equals(byte[], int, int, byte[],
+     * int, int)} for the common medium-length XML names.
+     */
+    boolean generatedNameEquals16(long expectedHead, long expectedTail, long tailMask, int length) {
+        if (nameLen != length) {
+            return false;
+        }
+        int start = nameStart;
+        long actualHead = (long) LONG_LITTLE_ENDIAN.get(buf, start);
+        int tailLength = length - Long.BYTES;
+        int tailStart = start + Long.BYTES;
+        long actualTail = tailStart + Long.BYTES <= buf.length
+                ? (long) LONG_LITTLE_ENDIAN.get(buf, tailStart) & tailMask
+                : packedName(tailStart, tailLength);
+        return actualHead == expectedHead && actualTail == expectedTail;
+    }
+
+    private long packedName(int start, int length) {
+        long value = 0;
+        for (int i = 0; i < length; i++) {
+            value |= (long) (buf[start + i] & 0xFF) << (i << 3);
+        }
+        return value;
+    }
+
+    String generatedElementName() {
+        return elementName();
+    }
+
+    void generatedSkipElement() {
+        skipElement();
+    }
+
+    boolean generatedHasAttributes() {
+        return attrCount > 0;
+    }
+
+    String generatedAttribute(byte[] name) {
+        return getAttributeValueByBytes(name);
+    }
+
+    boolean generatedIsNull() {
+        return isMemberNull();
+    }
+
+    boolean generatedReadBoolean() {
+        readTextSpan();
+        boolean result = parseBooleanFromSpan();
+        consumeEndElement();
+        return result;
+    }
+
+    byte generatedReadByte() {
+        readTextSpan();
+        int value = parseIntFromSpan();
+        if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) {
+            throw new SerializationException("Value out of range for byte: " + value);
+        }
+        consumeEndElement();
+        return (byte) value;
+    }
+
+    short generatedReadShort() {
+        readTextSpan();
+        int value = parseIntFromSpan();
+        if (value < Short.MIN_VALUE || value > Short.MAX_VALUE) {
+            throw new SerializationException("Value out of range for short: " + value);
+        }
+        consumeEndElement();
+        return (short) value;
+    }
+
+    int generatedReadInteger() {
+        readTextSpan();
+        int result = parseIntFromSpan();
+        consumeEndElement();
+        return result;
+    }
+
+    long generatedReadLong() {
+        readTextSpan();
+        long result = parseLongFromSpan();
+        consumeEndElement();
+        return result;
+    }
+
+    float generatedReadFloat() {
+        readTextSpan();
+        float result = parseFloatFromSpan();
+        consumeEndElement();
+        return result;
+    }
+
+    double generatedReadDouble() {
+        readTextSpan();
+        double result = parseDoubleFromSpan();
+        consumeEndElement();
+        return result;
+    }
+
+    BigInteger generatedReadBigInteger() {
+        readTextSpan();
+        BigInteger result = parseBigIntegerFromSpan();
+        consumeEndElement();
+        return result;
+    }
+
+    BigDecimal generatedReadBigDecimal() {
+        readTextSpan();
+        BigDecimal result = parseBigDecimalFromSpan();
+        consumeEndElement();
+        return result;
+    }
+
+    String generatedReadString() {
+        return readStringAndConsumeEndTag();
+    }
+
+    ByteBuffer generatedReadBlob() {
+        readTextSpan();
+        ByteBuffer result = parseBlobFromSpan();
+        consumeEndElement();
+        return result;
+    }
+
+    /** @param format one of the {@code XmlCodegenWriter.FORMAT_*} codes. */
+    Instant generatedReadTimestamp(int format) {
+        readTextSpan();
+        Instant result = parseTimestampFromSpan(GENERATED_FORMATTERS[format], null);
+        consumeEndElement();
+        return result;
+    }
+
+    /** Reads a map key element's text and consumes its end tag, leaving the value element next. */
+    String generatedReadKey() {
+        String key = readTextContent();
+        consumeEndElement();
+        return key;
+    }
+
+    /** Consumes the end tag of a map entry, whose name is not the element the reader is positioned on. */
+    void generatedEndEntry(byte[] entryName) {
+        consumeEndElement(entryName);
+    }
+
+    /** Skips the element a null-valued member occupies, mirroring {@code MemberDeserializer.readNull}. */
+    void generatedSkipNull() {
+        skipElement();
+    }
+
+    static boolean generatedAttrBoolean(String value) {
+        return switch (value) {
+            case "true" -> true;
+            case "false" -> false;
+            default -> throw new SerializationException(
+                    "Expected boolean 'true' or 'false', found '" + value + "'");
+        };
+    }
+
+    static Instant generatedAttrTimestamp(String value, int format) {
+        try {
+            return GENERATED_FORMATTERS[format].readFromString(value, false);
+        } catch (TimestampFormatter.TimestampSyntaxError e) {
+            throw new SerializationException("Failed to read timestamp: " + e.getMessage(), e);
+        }
+    }
+
+    /** Mirrors {@code MemberDeserializer.isNull()} for both the interpreted and generated paths. */
+    private boolean isMemberNull() {
+        if (selfClosing) {
+            return true;
+        }
+        int saved = pos;
+        while (saved < limit && isWhitespace(buf[saved])) {
+            saved++;
+        }
+        return saved + 1 < limit && buf[saved] == '<' && buf[saved + 1] == '/';
+    }
+
     private <T> void readStructContent(Schema schema, T state, StructMemberConsumer<T> consumer) {
         int containerNameStart = nameStart;
         int containerNameLen = nameLen;
@@ -1336,7 +1667,11 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                 int idx = attributeSchema.memberIndex();
                 String attrValue;
                 if (nameTable != null && idx >= 0 && idx < nameTable.length && nameTable[idx] != null) {
-                    attrValue = getAttributeValueByBytes(nameTable[idx]);
+                    byte[] configuredName = nameTable[idx];
+                    attrValue = getAttributeValueByBytes(configuredName);
+                    if (attrValue == null) {
+                        attrValue = getAttributeValueByLocalName(configuredName);
+                    }
                 } else {
                     String attributeName = entry.getKey();
                     int colonIdx = attributeName.indexOf(':');
@@ -1562,10 +1897,18 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
     }
 
     private Instant parseTimestampFromSpan(Schema schema) {
+        return parseTimestampFromSpan(null, schema);
+    }
+
+    /**
+     * @param formatter the resolved formatter, or null to resolve it from {@code schema} on demand. A
+     *                  generated reader already knows the format, while the interpreted path
+     *                  deliberately keeps resolution off the ISO-8601 fast path.
+     */
+    private Instant parseTimestampFromSpan(TimestampFormatter formatter, Schema schema) {
         if (spanHasCdataFallback()) {
             try {
-                return TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME)
-                        .readFromString(textFallback, false);
+                return formatter(formatter, schema).readFromString(textFallback, false);
             } catch (TimestampFormatter.TimestampSyntaxError | DateTimeParseException e) {
                 throw new SerializationException("Failed to read timestamp: " + e.getMessage(), e);
             }
@@ -1576,10 +1919,16 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                 return result;
             }
             String value = new String(buf, textSpanStart, textSpanEnd - textSpanStart, StandardCharsets.UTF_8);
-            return TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME).readFromString(value, false);
+            return formatter(formatter, schema).readFromString(value, false);
         } catch (TimestampFormatter.TimestampSyntaxError | DateTimeParseException e) {
             throw new SerializationException("Failed to read timestamp: " + e.getMessage(), e);
         }
+    }
+
+    private static TimestampFormatter formatter(TimestampFormatter formatter, Schema schema) {
+        return formatter != null
+                ? formatter
+                : TimestampFormatter.of(schema, TimestampFormatTrait.Format.DATE_TIME);
     }
 
     private int parseIntFromSpan() {
@@ -1751,14 +2100,7 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
 
         @Override
         public boolean isNull() {
-            if (selfClosing) {
-                return true;
-            }
-            int saved = pos;
-            while (saved < limit && isWhitespace(buf[saved])) {
-                saved++;
-            }
-            return saved + 1 < limit && buf[saved] == '<' && buf[saved + 1] == '/';
+            return isMemberNull();
         }
 
         @Override
