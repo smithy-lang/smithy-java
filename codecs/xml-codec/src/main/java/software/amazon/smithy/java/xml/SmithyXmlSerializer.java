@@ -41,6 +41,7 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
     private static final StripedPool<SmithyXmlSerializer, AcquireContext> POOL = new XmlStripedPool();
 
     private byte[] buf;
+    private byte[] base64Scratch;
     private int pos;
     private OutputStream sink;
     private XmlNamespaceTrait defaultNamespace;
@@ -108,6 +109,15 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
 
     private void grow(int needed) {
         buf = Arrays.copyOf(buf, Math.max(buf.length * 2, pos + needed));
+    }
+
+    private byte[] base64Scratch(int dataLen) {
+        int capacity = ByteBufferUtils.base64EncodedSize(dataLen);
+        byte[] scratch = base64Scratch;
+        if (scratch == null || scratch.length < capacity) {
+            scratch = base64Scratch = new byte[capacity];
+        }
+        return scratch;
     }
 
     @Override
@@ -265,6 +275,9 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
         protected void prepareForPool(SmithyXmlSerializer s) {
             if (s.buf.length > MAX_CACHEABLE_BUF) {
                 s.buf = new byte[DEFAULT_BUF_SIZE];
+            }
+            if (s.base64Scratch != null && s.base64Scratch.length > MAX_CACHEABLE_BUF) {
+                s.base64Scratch = null;
             }
         }
 
@@ -600,10 +613,9 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
         @Override
         public void writeBlob(Schema schema, ByteBuffer value) {
             closePendingTag();
-            byte[] encoded = ByteBufferUtils.base64EncodeToBytes(value);
-            ensureCapacity(encoded.length);
-            System.arraycopy(encoded, 0, buf, pos, encoded.length);
-            pos += encoded.length;
+            int remaining = value.remaining();
+            ensureCapacity(ByteBufferUtils.base64EncodedSize(remaining));
+            pos += ByteBufferUtils.base64EncodeTo(value, buf, pos, base64Scratch(remaining));
         }
 
         @Override
