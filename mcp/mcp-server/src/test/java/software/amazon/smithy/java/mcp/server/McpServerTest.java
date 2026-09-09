@@ -1580,6 +1580,87 @@ public class McpServerTest {
             .assemble()
             .unwrap();
 
+    private static final String ONE_OF_ROOT_MODEL_STR =
+            """
+                    $version: "2"
+
+                    namespace smithy.test.oneofroot
+
+                    use smithy.mcp#oneOf
+
+                    @aws.protocols#awsJson1_0
+                    service TestOneOfRootService {
+                        operations: [ProcessShape, GetShape]
+                    }
+
+                    /// References the polymorphic document as a nested member, so the schema
+                    /// cache holds a oneOf schema for it when GetShape's output is built.
+                    operation ProcessShape {
+                        input: ProcessShapeInput
+                        output: ProcessShapeOutput
+                    }
+
+                    /// Returns the polymorphic document directly as the operation output.
+                    operation GetShape {
+                        input: GetShapeInput
+                        output: ShapeWithOneOf
+                    }
+
+                    structure ProcessShapeInput {
+                        shape: ShapeWithOneOf
+                    }
+
+                    structure ProcessShapeOutput {
+                        shape: ShapeWithOneOf
+                    }
+
+                    structure GetShapeInput {
+                        id: String
+                    }
+
+                    /// Same shapes, but operation names sort the nested reference BEFORE the
+                    /// root reference: AProcessShape caches the oneOf schema, then ZGetShape
+                    /// requests the same shape as its output root (the cache-hit order).
+                    @aws.protocols#awsJson1_0
+                    service TestOneOfRootCachedService {
+                        operations: [AProcessShape, ZGetShape]
+                    }
+
+                    operation AProcessShape {
+                        input: ProcessShapeInput
+                        output: ProcessShapeOutput
+                    }
+
+                    operation ZGetShape {
+                        input: GetShapeInput
+                        output: ShapeWithOneOf
+                    }
+
+                    @oneOf(discriminator: "__type", members: [
+                        {name: "circle", target: Circle},
+                        {name: "square", target: Square}
+                    ])
+                    document ShapeWithOneOf
+
+                    structure Circle {
+                        @required
+                        radius: Integer
+                    }
+
+                    structure Square {
+                        @required
+                        side: Integer
+                    }""";
+
+    // Assembled without validation, mirroring ModelBundles: bundled models reach the MCP server
+    // with document-typed operation outputs, which strict validation would reject.
+    private static final Model ONE_OF_ROOT_MODEL = Model.assembler()
+            .addUnparsedModel("test-oneof-root.smithy", ONE_OF_ROOT_MODEL_STR)
+            .discoverModels()
+            .disableValidation()
+            .assemble()
+            .unwrap();
+
     @Test
     void testUnionSchemaGeneratesOneOfWithWrappedMembers() {
         server = McpServer.builder()
@@ -1670,6 +1751,97 @@ public class McpServerTest {
         // Document with @oneOf should have oneOf array generated from trait members
         var oneOf = shapeProperty.get("oneOf").asList();
         assertEquals(2, oneOf.size(), "Document with @oneOf should have 2 oneOf variants");
+    }
+
+    @Test
+    void testOneOfDocumentAsOperationOutputRoot() {
+        // Regression test: a @oneOf document used directly as an operation output used to
+        // either throw ClassCastException (when another operation had already cached its
+        // JsonOneOfSchema) or silently cache an empty object schema that clobbered nested
+        // references, depending on operation processing order.
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.oneofroot#TestOneOfRootService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(ONE_OF_ROOT_MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        // The tool whose output IS the polymorphic document: the root schema must be
+        // object-typed (required by the MCP spec) and still carry the oneOf variants.
+        var rootTool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("GetShape"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+        var outputSchema = rootTool.get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        var rootOneOf = outputSchema.get("oneOf").asList();
+        assertEquals(2, rootOneOf.size(), "Polymorphic output root should have 2 oneOf variants");
+
+        // The nested reference must keep its full oneOf schema: rendering the same shape in an
+        // object position must not pollute the schema cache for other references.
+        var nestedTool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ProcessShape"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+        var shapeProp = nestedTool.get("inputSchema")
+                .asStringMap()
+                .get("properties")
+                .asStringMap()
+                .get("shape")
+                .asStringMap();
+        assertEquals(2,
+                shapeProp.get("oneOf").asList().size(),
+                "Nested reference to the polymorphic document should keep its oneOf variants");
+    }
+
+    @Test
+    void testOneOfDocumentAsOperationOutputRootWithCachedSchema() {
+        // Operations are processed in sorted order, so AProcessShape caches the document's
+        // JsonOneOfSchema before ZGetShape requests the same shape as its output root. This is
+        // the order that used to throw ClassCastException while building the service.
+        server = McpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.oneofroot#TestOneOfRootCachedService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(ONE_OF_ROOT_MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(ProtocolVersion.v2025_06_18.INSTANCE);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var rootTool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ZGetShape"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+        var outputSchema = rootTool.get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        assertEquals(2,
+                outputSchema.get("oneOf").asList().size(),
+                "Root schema converted from the cached oneOf schema should keep its variants");
     }
 
     @Test
