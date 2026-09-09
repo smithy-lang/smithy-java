@@ -51,8 +51,8 @@ dependencies {
     jmh("org.apache.httpcomponents.client5:httpclient5:5.6.4")
 
     // Helidon WebClient for benchmarking comparison
-    jmh("io.helidon.webclient:helidon-webclient:4.5.3")
-    jmh("io.helidon.webclient:helidon-webclient-http2:4.5.3")
+    jmh("io.helidon.webclient:helidon-webclient:4.5.4")
+    jmh("io.helidon.webclient:helidon-webclient-http2:4.5.4")
 
     // Netty for raw HTTP/2 benchmarking
     jmh("io.netty:netty-all:4.2.17.Final")

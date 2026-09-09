@@ -23,7 +23,7 @@ dependencies {
     implementation("software.amazon.smithy.java:cbor-codec:$smithyJavaVersion")
 
     // Publishes events to an SNS topic.
-    implementation("software.amazon.awssdk:sns:2.54.4")
+    implementation("software.amazon.awssdk:sns:2.54.10")
 }
 
 // Compile the generated sources and package the generated resources, which hold the
