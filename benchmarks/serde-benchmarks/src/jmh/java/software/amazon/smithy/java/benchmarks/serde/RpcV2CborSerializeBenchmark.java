@@ -29,6 +29,9 @@ public class RpcV2CborSerializeBenchmark {
             ShapeId.from("com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane");
 
     @Param({
+            "rpcv2Cbor_WideTypesRequest_S",
+            "rpcv2Cbor_WideTypesRequest_M",
+            "rpcv2Cbor_WideTypesRequest_L",
             "rpcv2Cbor_PutItemRequest_Baseline",
             "rpcv2Cbor_PutItemRequest_ShallowMap_S",
             "rpcv2Cbor_PutItemRequest_ShallowMap_M",

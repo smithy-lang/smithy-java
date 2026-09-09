@@ -55,7 +55,7 @@ record StructureSerializerGenerator(
     private void writeMemberSerialization(JavaWriter writer) {
         boolean isError = shape.hasTrait(ErrorTrait.class);
 
-        for (var member : shape.members()) {
+        for (var member : CodegenUtils.getSortedMembers(shape)) {
             var memberName = symbolProvider.toMemberName(member);
             // if the shape is an error we need to use the `getMessage()` method for message field.
             if (isError && memberName.equalsIgnoreCase("message")) {

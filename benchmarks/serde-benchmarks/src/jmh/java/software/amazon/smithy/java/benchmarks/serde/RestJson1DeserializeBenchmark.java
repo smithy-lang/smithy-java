@@ -33,6 +33,9 @@ public class RestJson1DeserializeBenchmark {
     private static final String CONTENT_TYPE = "application/json";
 
     @Param({
+            "restJson1_WideTypesResponse_S",
+            "restJson1_WideTypesResponse_M",
+            "restJson1_WideTypesResponse_L",
             "restJson1_CopyObjectOutput_Baseline",
             "restJson1_CopyObjectOutput_M",
             "restJson1_CopyObjectOutput_OutOfOrder",

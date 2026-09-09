@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public final class ByteBufferUtils {
+    private static final Base64.Encoder BASE64_ENCODER = Base64.getEncoder();
 
     private ByteBufferUtils() {}
 
@@ -22,7 +23,41 @@ public final class ByteBufferUtils {
     }
 
     public static byte[] base64EncodeToBytes(ByteBuffer buffer) {
-        return Base64.getEncoder().encode(buffer.duplicate()).array();
+        return isExact(buffer)
+                ? BASE64_ENCODER.encode(buffer.array())
+                : BASE64_ENCODER.encode(buffer.duplicate()).array();
+    }
+
+    /**
+     * Number of bytes {@link #base64EncodeTo} writes for {@code dataLen} bytes of input.
+     */
+    public static int base64EncodedSize(int dataLen) {
+        return ((dataLen + 2) / 3) * 4;
+    }
+
+    /**
+     * Base64-encodes {@code buffer} into {@code scratch} starting at index 0, returning the number
+     * of bytes written. {@code scratch} must be at least {@link #base64EncodedSize} of the buffer's
+     * remaining bytes. The buffer's position is not consumed.
+     */
+    public static int base64EncodeInto(ByteBuffer buffer, byte[] scratch) {
+        if (isExact(buffer)) {
+            return BASE64_ENCODER.encode(buffer.array(), scratch);
+        }
+        byte[] encoded = BASE64_ENCODER.encode(buffer.duplicate()).array();
+        System.arraycopy(encoded, 0, scratch, 0, encoded.length);
+        return encoded.length;
+    }
+
+    /**
+     * Base64-encodes {@code buffer} into {@code dst} starting at {@code dstOffset}, returning the
+     * number of bytes written. The buffer's position is not consumed. {@code scratch} follows the
+     * {@link #base64EncodeInto} contract.
+     */
+    public static int base64EncodeTo(ByteBuffer buffer, byte[] dst, int dstOffset, byte[] scratch) {
+        int written = base64EncodeInto(buffer, scratch);
+        System.arraycopy(scratch, 0, dst, dstOffset, written);
+        return written;
     }
 
     public static String getUTF8String(ByteBuffer buffer) {

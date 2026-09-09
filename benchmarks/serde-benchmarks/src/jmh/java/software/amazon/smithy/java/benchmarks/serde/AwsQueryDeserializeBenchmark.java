@@ -40,6 +40,9 @@ public class AwsQueryDeserializeBenchmark {
     private static final byte[] EMPTY_XML_BODY = new byte[0];
 
     @Param({
+            "awsQuery_WideTypesResponse_S",
+            "awsQuery_WideTypesResponse_M",
+            "awsQuery_WideTypesResponse_L",
             "awsQuery_GetMetricDataResponse_S",
             "awsQuery_GetMetricDataResponse_M",
             "awsQuery_GetMetricDataResponse_L",
