@@ -539,4 +539,20 @@ public final class Opcodes {
      * <p><code>STRUCTN [size:byte]</code>
      */
     public static final byte STRUCTN = 54;
+
+    /**
+     * Build a string from an inline sequence of literal, register, and register-property segments.
+     *
+     * <p>Stack: [...] => [..., string]
+     *
+     * <p><code>BUILD_TEMPLATE [segment-count:byte] [segments...]</code>
+     *
+     * <p>Each segment begins with a tag followed by tag-specific operands:
+     * <ul>
+     *   <li>{@code LITERAL}: {@code [constant-index:short]}</li>
+     *   <li>{@code REGISTER}: {@code [register-index:byte]}</li>
+     *   <li>{@code REGISTER_PROPERTY}: {@code [register-index:byte] [property-index:short]}</li>
+     * </ul>
+     */
+    public static final byte BUILD_TEMPLATE = 55;
 }

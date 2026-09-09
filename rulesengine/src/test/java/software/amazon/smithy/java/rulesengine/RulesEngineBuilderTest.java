@@ -149,6 +149,26 @@ class RulesEngineBuilderTest {
     }
 
     @Test
+    void testLoadPreviousBytecodeVersion() {
+        BytecodeWriter writer = new BytecodeWriter();
+        writer.markConditionStart();
+        writer.writeByte(Opcodes.LOAD_CONST);
+        writer.writeByte(writer.getConstantIndex(Boolean.TRUE));
+        writer.writeByte(Opcodes.RETURN_VALUE);
+        byte[] data = writer.build(
+                new RegisterDefinition[0],
+                new RulesFunction[0],
+                new int[] {-1, 1, -1},
+                1).getBytecode().clone();
+        data[4] = 0;
+        data[5] = 1;
+
+        Bytecode loaded = builder.load(data);
+
+        assertEquals(1, loaded.getVersion());
+    }
+
+    @Test
     void testLoadTooShortBytecode() {
         byte[] bytecode = new byte[43]; // One byte too short
 

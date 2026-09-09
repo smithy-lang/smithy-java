@@ -39,6 +39,8 @@ import software.amazon.smithy.rulesengine.traits.EndpointBddTrait;
 
 final class BytecodeCompiler {
 
+    private static final int MIN_BUILD_TEMPLATE_SEGMENTS = 3;
+
     private final List<RulesExtension> extensions;
     private final EndpointBddTrait bdd;
     private final Map<String, Function<Context, Object>> builtinProviders;
@@ -204,48 +206,12 @@ final class BytecodeCompiler {
                         }
                     }
 
-                    // Compile host parts: afterScheme + parts[1..pathPartIndex)
-                    int hostPartCount = 0;
-                    if (!afterScheme.isEmpty()) {
-                        addLoadConst(afterScheme);
-                        hostPartCount++;
-                    }
                     int hostEnd = pathPartIndex > 0 ? pathPartIndex : parts.size();
-                    for (int i = 1; i < hostEnd; i++) {
-                        var part = parts.get(i);
-                        if (part instanceof Template.Dynamic d) {
-                            compileExpression(d.toExpression());
-                        } else {
-                            addLoadConst(part.toString());
-                        }
-                        hostPartCount++;
-                    }
-                    // Resolve host template to a single string
-                    if (hostPartCount == 1) {
-                        // Already a single value on stack
-                    } else if (hostPartCount > 1) {
-                        writer.writeByte(Opcodes.RESOLVE_TEMPLATE);
-                        writer.writeByte(hostPartCount);
-                    } else {
-                        addLoadConst("");
-                    }
+                    compileTemplateParts(parts, 1, hostEnd, afterScheme);
 
                     // Compile path parts
                     if (pathPartIndex > 0) {
-                        int pathPartCount = 0;
-                        for (int i = pathPartIndex; i < parts.size(); i++) {
-                            var part = parts.get(i);
-                            if (part instanceof Template.Dynamic d) {
-                                compileExpression(d.toExpression());
-                            } else {
-                                addLoadConst(part.toString());
-                            }
-                            pathPartCount++;
-                        }
-                        if (pathPartCount > 1) {
-                            writer.writeByte(Opcodes.RESOLVE_TEMPLATE);
-                            writer.writeByte(pathPartCount);
-                        }
+                        compileTemplateParts(parts, pathPartIndex, parts.size(), null);
                     } else {
                         addLoadConst("");
                     }
@@ -271,6 +237,104 @@ final class BytecodeCompiler {
             }
         }
         return false;
+    }
+
+    private void compileTemplateParts(
+            List<Template.Part> parts,
+            int start,
+            int end,
+            String leadingLiteral
+    ) {
+        boolean hasLeadingLiteral = leadingLiteral != null && !leadingLiteral.isEmpty();
+        int segmentCount = end - start + (hasLeadingLiteral ? 1 : 0);
+        if (segmentCount == 0) {
+            addLoadConst("");
+            return;
+        }
+
+        if (segmentCount >= MIN_BUILD_TEMPLATE_SEGMENTS
+                && tryCompileBuildTemplate(parts, start, end, leadingLiteral)) {
+            return;
+        }
+
+        if (hasLeadingLiteral) {
+            addLoadConst(leadingLiteral);
+        }
+        for (int i = start; i < end; i++) {
+            var part = parts.get(i);
+            if (part instanceof Template.Dynamic dynamic) {
+                compileExpression(dynamic.toExpression());
+            } else {
+                addLoadConst(part.toString());
+            }
+        }
+        if (segmentCount > 1) {
+            writer.writeByte(Opcodes.RESOLVE_TEMPLATE);
+            writer.writeByte(segmentCount);
+        }
+    }
+
+    private boolean tryCompileBuildTemplate(
+            List<Template.Part> parts,
+            int start,
+            int end,
+            String leadingLiteral
+    ) {
+        var segments = new ArrayList<TemplateSegment>(end - start + 1);
+        if (leadingLiteral != null && !leadingLiteral.isEmpty()) {
+            segments.add(TemplateSegment.literal(leadingLiteral));
+        }
+
+        for (int i = start; i < end; i++) {
+            TemplateSegment segment = createTemplateSegment(parts.get(i));
+            if (segment == null) {
+                return false;
+            }
+            segments.add(segment);
+        }
+
+        if (segments.size() > 255) {
+            return false;
+        }
+
+        writer.writeByte(Opcodes.BUILD_TEMPLATE);
+        writer.writeByte(segments.size());
+        for (var segment : segments) {
+            writer.writeByte(segment.type());
+            switch (segment.type()) {
+                case TemplateSegmentType.LITERAL -> writer.writeShort(writer.getConstantIndex(segment.value()));
+                case TemplateSegmentType.REGISTER -> writer.writeByte(segment.register());
+                case TemplateSegmentType.REGISTER_PROPERTY -> {
+                    writer.writeByte(segment.register());
+                    writer.writeShort(writer.getConstantIndex(segment.value()));
+                }
+                default -> throw new IllegalStateException("Unexpected template segment type: " + segment.type());
+            }
+        }
+        return true;
+    }
+
+    private TemplateSegment createTemplateSegment(Template.Part part) {
+        if (part instanceof Template.Literal literal) {
+            return TemplateSegment.literal(literal.toString());
+        }
+        if (!(part instanceof Template.Dynamic dynamic)) {
+            return null;
+        }
+
+        Expression expression = dynamic.toExpression();
+        if (expression instanceof Reference ref) {
+            return TemplateSegment.register(registerAllocator.getRegister(ref.getName().toString()));
+        }
+        if (expression instanceof GetAttr getAttr
+                && getAttr.getTarget() instanceof Reference ref
+                && getAttr.getPath().size() == 1
+                && getAttr.getPath().get(0) instanceof GetAttr.Part.Key key) {
+            return TemplateSegment.registerProperty(
+                    registerAllocator.getRegister(ref.getName().toString()),
+                    key.key().toString());
+        }
+        return null;
     }
 
     private void compileErrorRule(ErrorRule rule) {
@@ -630,18 +694,7 @@ final class BytecodeCompiler {
                     // Single dynamic expression, so just evaluate it
                     compileExpression(dynamic.toExpression());
                 } else {
-                    // Multiple parts - need to concatenate
-                    int expressionCount = 0;
-                    for (var part : parts) {
-                        if (part instanceof Template.Dynamic d) {
-                            compileExpression(d.toExpression());
-                        } else {
-                            addLoadConst(part.toString());
-                        }
-                        expressionCount++;
-                    }
-                    writer.writeByte(Opcodes.RESOLVE_TEMPLATE);
-                    writer.writeByte(expressionCount);
+                    compileTemplateParts(parts, 0, parts.size(), null);
                 }
             }
             case TupleLiteral t -> {
@@ -705,6 +758,20 @@ final class BytecodeCompiler {
         } else {
             writer.writeByte(Opcodes.LOAD_CONST_W);
             writer.writeShort(constant);
+        }
+    }
+
+    private record TemplateSegment(byte type, byte register, String value) {
+        static TemplateSegment literal(String value) {
+            return new TemplateSegment(TemplateSegmentType.LITERAL, (byte) 0, value);
+        }
+
+        static TemplateSegment register(byte register) {
+            return new TemplateSegment(TemplateSegmentType.REGISTER, register, null);
+        }
+
+        static TemplateSegment registerProperty(byte register, String property) {
+            return new TemplateSegment(TemplateSegmentType.REGISTER_PROPERTY, register, property);
         }
     }
 

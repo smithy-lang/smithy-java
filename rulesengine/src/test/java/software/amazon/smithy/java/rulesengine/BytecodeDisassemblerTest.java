@@ -97,6 +97,36 @@ class BytecodeDisassemblerTest {
     }
 
     @Test
+    void disassemblesBuildTemplate() {
+        BytecodeWriter writer = new BytecodeWriter();
+        int scheme = writer.getConstantIndex("https://");
+        int property = writer.getConstantIndex("suffix");
+
+        writer.markConditionStart();
+        writer.writeByte(Opcodes.BUILD_TEMPLATE);
+        writer.writeByte(3);
+        writer.writeByte(TemplateSegmentType.LITERAL);
+        writer.writeShort(scheme);
+        writer.writeByte(TemplateSegmentType.REGISTER);
+        writer.writeByte(0);
+        writer.writeByte(TemplateSegmentType.REGISTER_PROPERTY);
+        writer.writeByte(1);
+        writer.writeShort(property);
+        writer.writeByte(Opcodes.RETURN_VALUE);
+
+        RegisterDefinition[] registers = {
+                new RegisterDefinition("region", true, null, null, false),
+                new RegisterDefinition("metadata", true, null, null, false)
+        };
+        Bytecode bytecode = writer.build(registers, new RulesFunction[0], new int[] {-1, 1, -1}, 1);
+
+        String result = new BytecodeDisassembler(bytecode).disassemble();
+
+        assertThat(result, containsString("BUILD_TEMPLATE"));
+        assertThat(result, containsString("segments=[\"https://\", region, metadata.suffix]"));
+    }
+
+    @Test
     void disassemblesConstantPool() {
         BytecodeWriter writer = new BytecodeWriter();
 

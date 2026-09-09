@@ -41,6 +41,7 @@ final class BytecodeDisassembler {
 
             // Template operation
             Map.entry(Opcodes.RESOLVE_TEMPLATE, new InstructionDef("RESOLVE_TEMPLATE", Show.ARG_COUNT)),
+            Map.entry(Opcodes.BUILD_TEMPLATE, new InstructionDef("BUILD_TEMPLATE", Show.TEMPLATE)),
 
             // Function operations
             Map.entry(Opcodes.FN0, new InstructionDef("FN0", Show.FN)),
@@ -106,7 +107,8 @@ final class BytecodeDisassembler {
         SUBSTRING_EQ,
         SPLIT_GET,
         SELECT_BOOL,
-        REG_CONST
+        REG_CONST,
+        TEMPLATE
     }
 
     private record InstructionDef(String name, Show show) {
@@ -436,6 +438,58 @@ final class BytecodeDisassembler {
                     s.append(formatConstant(bytecode.getConstant(constIdx)));
                 }
             }
+            case TEMPLATE -> appendTemplate(s, walker);
+        }
+    }
+
+    private void appendTemplate(StringBuilder s, BytecodeWalker walker) {
+        byte[] instructions = bytecode.getBytecode();
+        int segmentCount = walker.getOperand(0);
+        int cursor = walker.getPosition() + 2;
+        s.append("segments=[");
+        for (int i = 0; i < segmentCount; i++) {
+            if (i > 0) {
+                s.append(", ");
+            }
+
+            int segmentType = instructions[cursor++] & 0xFF;
+            switch (segmentType) {
+                case TemplateSegmentType.LITERAL -> {
+                    int constIdx = ((instructions[cursor] & 0xFF) << 8) | (instructions[cursor + 1] & 0xFF);
+                    cursor += 2;
+                    if (constIdx < bytecode.getConstantPoolCount()) {
+                        s.append(formatConstant(bytecode.getConstant(constIdx)));
+                    } else {
+                        s.append("constant[").append(constIdx).append("]");
+                    }
+                }
+                case TemplateSegmentType.REGISTER -> {
+                    int regIdx = instructions[cursor++] & 0xFF;
+                    appendRegisterName(s, regIdx);
+                }
+                case TemplateSegmentType.REGISTER_PROPERTY -> {
+                    int regIdx = instructions[cursor++] & 0xFF;
+                    int propertyIdx = ((instructions[cursor] & 0xFF) << 8) | (instructions[cursor + 1] & 0xFF);
+                    cursor += 2;
+                    appendRegisterName(s, regIdx);
+                    s.append(".");
+                    if (propertyIdx < bytecode.getConstantPoolCount()) {
+                        s.append(bytecode.getConstant(propertyIdx));
+                    } else {
+                        s.append("constant[").append(propertyIdx).append("]");
+                    }
+                }
+                default -> s.append("unknown[").append(segmentType).append("]");
+            }
+        }
+        s.append("]");
+    }
+
+    private void appendRegisterName(StringBuilder s, int registerIndex) {
+        if (registerIndex < bytecode.getRegisterDefinitions().length) {
+            s.append(bytecode.getRegisterDefinitions()[registerIndex].name());
+        } else {
+            s.append("register[").append(registerIndex).append("]");
         }
     }
 

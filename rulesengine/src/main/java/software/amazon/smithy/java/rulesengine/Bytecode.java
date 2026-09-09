@@ -31,7 +31,7 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
  * Offset  Size  Description
  * ------  ----  -----------
  * 0       4     Magic number (0x52554C45 = "RULE")
- * 4       2     Version (rolling version number, currently 1)
+ * 4       2     Version (rolling version number, currently 2)
  * 6       2     Condition count (unsigned short)
  * 8       2     Result count (unsigned short)
  * 10      2     Register count (unsigned short)
@@ -153,7 +153,7 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
 public final class Bytecode {
 
     static final int MAGIC = 0x52554C45; // "RULE"
-    static final short VERSION = 1;
+    static final short VERSION = 2;
     static final byte CONST_NULL = 0;
     static final byte CONST_STRING = 1;
     static final byte CONST_INTEGER = 2;
