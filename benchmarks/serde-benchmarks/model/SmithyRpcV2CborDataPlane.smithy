@@ -14,6 +14,7 @@ service SmithyRpcV2CborDataPlane {
     version: "1999-12-31"
     operations: [
         Healthcheck
+        WideTypes
     ]
     resources: [
         DynamoDBItem

@@ -15,6 +15,7 @@ service AwsQueryDataPlane {
     version: "1999-12-31"
     operations: [
         Healthcheck
+        WideTypes
     ]
     resources: [
         DynamoDBItem

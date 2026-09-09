@@ -30,6 +30,9 @@ public class RestXmlSerializeBenchmark {
             ShapeId.from("com.amazonaws.sdk.benchmark#AwsRestXmlDataPlane");
 
     @Param({
+            "restXml_WideTypesRequest_S",
+            "restXml_WideTypesRequest_M",
+            "restXml_WideTypesRequest_L",
             "restXml_CopyObjectRequest_Baseline",
             "restXml_CopyObjectRequest_M",
             "restXml_PutObject_S",

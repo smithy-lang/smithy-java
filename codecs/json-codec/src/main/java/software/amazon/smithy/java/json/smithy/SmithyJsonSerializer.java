@@ -22,6 +22,7 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonFieldMapper;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -36,11 +37,12 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     private static final int MAX_DEPTH = 64;
     private static final int DEFAULT_BUF_SIZE = 8192;
-    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
+    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 16;
 
     private static final StripedPool<SmithyJsonSerializer, JsonSettings> POOL = new JsonStripedPool();
 
     private byte[] buf;
+    private byte[] base64Scratch;
     private int pos;
     private final OutputStream sink;
     private final JsonSettings settings;
@@ -222,14 +224,36 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeBlob(Schema schema, byte[] value) {
-        ensureCapacity(JsonWriteUtils.maxBase64Bytes(value.length));
-        pos = JsonWriteUtils.writeBase64String(buf, pos, value, 0, value.length);
+        writeBlobValue(ByteBuffer.wrap(value));
     }
 
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
-        ensureCapacity(JsonWriteUtils.maxBase64Bytes(value.remaining()));
+        writeBlobValue(value);
+    }
+
+    private void writeBlobValue(ByteBuffer value) {
+        int remaining = value.remaining();
+        ensureCapacity(ByteBufferUtils.base64EncodedSize(remaining) + 2);
+        if (remaining >= 32) {
+            byte[] b = buf;
+            int p = pos;
+            b[p++] = '"';
+            p += ByteBufferUtils.base64EncodeTo(value, b, p, base64Scratch(remaining));
+            b[p++] = '"';
+            pos = p;
+            return;
+        }
         pos = JsonWriteUtils.writeBase64String(buf, pos, value);
+    }
+
+    private byte[] base64Scratch(int dataLen) {
+        int capacity = ByteBufferUtils.base64EncodedSize(dataLen);
+        byte[] scratch = base64Scratch;
+        if (scratch == null || scratch.length < capacity) {
+            scratch = base64Scratch = new byte[capacity];
+        }
+        return scratch;
     }
 
     @Override
@@ -398,6 +422,9 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         protected void prepareForPool(SmithyJsonSerializer s) {
             if (s.buf.length > MAX_CACHEABLE_BUF) {
                 s.buf = new byte[DEFAULT_BUF_SIZE];
+            }
+            if (s.base64Scratch != null && s.base64Scratch.length > MAX_CACHEABLE_BUF) {
+                s.base64Scratch = null;
             }
         }
 

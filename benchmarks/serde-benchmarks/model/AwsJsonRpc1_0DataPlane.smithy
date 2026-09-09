@@ -14,6 +14,7 @@ service AwsJsonRpc10DataPlane {
     version: "1999-12-31"
     operations: [
         Healthcheck
+        WideTypes
     ]
     resources: [
         DynamoDBItem

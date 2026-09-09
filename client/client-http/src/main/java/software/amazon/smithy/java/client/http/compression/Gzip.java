@@ -32,7 +32,7 @@ public final class Gzip implements CompressionAlgorithm {
             var gzip = new GZIPOutputStream(bos);
             in.transferTo(gzip);
             gzip.close();
-            return DataStream.ofBytes(bos.toByteBuffer().array());
+            return DataStream.ofByteBuffer(bos.toByteBuffer(), data.contentType());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

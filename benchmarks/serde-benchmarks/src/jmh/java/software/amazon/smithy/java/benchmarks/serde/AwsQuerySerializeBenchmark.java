@@ -31,6 +31,9 @@ public class AwsQuerySerializeBenchmark {
     private static final String VERSION = "1999-12-31";
 
     @Param({
+            "awsQuery_WideTypesRequest_S",
+            "awsQuery_WideTypesRequest_M",
+            "awsQuery_WideTypesRequest_L",
             "awsQuery_GetMetricDataRequest_S",
             "awsQuery_GetMetricDataRequest_M",
             "awsQuery_GetMetricDataRequest_L",

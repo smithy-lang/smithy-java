@@ -1,5 +1,44 @@
 # Change Log
 
+## 1.6.1 (9/2/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+* Added a configurable per-request timeout to the MCP stdio proxy.
+  ([#1336](https://github.com/smithy-lang/smithy-java/pull/1336))
+
+### Bug Fixes
+
+* Fixed AWS Query and EC2 Query serialization issues affecting long Unicode
+  strings, arbitrary-length `BigInteger` values, nested collection indexes,
+  and pooled serializer reuse.
+  ([#1343](https://github.com/smithy-lang/smithy-java/pull/1343))
+* Fixed GZIP request compression appending unused buffer capacity as trailing
+  zero bytes.
+  ([#1342](https://github.com/smithy-lang/smithy-java/pull/1342))
+* Fixed MCP `tools/list` and `prompts/list` pagination and made tool, prompt,
+  and proxy registries thread-safe to prevent `tools/list_changed` refresh
+  deadlocks.
+  ([#1336](https://github.com/smithy-lang/smithy-java/pull/1336))
+* Fixed unknown MCP JSON-RPC methods returning an empty response instead of a
+  `-32601` method-not-found error.
+  ([#1338](https://github.com/smithy-lang/smithy-java/pull/1338))
+
+### Improvements
+
+* Improved Query serialization performance for mixed Unicode strings and
+  oversized buffers.
+  ([#1343](https://github.com/smithy-lang/smithy-java/pull/1343))
+* Improved MCP registry safety by returning immutable proxy snapshots and
+  preserving deterministic tool and prompt insertion order.
+  ([#1336](https://github.com/smithy-lang/smithy-java/pull/1336))
+
 ## 1.6.0 (8/25/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including

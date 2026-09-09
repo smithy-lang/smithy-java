@@ -37,6 +37,9 @@ public class RpcV2CborDeserializeBenchmark {
     private static final String CONTENT_TYPE = "application/cbor";
 
     @Param({
+            "rpcv2Cbor_WideTypesResponse_S",
+            "rpcv2Cbor_WideTypesResponse_M",
+            "rpcv2Cbor_WideTypesResponse_L",
             "rpcv2Cbor_GetItemOutput_Baseline",
             "rpcv2Cbor_GetItemOutput_S",
             "rpcv2Cbor_GetItemOutput_M",

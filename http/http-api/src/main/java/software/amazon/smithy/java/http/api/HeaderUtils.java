@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.http.api;
 
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
+
 /**
  * HTTP header utilities.
  */
@@ -89,6 +91,38 @@ public final class HeaderUtils {
      * @throws IllegalArgumentException if the value contains invalid characters
      */
     public static String normalizeValue(String value) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(value);
+        return latin1 == null ? normalizeUtf16Value(value) : normalizeLatin1Value(value, latin1);
+    }
+
+    private static String normalizeLatin1Value(String value, byte[] latin1) {
+        int length = latin1.length;
+        if (length == 0) {
+            return value;
+        }
+
+        for (byte b : latin1) {
+            int c = b & 0xff;
+            if ((c < 0x20 && c != '\t') || c == 0x7f) {
+                throw invalidHeaderValueChar(value);
+            }
+        }
+
+        int start = 0;
+        while (start < length && (latin1[start] == ' ' || latin1[start] == '\t')) {
+            start++;
+        }
+        if (start == length) {
+            return "";
+        }
+        int end = length - 1;
+        while (end > start && (latin1[end] == ' ' || latin1[end] == '\t')) {
+            end--;
+        }
+        return start == 0 && end == length - 1 ? value : value.substring(start, end + 1);
+    }
+
+    private static String normalizeUtf16Value(String value) {
         int len = value.length();
         if (len == 0) {
             return value;

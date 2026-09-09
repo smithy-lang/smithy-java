@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
@@ -72,6 +73,9 @@ final class QueryFormSerializer implements ShapeSerializer {
 
     private static final int DEFAULT_BUF_SIZE = 1024;
     private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
+
+    private static final int MAX_BYTES_PER_CHAR = 9;
+    private static final int MAX_BYTES_PER_LATIN1_BYTE = 6;
 
     record AcquireContext(QueryVariant variant, String action, String version) {}
 
@@ -139,7 +143,14 @@ final class QueryFormSerializer implements ShapeSerializer {
     }
 
     ByteBuffer finish() {
-        ByteBuffer result = ByteBuffer.wrap(buf, 0, pos);
+        ByteBuffer result;
+        if (buf.length > MAX_CACHEABLE_BUF) {
+            byte[] resultBuf = buf;
+            buf = new byte[DEFAULT_BUF_SIZE];
+            result = ByteBuffer.wrap(resultBuf, 0, pos).slice();
+        } else {
+            result = ByteBuffer.wrap(Arrays.copyOf(buf, pos));
+        }
         POOL.release(this);
         return result;
     }
@@ -221,9 +232,96 @@ final class QueryFormSerializer implements ShapeSerializer {
         }
     }
 
+    @SuppressWarnings("deprecation")
     private void writeUrlEncoded(String s) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(s);
+        if (latin1 != null) {
+            writeUrlEncodedLatin1(latin1);
+            return;
+        }
+
         int len = s.length();
+        boolean allUnreserved = true;
         for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c >= 0x80) {
+                allUnreserved = false;
+                break;
+            }
+            allUnreserved &= UNRESERVED[c];
+        }
+        if (allUnreserved) {
+            s.getBytes(0, len, buf, pos);
+            pos += len;
+            return;
+        }
+
+        int next = pos;
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c >= 0x80) {
+                ensureCapacity(next - pos + (len - i) * MAX_BYTES_PER_CHAR);
+                // Read buf after ensureCapacity: it may have replaced the array.
+                pos = writeUrlEncodedRemainder(buf, next, s, i);
+                return;
+            }
+            if (UNRESERVED[c]) {
+                buf[next++] = (byte) c;
+            } else {
+                int off = c * 3;
+                buf[next] = PERCENT_ENCODED[off];
+                buf[next + 1] = PERCENT_ENCODED[off + 1];
+                buf[next + 2] = PERCENT_ENCODED[off + 2];
+                next += 3;
+            }
+        }
+        pos = next;
+    }
+
+    private void writeUrlEncodedLatin1(byte[] value) {
+        boolean allUnreserved = true;
+        boolean hasNonAscii = false;
+        for (byte current : value) {
+            int c = current & 0xff;
+            hasNonAscii |= c >= 0x80;
+            allUnreserved &= c < 0x80 && UNRESERVED[c];
+        }
+        if (allUnreserved) {
+            System.arraycopy(value, 0, buf, pos, value.length);
+            pos += value.length;
+            return;
+        }
+        if (hasNonAscii) {
+            ensureCapacity(value.length * MAX_BYTES_PER_LATIN1_BYTE);
+        }
+
+        for (byte current : value) {
+            int c = current & 0xff;
+            if (c < 0x80) {
+                if (UNRESERVED[c]) {
+                    buf[pos++] = current;
+                } else {
+                    int off = c * 3;
+                    buf[pos] = PERCENT_ENCODED[off];
+                    buf[pos + 1] = PERCENT_ENCODED[off + 1];
+                    buf[pos + 2] = PERCENT_ENCODED[off + 2];
+                    pos += 3;
+                }
+            } else {
+                int b0 = 0xC0 | (c >> 6);
+                int b1 = 0x80 | (c & 0x3F);
+                System.arraycopy(PERCENT_ENCODED, b0 * 3, buf, pos, 3);
+                pos += 3;
+                System.arraycopy(PERCENT_ENCODED, b1 * 3, buf, pos, 3);
+                pos += 3;
+            }
+        }
+    }
+
+    // Encodes the remaining arbitrary characters. The caller must reserve nine bytes per char.
+    private static int writeUrlEncodedRemainder(byte[] buf, int pos, String s, int start) {
+        int len = s.length();
+        for (int i = start; i < len; i++) {
             char c = s.charAt(i);
             if (c < 0x80) {
                 if (UNRESERVED[c]) {
@@ -269,6 +367,16 @@ final class QueryFormSerializer implements ShapeSerializer {
                 pos += 3;
             }
         }
+        return pos;
+    }
+
+    /**
+     * Upper bound on the base-10 ASCII bytes {@link NumberCodec#writeBigInteger} writes to the form body.
+     */
+    static int maxBigIntegerLength(BigInteger value) {
+        // log10(2) is just over 0.301; the larger factor plus constants cover rounding and a sign.
+        int digits = (int) (value.bitLength() * 0.302) + 2;
+        return 1 + digits;
     }
 
     /**
@@ -431,8 +539,17 @@ final class QueryFormSerializer implements ShapeSerializer {
             return;
         }
 
+        // Save/restore for the same reason writeAwsQueryList does it.
+        var savedMemberNameBytes = listSerializer.memberNameBytes;
+        var savedFlattened = listSerializer.flattened;
+        var savedIndex = listSerializer.index;
+
         listSerializer.reset(null, true);
         consumer.accept(listState, listSerializer);
+
+        listSerializer.memberNameBytes = savedMemberNameBytes;
+        listSerializer.flattened = savedFlattened;
+        listSerializer.index = savedIndex;
 
         if (schema.isMember()) {
             popPrefix();
@@ -571,7 +688,7 @@ final class QueryFormSerializer implements ShapeSerializer {
 
         @Override
         public void writeBigInteger(Schema schema, BigInteger value) {
-            writeIndexedKeyPrefix(64);
+            writeIndexedKeyPrefix(maxBigIntegerLength(value));
             pos = NumberCodec.writeBigInteger(buf, pos, value);
             index++;
         }
@@ -744,8 +861,16 @@ final class QueryFormSerializer implements ShapeSerializer {
                 memberNameBytes = xmlName != null ? xmlName.getValue().getBytes(StandardCharsets.UTF_8) : MEMBER;
             }
 
+            var savedMemberNameBytes = listSerializer.memberNameBytes;
+            var savedFlattened = listSerializer.flattened;
+            var savedIndex = listSerializer.index;
+
             listSerializer.reset(memberNameBytes, flattened);
             consumer.accept(listState, listSerializer);
+
+            listSerializer.memberNameBytes = savedMemberNameBytes;
+            listSerializer.flattened = savedFlattened;
+            listSerializer.index = savedIndex;
         }
 
         @Override
@@ -762,8 +887,20 @@ final class QueryFormSerializer implements ShapeSerializer {
                     valueXmlName != null ? valueXmlName.getValue().getBytes(StandardCharsets.UTF_8) : VALUE;
             byte[] entryNameBytes = flattened ? null : ENTRY;
 
+            var savedEntry = mapSerializer.entryNameBytes;
+            var savedKey = mapSerializer.keyNameBytes;
+            var savedValue = mapSerializer.valueNameBytes;
+            var savedFlattened = mapSerializer.flattened;
+            var savedIndex = mapSerializer.index;
+
             mapSerializer.reset(entryNameBytes, keyNameBytes, valueNameBytes, flattened);
             consumer.accept(mapState, mapSerializer);
+
+            mapSerializer.entryNameBytes = savedEntry;
+            mapSerializer.keyNameBytes = savedKey;
+            mapSerializer.valueNameBytes = savedValue;
+            mapSerializer.flattened = savedFlattened;
+            mapSerializer.index = savedIndex;
         }
 
         @Override
@@ -817,7 +954,7 @@ final class QueryFormSerializer implements ShapeSerializer {
 
         @Override
         public void writeBigInteger(Schema schema, BigInteger value) {
-            writePrefixEquals(64);
+            writePrefixEquals(maxBigIntegerLength(value));
             pos = NumberCodec.writeBigInteger(buf, pos, value);
         }
 
@@ -924,7 +1061,7 @@ final class QueryFormSerializer implements ShapeSerializer {
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
         byte[] key = getMemberNameBytes(schema);
-        writeKeyPrefix(key, 64);
+        writeKeyPrefix(key, maxBigIntegerLength(value));
         pos = NumberCodec.writeBigInteger(buf, pos, value);
     }
 
