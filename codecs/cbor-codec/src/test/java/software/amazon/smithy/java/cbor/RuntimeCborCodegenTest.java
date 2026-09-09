@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
 import software.amazon.smithy.java.cbor.bench.model.AcronymStruct;
 import software.amazon.smithy.java.cbor.bench.model.BenchError;
 import software.amazon.smithy.java.cbor.bench.model.BenchUnion;
@@ -33,6 +33,7 @@ import software.amazon.smithy.java.cbor.bench.model.InnerStruct;
 import software.amazon.smithy.java.cbor.bench.model.NestedStruct;
 import software.amazon.smithy.java.cbor.bench.model.Priority;
 import software.amazon.smithy.java.cbor.bench.model.RecursiveStruct;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
@@ -46,7 +47,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class RuntimeCborCodegenTest {
     @BeforeAll
     static void requireRuntimeCodegen() {
-        org.junit.jupiter.api.Assumptions.assumeTrue(RuntimeCodegenFeature.available());
+        Assumptions.assumeTrue(RuntimeCodegenFeature.available());
     }
 
     @Test
