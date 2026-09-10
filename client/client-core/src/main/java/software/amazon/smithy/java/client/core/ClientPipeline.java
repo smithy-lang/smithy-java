@@ -186,7 +186,11 @@ final class ClientPipeline<RequestT, ResponseT> {
         call.context.put(CallContext.ENDPOINT, endpoint);
 
         // Augment or swap the resolved auth scheme based on the endpoint's authSchemes property.
-        resolvedAuthScheme = applyEndpointAuthSchemeOverrides(call, endpoint, resolvedAuthScheme);
+        resolvedAuthScheme = applyEndpointAuthSchemeOverrides(
+                call,
+                endpoint,
+                requestHook.request(),
+                resolvedAuthScheme);
         call.context.put(CallContext.IDENTITY, resolvedAuthScheme.identity().unwrap());
         call.context.put(CallContext.IDENTITY_RESOLVER, resolvedAuthScheme.identityResolver());
 
@@ -319,7 +323,8 @@ final class ClientPipeline<RequestT, ResponseT> {
      *
      * <ul>
      *     <li>If no {@code authSchemes} entries are emitted, keep the resolver-chosen scheme.</li>
-     *     <li>Iterate emitted entries; pick the first one whose ID is in {@code supportedAuthSchemes}.</li>
+     *     <li>Iterate emitted entries; pick the first one whose ID is in {@code supportedAuthSchemes}
+     *         and whose request type is compatible with the serialized request.</li>
      *     <li>If that entry matches the resolver-chosen scheme, merge its property overrides onto
      *         the existing signer Context (no re-resolution).</li>
      *     <li>If it differs, swap to the new scheme: re-resolve identity for it, then apply the
@@ -336,6 +341,7 @@ final class ClientPipeline<RequestT, ResponseT> {
             O extends SerializableStruct> ResolvedScheme<?, RequestT> applyEndpointAuthSchemeOverrides(
                     ClientCall<I, O> call,
                     Endpoint endpoint,
+                    RequestT request,
                     ResolvedScheme<?, RequestT> resolvedScheme
             ) {
         var endpointAuthSchemes = endpoint.authSchemes();
@@ -350,10 +356,10 @@ final class ClientPipeline<RequestT, ResponseT> {
                 return mergeOverrides(resolvedScheme, endpointAuthScheme);
             }
 
-            // Endpoint asked for a different scheme. If the client supports it, swap.
+            // Endpoint asked for a different scheme. If the client supports it for this request type, swap.
             ShapeId targetId = ShapeId.from(endpointSchemeId);
             AuthScheme<?, ?> swapped = call.supportedAuthSchemes.get(targetId);
-            if (swapped == null) {
+            if (swapped == null || !swapped.requestClass().isAssignableFrom(request.getClass())) {
                 continue;
             }
             AuthScheme<RequestT, ?> targetScheme = (AuthScheme<RequestT, ?>) swapped;

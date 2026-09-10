@@ -452,6 +452,67 @@ public class ClientPipelineTest {
     }
 
     @Test
+    public void endpointAuthSchemeSwapSkipsIncompatibleRequestTypes() {
+        var service = ShapeId.from("smithy.example#Sprockets");
+        var resolverChosenId = ShapeId.from("smithy.test#chosenAuth");
+        var incompatibleId = ShapeId.from("smithy.test#incompatibleAuth");
+        var compatibleId = ShapeId.from("smithy.test#compatibleAuth");
+        var compatibleSigned = new AtomicReference<Boolean>(false);
+
+        var resolverScheme = AuthScheme.of(
+                resolverChosenId,
+                HttpRequest.class,
+                Identity.class,
+                (request, identity, properties) -> {
+                    throw new AssertionError("Endpoint auth scheme should replace the resolver-chosen scheme");
+                });
+        var incompatibleScheme = AuthScheme.of(
+                incompatibleId,
+                String.class,
+                Identity.class,
+                (request, identity, properties) -> {
+                    throw new AssertionError("Incompatible auth scheme should not be selected");
+                });
+        var compatibleScheme = AuthScheme.of(
+                compatibleId,
+                HttpRequest.class,
+                Identity.class,
+                (request, identity, properties) -> {
+                    compatibleSigned.set(true);
+                    return new SignResult<>(request);
+                });
+
+        EndpointResolver endpointResolver = params -> Endpoint.builder()
+                .uri("https://example.com")
+                .addAuthScheme(EndpointAuthScheme.builder()
+                        .authSchemeId(incompatibleId.toString())
+                        .build())
+                .addAuthScheme(EndpointAuthScheme.builder()
+                        .authSchemeId(compatibleId.toString())
+                        .build())
+                .build();
+
+        var mockQueue = new MockQueue()
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable());
+        var client = DynamicClient.builder()
+                .serviceId(service)
+                .model(MODEL)
+                .addPlugin(MockPlugin.builder().addQueue(mockQueue).build())
+                .endpointResolver(endpointResolver)
+                .authSchemeResolver(params -> List.of(new AuthSchemeOption(resolverChosenId)))
+                .putSupportedAuthSchemes(resolverScheme, incompatibleScheme, compatibleScheme)
+                .addIdentityResolver(identityResolver(new Identity() {}))
+                .build();
+
+        client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
+
+        assertThat(compatibleSigned.get(), is(true));
+    }
+
+    @Test
     public void endpointAuthSchemeUnsupportedNameFails() {
         var service = ShapeId.from("smithy.example#Sprockets");
         var resolverChosenId = ShapeId.from("smithy.test#chosenAuth");
