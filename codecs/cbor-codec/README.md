@@ -7,3 +7,17 @@ Smithy-Java `SerializableShape`'s.
 > for the encoding of BigIntegers, BigDecimals, and Timestamps.
 
 CBOR Protocol implementation can use this package to provide basic serde functionality.
+
+On JDK 25 or newer, enable runtime-generated codecs with:
+
+```java
+Rpcv2CborCodec codec = Rpcv2CborCodec.builder()
+        .runtimeCodegen(true)
+        .build();
+```
+
+Unsupported models and generation failures transparently fall back to the built-in CBOR provider.
+Explicit runtime-codegen activation cannot be combined with a custom provider.
+
+The `smithy-java.runtime-codegen.cbor=enabled` system property enables runtime code generation
+for codecs using the built-in provider.
