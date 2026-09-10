@@ -20,6 +20,7 @@ import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.SignResult;
+import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
@@ -216,6 +217,46 @@ public class ClientPipelineTest {
         assertThat(responseErrorCodes.size(), equalTo(2));
         assertThat(responseErrorCodes.get(0), equalTo("ExpiredToken"));
         Assertions.assertNull(responseErrorCodes.get(1));
+    }
+
+    @Test
+    public void skipsAuthSchemePropertyResolutionWhenIdentityResolverIsUnavailable() {
+        var service = ShapeId.from("smithy.example#Sprockets");
+        var unavailableSchemeId = ShapeId.from("smithy.test#unavailableAuth");
+        var fallbackSchemeId = ShapeId.from("smithy.test#fallbackAuth");
+        var fallbackSigned = new AtomicReference<Boolean>(false);
+
+        var fallbackScheme = AuthScheme.of(
+                fallbackSchemeId,
+                HttpRequest.class,
+                Identity.class,
+                (request, identity, properties) -> {
+                    fallbackSigned.set(true);
+                    return new SignResult<>(request);
+                });
+
+        var mockQueue = new MockQueue()
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable());
+        var client = DynamicClient.builder()
+                .serviceId(service)
+                .model(MODEL)
+                .addPlugin(MockPlugin.builder().addQueue(mockQueue).build())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://example.com"))
+                .authSchemeResolver(params -> List.of(
+                        new AuthSchemeOption(unavailableSchemeId),
+                        new AuthSchemeOption(fallbackSchemeId)))
+                .putSupportedAuthSchemes(
+                        new PropertiesFailingAuthScheme(unavailableSchemeId),
+                        fallbackScheme)
+                .addIdentityResolver(identityResolver(new Identity() {}))
+                .build();
+
+        client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
+
+        assertThat(fallbackSigned.get(), is(true));
     }
 
     @Test
@@ -441,6 +482,44 @@ public class ClientPipelineTest {
                 return Identity.class;
             }
         };
+    }
+
+    private static final class PropertiesFailingAuthScheme implements AuthScheme<HttpRequest, TokenIdentity> {
+        private final ShapeId schemeId;
+
+        private PropertiesFailingAuthScheme(ShapeId schemeId) {
+            this.schemeId = schemeId;
+        }
+
+        @Override
+        public ShapeId schemeId() {
+            return schemeId;
+        }
+
+        @Override
+        public Class<HttpRequest> requestClass() {
+            return HttpRequest.class;
+        }
+
+        @Override
+        public Class<TokenIdentity> identityClass() {
+            return TokenIdentity.class;
+        }
+
+        @Override
+        public Context getSignerProperties(Context context) {
+            throw new AssertionError("Signer properties must not be resolved without an identity resolver");
+        }
+
+        @Override
+        public Context getIdentityProperties(Context context) {
+            throw new AssertionError("Identity properties must not be resolved without an identity resolver");
+        }
+
+        @Override
+        public Signer<HttpRequest, TokenIdentity> signer() {
+            throw new AssertionError("Unavailable auth scheme must not be used");
+        }
     }
 
     private static final class Token implements RetryToken {

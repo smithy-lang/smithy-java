@@ -271,12 +271,12 @@ final class ClientPipeline<RequestT, ResponseT> {
             AuthScheme<RequestT, IdentityT> authScheme,
             AuthSchemeOption option
     ) {
-        var identityProperties = authScheme.getIdentityProperties(context).merge(option.identityPropertyOverrides());
-        var signerProperties = authScheme.getSignerProperties(context).merge(option.signerPropertyOverrides());
         var identityResolver = authScheme.identityResolver(identityResolvers);
         if (identityResolver == null) {
             return null;
         }
+        var identityProperties = authScheme.getIdentityProperties(context).merge(option.identityPropertyOverrides());
+        var signerProperties = authScheme.getSignerProperties(context).merge(option.signerPropertyOverrides());
         return new ResolvedScheme<>(
                 signerProperties,
                 authScheme,
