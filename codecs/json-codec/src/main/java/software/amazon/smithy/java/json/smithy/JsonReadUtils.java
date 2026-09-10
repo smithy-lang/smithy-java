@@ -41,6 +41,22 @@ final class JsonReadUtils {
 
     private static final int MAX_SAFE_LONG_DIGITS = 18;
 
+    static long readLongLittleEndian(byte[] buf, int pos) {
+        return (long) LONG_HANDLE.get(buf, pos);
+    }
+
+    static void writeLongLittleEndian(byte[] buf, int pos, long value) {
+        LONG_HANDLE.set(buf, pos, value);
+    }
+
+    static int readIntLittleEndian(byte[] buf, int pos) {
+        return (int) INT_HANDLE.get(buf, pos);
+    }
+
+    static void writeIntLittleEndian(byte[] buf, int pos, int value) {
+        INT_HANDLE.set(buf, pos, value);
+    }
+
     // Hex digit lookup table: -1 means invalid hex digit
     private static final int[] HEX_VALUES = new int[128];
 

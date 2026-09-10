@@ -74,6 +74,16 @@ structure ComplexStruct {
 
     colorList: ColorList
 
+    wireLength: WireLengthEnum
+
+    wireLengthList: WireLengthEnumList
+
+    priority: Priority
+
+    priorityList: PriorityList
+
+    priorityMap: PriorityMap
+
     sparseStrings: SparseStringList
 
     sparseMap: SparseStringMap
@@ -111,6 +121,45 @@ enum Color {
     GREEN
     BLUE
     YELLOW
+}
+
+enum WireLengthEnum {
+    ONE = "a"
+    SEVEN = "abcdefg"
+    EIGHT = "abcdefgh"
+    NINE = "abcdefghi"
+    SIXTEEN = "abcdefghijklmnop"
+    SEVENTEEN = "abcdefghijklmnopq"
+    LONG = "abcdefghijklmnopqrstuvwxyz0123456789"
+    SHARED_PREFIX_EIGHT = "abcdefgx"
+    SHARED_PREFIX_NINE = "abcdefghx"
+    SHARED_PREFIX_LONG = "abcdefghijklmnopqx"
+    QUOTE = "a\"b"
+    BACKSLASH = "a\\b"
+    NON_ASCII_SHORT = "ü"
+    NON_ASCII = "café-ünïcøde"
+}
+
+list WireLengthEnumList {
+    member: WireLengthEnum
+}
+
+intEnum Priority {
+    MIN = -2147483648
+    NEGATIVE = -7
+    ZERO = 0
+    ONE = 1
+    HUNDRED = 100
+    MAX = 2147483647
+}
+
+list PriorityList {
+    member: Priority
+}
+
+map PriorityMap {
+    key: String
+    value: Priority
 }
 
 list StringList {
@@ -192,7 +241,21 @@ structure JsonNameStruct {
     @jsonName("DisplayName")
     displayName: String
 
+    @jsonName("é")
+    unicodeName: String
+
     normalField: String
+}
+
+structure HashCollisionStruct {
+    aa: String
+    bB: String
+}
+
+structure RequiredDefaultStruct {
+    @required
+    @default("text")
+    type: String
 }
 
 /// Structure that nests itself for depth testing
@@ -204,6 +267,14 @@ structure RecursiveStruct {
 /// Structure for blob testing
 structure BlobStruct {
     data: Blob
+}
+
+@error("client")
+structure BenchError {
+    @required
+    message: String
+
+    code: Integer
 }
 
 list DoubleList {

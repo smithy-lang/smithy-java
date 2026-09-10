@@ -44,6 +44,9 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     private final JsonSettings settings;
     private final boolean useJsonName;
     private int depth;
+    private int generatedFieldStart;
+    private int generatedFieldEnd;
+    private String generatedFieldName;
 
     // Mutable result fields, avoids allocating arrays on every parse call.
     // Safe because the deserializer is single-threaded (one instance per operation).
@@ -135,6 +138,10 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         // Pool full — let GC collect.
     }
 
+    void generatedAbort() {
+        releaseCache();
+    }
+
     /**
      * Decodes an unescaped string, deduplicating short (&lt;= 8 byte) strings through a
      * per-document cache. The packed bytes form an exact identity (see field docs), so a
@@ -214,6 +221,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public boolean readBoolean(Schema schema) {
         skipWhitespace();
+        return readBooleanValue();
+    }
+
+    boolean generatedReadBoolean() {
+        return readBooleanValue();
+    }
+
+    private boolean readBooleanValue() {
         if (pos + 4 <= end && buf[pos] == 't') {
             if (buf[pos + 1] == 'r' && buf[pos + 2] == 'u' && buf[pos + 3] == 'e') {
                 pos += 4;
@@ -235,6 +250,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public byte readByte(Schema schema) {
         skipWhitespace();
+        return readByteValue();
+    }
+
+    byte generatedReadByte() {
+        return readByteValue();
+    }
+
+    private byte readByteValue() {
         JsonReadUtils.parseLong(buf, pos, end, this);
         pos = parsedEndPos;
         if (parsedLong < Byte.MIN_VALUE || parsedLong > Byte.MAX_VALUE) {
@@ -246,6 +269,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public short readShort(Schema schema) {
         skipWhitespace();
+        return readShortValue();
+    }
+
+    short generatedReadShort() {
+        return readShortValue();
+    }
+
+    private short readShortValue() {
         JsonReadUtils.parseLong(buf, pos, end, this);
         pos = parsedEndPos;
         if (parsedLong < Short.MIN_VALUE || parsedLong > Short.MAX_VALUE) {
@@ -257,6 +288,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public int readInteger(Schema schema) {
         skipWhitespace();
+        return readIntegerValue();
+    }
+
+    int generatedReadInteger() {
+        return readIntegerValue();
+    }
+
+    private int readIntegerValue() {
         JsonReadUtils.parseLong(buf, pos, end, this);
         pos = parsedEndPos;
         if (parsedLong < Integer.MIN_VALUE || parsedLong > Integer.MAX_VALUE) {
@@ -268,6 +307,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public long readLong(Schema schema) {
         skipWhitespace();
+        return readLongValue();
+    }
+
+    long generatedReadLong() {
+        return readLongValue();
+    }
+
+    private long readLongValue() {
         JsonReadUtils.parseLong(buf, pos, end, this);
         pos = parsedEndPos;
         return parsedLong;
@@ -276,6 +323,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public float readFloat(Schema schema) {
         skipWhitespace();
+        return readFloatValue();
+    }
+
+    float generatedReadFloat() {
+        return readFloatValue();
+    }
+
+    private float readFloatValue() {
         if (pos < end && buf[pos] == '"') {
             String s = readStringValue();
             return switch (s) {
@@ -293,6 +348,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public double readDouble(Schema schema) {
         skipWhitespace();
+        return readDoubleValue();
+    }
+
+    double generatedReadDouble() {
+        return readDoubleValue();
+    }
+
+    private double readDoubleValue() {
         if (pos < end && buf[pos] == '"') {
             String s = readStringValue();
             return switch (s) {
@@ -380,6 +443,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     @Override
     public ByteBuffer readBlob(Schema schema) {
         skipWhitespace();
+        return readBlobValue();
+    }
+
+    ByteBuffer generatedReadBlob() {
+        return readBlobValue();
+    }
+
+    private ByteBuffer readBlobValue() {
         ByteBuffer decoded = JsonReadUtils.decodeBase64String(buf, pos, end, this);
         pos = parsedEndPos;
         return decoded;
@@ -387,72 +458,55 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public Instant readTimestamp(Schema schema) {
-        skipWhitespace();
         var format = settings.timestampResolver().resolve(schema);
-        if (format == TimestampFormatter.Prelude.EPOCH_SECONDS
-                && pos < end
-                && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
-            long tenDigitSecond = JsonReadUtils.tryParseTenDigitEpochSecond(buf, pos, end);
-            if (tenDigitSecond >= 0) {
+        skipWhitespace();
+        return readTimestampValue(format);
+    }
+
+    Instant generatedReadEpochTimestamp() {
+        if (pos < end && (buf[pos] == '-' || (buf[pos] >= '0' && buf[pos] <= '9'))) {
+            long fastSecond = JsonReadUtils.tryParseTenDigitEpochSecond(buf, pos, end);
+            if (fastSecond >= 0) {
                 pos += 10;
-                return Instant.ofEpochSecond(tenDigitSecond);
+                return instantFromEpochSecond(fastSecond);
             }
-            // Fast path for epoch-seconds: try integer parsing first.
-            // Most epoch-seconds timestamps are whole numbers, so parseLong avoids
-            // the expensive FastDoubleParser path entirely.
             int startPos = pos;
-            JsonReadUtils.parseLong(buf, pos, end, this);
+            JsonReadUtils.parseLong(buf, startPos, end, this);
             int endPos = parsedEndPos;
-            if (endPos < end && buf[endPos] == '.') {
-                // Fractional epoch-seconds: parse with full nanosecond precision
-                // instead of going through double (which truncates to ~15 significant digits).
-                int fracPos = endPos + 1;
-                int fracStart = fracPos;
-                while (fracPos < end && buf[fracPos] >= '0' && buf[fracPos] <= '9') {
-                    fracPos++;
-                }
-                int fracLen = fracPos - fracStart;
-                // Skip the precision fast path if an exponent follows — the precision
-                // fast path doesn't apply scientific notation and would leave pos before
-                // the 'e'/'E', corrupting subsequent parsing.
-                boolean hasExponent = fracPos < end && (buf[fracPos] == 'e' || buf[fracPos] == 'E');
-                if (fracLen > 0 && !hasExponent) {
-                    int nano = 0;
-                    for (int i = 0; i < 9; i++) {
-                        nano *= 10;
-                        if (i < fracLen) {
-                            nano += buf[fracStart + i] - '0';
-                        }
-                    }
-                    pos = fracPos;
-                    long epochSecond = parsedLong;
-                    boolean negative = buf[startPos] == '-';
-                    if (negative && nano > 0) {
-                        // -0.5 means parsedLong=0 but the value is -0.5 = Instant(-1, 500_000_000)
-                        // -1.5 means parsedLong=-1 but the value is -1.5 = Instant(-2, 500_000_000)
-                        epochSecond -= 1;
-                        nano = 1_000_000_000 - nano;
-                    }
-                    try {
-                        return Instant.ofEpochSecond(epochSecond, nano);
-                    } catch (DateTimeException e) {
-                        throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
-                    }
-                }
-                // No digits after dot, or exponent present -- fall through to double parsing
-            } else if (endPos >= end || (buf[endPos] != 'e' && buf[endPos] != 'E')) {
-                // Pure integer -- no fractional part
+            if (endPos >= end || (buf[endPos] != '.' && buf[endPos] != 'e' && buf[endPos] != 'E')) {
                 pos = endPos;
-                try {
-                    return Instant.ofEpochSecond(parsedLong);
-                } catch (DateTimeException e) {
-                    throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
-                }
+                return instantFromEpochSecond(parsedLong);
             }
-            // Has exponent or unparseable fraction -- fall through to double parsing
-            JsonReadUtils.parseDouble(buf, pos, end, this);
-            pos = parsedEndPos;
-            return format.readFromNumber(parsedDouble);
+            return readFractionalEpochTimestamp(startPos, endPos);
+        }
+        return readTimestampFallback(TimestampFormatter.Prelude.EPOCH_SECONDS);
+    }
+
+    Instant generatedReadDateTimeTimestamp() {
+        if (pos < end && buf[pos] == '"') {
+            Instant result = JsonReadUtils.parseIso8601(buf, pos, end, this);
+            if (result != null) {
+                pos = parsedEndPos;
+                return result;
+            }
+        }
+        return readTimestampFallback(TimestampFormatter.Prelude.DATE_TIME);
+    }
+
+    Instant generatedReadHttpDateTimestamp() {
+        if (pos < end && buf[pos] == '"') {
+            Instant result = JsonReadUtils.parseHttpDate(buf, pos, end, this);
+            if (result != null) {
+                pos = parsedEndPos;
+                return result;
+            }
+        }
+        return readTimestampFallback(TimestampFormatter.Prelude.HTTP_DATE);
+    }
+
+    private Instant readTimestampValue(TimestampFormatter format) {
+        if (format == TimestampFormatter.Prelude.EPOCH_SECONDS) {
+            return generatedReadEpochTimestamp();
         }
         if (pos < end && buf[pos] == '"') {
             // Fast path: parse ISO-8601 and HTTP-date directly from bytes,
@@ -470,7 +524,57 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     return result;
                 }
             }
-            // Fallback: parse as String and use DateTimeFormatter
+        }
+        return readTimestampFallback(format);
+    }
+
+    private Instant readFractionalEpochTimestamp(int startPos, int integerEnd) {
+        if (buf[integerEnd] == '.') {
+            // Avoid losing nanosecond precision through double.
+            int fracPos = integerEnd + 1;
+            int fracStart = fracPos;
+            while (fracPos < end && buf[fracPos] >= '0' && buf[fracPos] <= '9') {
+                fracPos++;
+            }
+            int fracLen = fracPos - fracStart;
+            boolean hasExponent = fracPos < end && (buf[fracPos] == 'e' || buf[fracPos] == 'E');
+            if (fracLen > 0 && !hasExponent) {
+                int nano = 0;
+                for (int i = 0; i < 9; i++) {
+                    nano *= 10;
+                    if (i < fracLen) {
+                        nano += buf[fracStart + i] - '0';
+                    }
+                }
+                pos = fracPos;
+                long epochSecond = parsedLong;
+                if (buf[startPos] == '-' && nano > 0) {
+                    epochSecond -= 1;
+                    nano = 1_000_000_000 - nano;
+                }
+                try {
+                    return Instant.ofEpochSecond(epochSecond, nano);
+                } catch (DateTimeException e) {
+                    throw new SerializationException("Epoch seconds out of range: " + parsedLong, e);
+                }
+            }
+        }
+        pos = startPos;
+        JsonReadUtils.parseDouble(buf, startPos, end, this);
+        pos = parsedEndPos;
+        return TimestampFormatter.Prelude.EPOCH_SECONDS.readFromNumber(parsedDouble);
+    }
+
+    private Instant instantFromEpochSecond(long epochSecond) {
+        try {
+            return Instant.ofEpochSecond(epochSecond);
+        } catch (DateTimeException e) {
+            throw new SerializationException("Epoch seconds out of range: " + epochSecond, e);
+        }
+    }
+
+    private Instant readTimestampFallback(TimestampFormatter format) {
+        if (pos < end && buf[pos] == '"') {
             String s = readStringValue();
             try {
                 return format.readFromString(s, true);
@@ -1016,6 +1120,512 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 }
             }
         }
+    }
+
+    boolean generatedBeginObject() {
+        if (pos >= end || buf[pos] != '{') {
+            throw new SerializationException(
+                    "Expected '{', found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
+        pos++;
+        if (++depth > MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        skipWhitespace();
+        if (pos < end && buf[pos] == '}') {
+            pos++;
+            depth--;
+            return false;
+        }
+        return true;
+    }
+
+    boolean generatedAtEnd() {
+        pos = JsonReadUtils.skipWhitespace(buf, pos, end);
+        return pos >= end;
+    }
+
+    int generatedReadFieldHash() {
+        skipWhitespace();
+        if (pos >= end || buf[pos] != '"') {
+            throw new SerializationException(
+                    "Expected field name, found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
+        int start = ++pos;
+        int hash = 0;
+        while (pos < end && buf[pos] != '"') {
+            byte value = buf[pos];
+            if (value == '\\' || (value & 0xff) < 0x20) {
+                int fieldStart = start - 1;
+                JsonReadUtils.parseString(buf, fieldStart, end, this);
+                String decoded = parsedString;
+                generatedFieldName = decoded;
+                generatedFieldStart = -1;
+                generatedFieldEnd = -1;
+                pos = parsedEndPos;
+                skipWhitespace();
+                expect(':');
+                skipWhitespace();
+                return utf8Hash(decoded);
+            }
+            hash = 31 * hash + (value & 0xff);
+            pos++;
+        }
+        if (pos >= end) {
+            throw new SerializationException("Unterminated field name");
+        }
+        generatedFieldStart = start;
+        generatedFieldEnd = pos++;
+        generatedFieldName = null;
+        skipWhitespace();
+        expect(':');
+        skipWhitespace();
+        return hash;
+    }
+
+    // Generated switch arms recheck the bytes, so key collisions are safe.
+    int generatedReadStringKey() {
+        int p = pos;
+        if (p >= end || buf[p] != '"') {
+            throw new SerializationException(
+                    "Expected string, found: " + JsonReadUtils.describePos(buf, p, end));
+        }
+        int start = ++p;
+        if (p <= end - Long.BYTES) {
+            long word = JsonReadUtils.readLongLittleEndian(buf, p);
+            long stopMask = JsonReadUtils.stringStopMask(word);
+            if (stopMask != 0) {
+                int length = Long.numberOfTrailingZeros(stopMask) >>> 3;
+                int stop = p + length;
+                if (buf[stop] != '"') {
+                    return generatedStringKeySlow(start - 1);
+                }
+                generatedFieldStart = start;
+                generatedFieldEnd = stop;
+                generatedFieldName = null;
+                pos = stop + 1;
+                return stringKey(word & ((1L << (length << 3)) - 1), length);
+            }
+            p += Long.BYTES;
+        }
+        return generatedReadStringKeyLong(start, p);
+    }
+
+    private int generatedReadStringKeyLong(int start, int scan) {
+        int p = scan;
+        while (p <= end - Long.BYTES) {
+            long stopMask = JsonReadUtils.stringStopMask(JsonReadUtils.readLongLittleEndian(buf, p));
+            if (stopMask == 0) {
+                p += Long.BYTES;
+                continue;
+            }
+            int stop = p + (Long.numberOfTrailingZeros(stopMask) >>> 3);
+            if (buf[stop] != '"') {
+                return generatedStringKeySlow(start - 1);
+            }
+            return generatedStringKeyFound(start, stop);
+        }
+        while (p < end) {
+            byte value = buf[p];
+            if (value == '"') {
+                return generatedStringKeyFound(start, p);
+            }
+            if (value == '\\' || value < 0 || (value & 0xff) < 0x20) {
+                return generatedStringKeySlow(start - 1);
+            }
+            p++;
+        }
+        throw new SerializationException("Unterminated string");
+    }
+
+    private int generatedStringKeyFound(int start, int stop) {
+        generatedFieldStart = start;
+        generatedFieldEnd = stop;
+        generatedFieldName = null;
+        pos = stop + 1;
+        int length = stop - start;
+        long word;
+        if (length >= Long.BYTES) {
+            word = JsonReadUtils.readLongLittleEndian(buf, start);
+        } else {
+            word = start <= end - Long.BYTES
+                    ? JsonReadUtils.readLongLittleEndian(buf, start) & ((1L << (length << 3)) - 1)
+                    : readPackedToken(start, length);
+        }
+        return stringKey(word, length);
+    }
+
+    private int generatedStringKeySlow(int quotePos) {
+        JsonReadUtils.parseString(buf, quotePos, end, this);
+        generatedFieldName = parsedString;
+        generatedFieldStart = -1;
+        generatedFieldEnd = -1;
+        pos = parsedEndPos;
+        return stringKeyUtf8(generatedFieldName);
+    }
+
+    private static int utf8Hash(String value) {
+        int hash = 0;
+        for (int i = 0; i < value.length();) {
+            int codePoint = value.codePointAt(i);
+            i += Character.charCount(codePoint);
+            if (codePoint <= 0x7f) {
+                hash = 31 * hash + codePoint;
+            } else if (codePoint <= 0x7ff) {
+                hash = 31 * hash + (0xc0 | codePoint >>> 6);
+                hash = 31 * hash + (0x80 | codePoint & 0x3f);
+            } else if (codePoint <= 0xffff) {
+                hash = 31 * hash + (0xe0 | codePoint >>> 12);
+                hash = 31 * hash + (0x80 | codePoint >>> 6 & 0x3f);
+                hash = 31 * hash + (0x80 | codePoint & 0x3f);
+            } else {
+                hash = 31 * hash + (0xf0 | codePoint >>> 18);
+                hash = 31 * hash + (0x80 | codePoint >>> 12 & 0x3f);
+                hash = 31 * hash + (0x80 | codePoint >>> 6 & 0x3f);
+                hash = 31 * hash + (0x80 | codePoint & 0x3f);
+            }
+        }
+        return hash;
+    }
+
+    private static int stringKeyUtf8(String value) {
+        long word = 0;
+        int length = 0;
+        for (int i = 0; i < value.length();) {
+            int codePoint = value.codePointAt(i);
+            i += Character.charCount(codePoint);
+            if (codePoint <= 0x7f) {
+                word = appendKeyByte(word, length++, codePoint);
+            } else if (codePoint <= 0x7ff) {
+                word = appendKeyByte(word, length++, 0xc0 | codePoint >>> 6);
+                word = appendKeyByte(word, length++, 0x80 | codePoint & 0x3f);
+            } else if (codePoint <= 0xffff) {
+                word = appendKeyByte(word, length++, 0xe0 | codePoint >>> 12);
+                word = appendKeyByte(word, length++, 0x80 | codePoint >>> 6 & 0x3f);
+                word = appendKeyByte(word, length++, 0x80 | codePoint & 0x3f);
+            } else {
+                word = appendKeyByte(word, length++, 0xf0 | codePoint >>> 18);
+                word = appendKeyByte(word, length++, 0x80 | codePoint >>> 12 & 0x3f);
+                word = appendKeyByte(word, length++, 0x80 | codePoint >>> 6 & 0x3f);
+                word = appendKeyByte(word, length++, 0x80 | codePoint & 0x3f);
+            }
+        }
+        return stringKey(word, length);
+    }
+
+    private static long appendKeyByte(long word, int index, int value) {
+        return index < Long.BYTES ? word | (long) value << (index << 3) : word;
+    }
+
+    // Must match JsonRuntimeCodegenBackend.enumSwitchKey.
+    static int stringKey(long packedPrefix, int length) {
+        return (int) ((packedPrefix * 0x9E3779B97F4A7C15L) >>> 32) ^ length;
+    }
+
+    boolean generatedTryReadField(byte[] token) {
+        int start = pos;
+        int length = token.length;
+        if (start > end - length) {
+            return false;
+        }
+        for (int i = 0; i < length; i++) {
+            if (buf[start + i] != token[i]) {
+                return false;
+            }
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    boolean generatedTryReadNextField(byte[] token) {
+        int start = pos;
+        if (start >= end || buf[start] != ',') {
+            return false;
+        }
+        start = JsonReadUtils.skipWhitespace(buf, start + 1, end);
+        int length = token.length;
+        if (start > end - length) {
+            return false;
+        }
+        for (int i = 0; i < length; i++) {
+            if (buf[start + i] != token[i]) {
+                return false;
+            }
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    boolean generatedTryReadField8(long expected, long mask, int length) {
+        int start = pos;
+        if (start > end - length) {
+            return false;
+        }
+        long actual;
+        if (start <= end - Long.BYTES) {
+            actual = JsonReadUtils.readLongLittleEndian(buf, start) & mask;
+        } else {
+            actual = readPackedToken(start, length);
+        }
+        if (actual != expected) {
+            return false;
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    boolean generatedTryReadNextField8(long expected, long mask, int length) {
+        int start = pos;
+        if (start >= end || buf[start] != ',') {
+            return false;
+        }
+        start = JsonReadUtils.skipWhitespace(buf, start + 1, end);
+        if (start > end - length) {
+            return false;
+        }
+        long actual;
+        if (start <= end - Long.BYTES) {
+            actual = JsonReadUtils.readLongLittleEndian(buf, start) & mask;
+        } else {
+            actual = readPackedToken(start, length);
+        }
+        if (actual != expected) {
+            return false;
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    boolean generatedTryReadField16(long prefix, long suffix, long suffixMask, int length) {
+        int start = pos;
+        if (start > end - length || JsonReadUtils.readLongLittleEndian(buf, start) != prefix) {
+            return false;
+        }
+        int suffixStart = start + Long.BYTES;
+        long actualSuffix;
+        if (suffixStart <= end - Long.BYTES) {
+            actualSuffix = JsonReadUtils.readLongLittleEndian(buf, suffixStart) & suffixMask;
+        } else {
+            actualSuffix = readPackedToken(suffixStart, length - Long.BYTES);
+        }
+        if (actualSuffix != suffix) {
+            return false;
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    boolean generatedTryReadNextField16(long prefix, long suffix, long suffixMask, int length) {
+        int start = pos;
+        if (start >= end || buf[start] != ',') {
+            return false;
+        }
+        start = JsonReadUtils.skipWhitespace(buf, start + 1, end);
+        if (start > end - length || JsonReadUtils.readLongLittleEndian(buf, start) != prefix) {
+            return false;
+        }
+        int suffixStart = start + Long.BYTES;
+        long actualSuffix;
+        if (suffixStart <= end - Long.BYTES) {
+            actualSuffix = JsonReadUtils.readLongLittleEndian(buf, suffixStart) & suffixMask;
+        } else {
+            actualSuffix = readPackedToken(suffixStart, length - Long.BYTES);
+        }
+        if (actualSuffix != suffix) {
+            return false;
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, start + length, end);
+        return true;
+    }
+
+    private long readPackedToken(int start, int length) {
+        long value = 0;
+        for (int i = 0; i < length; i++) {
+            value |= (long) (buf[start + i] & 0xFF) << (i << 3);
+        }
+        return value;
+    }
+
+    boolean generatedFieldEquals(byte[] expected, String decoded) {
+        if (generatedFieldName != null) {
+            return generatedFieldName.equals(decoded);
+        }
+        int start = generatedFieldStart;
+        int length = generatedFieldEnd - start;
+        return start >= 0
+                && length == expected.length
+                && Arrays.equals(buf, start, generatedFieldEnd, expected, 0, expected.length);
+    }
+
+    boolean generatedStringEquals8(long expected, long mask, int length, String decoded) {
+        if (generatedFieldName != null) {
+            return generatedFieldName.equals(decoded);
+        }
+        int start = generatedFieldStart;
+        if (generatedFieldEnd - start != length) {
+            return false;
+        }
+        long actual = start <= end - Long.BYTES
+                ? JsonReadUtils.readLongLittleEndian(buf, start) & mask
+                : readPackedToken(start, length);
+        return actual == expected;
+    }
+
+    boolean generatedStringEquals16(
+            long prefix,
+            long suffix,
+            long suffixMask,
+            int length,
+            String decoded
+    ) {
+        if (generatedFieldName != null) {
+            return generatedFieldName.equals(decoded);
+        }
+        int start = generatedFieldStart;
+        if (generatedFieldEnd - start != length
+                || JsonReadUtils.readLongLittleEndian(buf, start) != prefix) {
+            return false;
+        }
+        int suffixStart = start + Long.BYTES;
+        long actualSuffix = suffixStart <= end - Long.BYTES
+                ? JsonReadUtils.readLongLittleEndian(buf, suffixStart) & suffixMask
+                : readPackedToken(suffixStart, length - Long.BYTES);
+        return actualSuffix == suffix;
+    }
+
+    String generatedFieldName() {
+        if (generatedFieldName != null) {
+            return generatedFieldName;
+        }
+        generatedFieldName = decodeUtf8Cached(
+                buf,
+                generatedFieldStart,
+                generatedFieldEnd - generatedFieldStart);
+        return generatedFieldName;
+    }
+
+    String generatedReadMapKey() {
+        int p = JsonReadUtils.skipWhitespace(buf, pos, end);
+        if (p >= end || buf[p] != '"') {
+            pos = p;
+            throw new SerializationException(
+                    "Expected map key, found: " + JsonReadUtils.describePos(buf, p, end));
+        }
+        int quote = p++;
+        int start = p;
+        while (p <= end - Long.BYTES) {
+            long stops = JsonReadUtils.stringStopMask(JsonReadUtils.readLongLittleEndian(buf, p));
+            if (stops == 0) {
+                p += Long.BYTES;
+                continue;
+            }
+            int stop = p + (Long.numberOfTrailingZeros(stops) >>> 3);
+            if (buf[stop] == '"') {
+                String key = decodeAsciiCached(buf, start, stop - start);
+                generatedFinishMapKey(stop + 1);
+                return key;
+            }
+            return generatedReadMapKeySlow(quote);
+        }
+        while (p < end) {
+            byte value = buf[p];
+            if (value == '"') {
+                String key = decodeAsciiCached(buf, start, p - start);
+                generatedFinishMapKey(p + 1);
+                return key;
+            }
+            if (value == '\\' || value < 0 || (value & 0xff) < 0x20) {
+                return generatedReadMapKeySlow(quote);
+            }
+            p++;
+        }
+        throw new SerializationException("Unterminated map key");
+    }
+
+    private String generatedReadMapKeySlow(int quote) {
+        JsonReadUtils.parseString(buf, quote, end, this);
+        String key = parsedString;
+        generatedFinishMapKey(parsedEndPos);
+        return key;
+    }
+
+    private void generatedFinishMapKey(int next) {
+        next = JsonReadUtils.skipWhitespace(buf, next, end);
+        if (next >= end || buf[next] != ':') {
+            pos = next;
+            throw new SerializationException(
+                    "Expected ':', found: " + JsonReadUtils.describePos(buf, next, end));
+        }
+        pos = JsonReadUtils.skipWhitespace(buf, next + 1, end);
+    }
+
+    boolean generatedObjectHasNext() {
+        skipWhitespace();
+        if (pos < end && buf[pos] == '}') {
+            pos++;
+            depth--;
+            return false;
+        }
+        expect(',');
+        skipWhitespace();
+        return true;
+    }
+
+    boolean generatedBeginArray() {
+        if (pos >= end || buf[pos] != '[') {
+            throw new SerializationException(
+                    "Expected '[', found: " + JsonReadUtils.describePos(buf, pos, end));
+        }
+        pos++;
+        if (++depth > MAX_DEPTH) {
+            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+        }
+        skipWhitespace();
+        if (pos < end && buf[pos] == ']') {
+            pos++;
+            depth--;
+            return false;
+        }
+        return true;
+    }
+
+    boolean generatedArrayHasNext() {
+        skipWhitespace();
+        if (pos < end && buf[pos] == ']') {
+            pos++;
+            depth--;
+            return false;
+        }
+        expect(',');
+        skipWhitespace();
+        return true;
+    }
+
+    boolean generatedTryReadNull() {
+        if (pos + 4 <= end
+                && buf[pos] == 'n'
+                && buf[pos + 1] == 'u'
+                && buf[pos + 2] == 'l'
+                && buf[pos + 3] == 'l') {
+            pos += 4;
+            return true;
+        }
+        return false;
+    }
+
+    String generatedReadString() {
+        return readStringValue();
+    }
+
+    void generatedSkipValue() {
+        skipValue();
+    }
+
+    int generatedScan() {
+        int start = pos;
+        skipValue();
+        close();
+        return pos - start;
     }
 
     private void skipString() {
