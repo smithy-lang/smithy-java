@@ -87,15 +87,13 @@ public final class ClientConfig {
         this.interceptorChain = ClientInterceptor.chain(this.interceptors);
 
         // By default, support NoAuthAuthScheme
-        List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-        supportedAuthSchemes.add(NO_AUTH_AUTH_SCHEME);
-        supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
-        this.supportedAuthSchemes = Collections.unmodifiableList(supportedAuthSchemes);
         var supportedAuthSchemesById = new LinkedHashMap<ShapeId, AuthScheme<?, ?>>();
-        for (var scheme : supportedAuthSchemes) {
-            supportedAuthSchemesById.putIfAbsent(scheme.schemeId(), scheme);
+        supportedAuthSchemesById.put(NO_AUTH_AUTH_SCHEME.schemeId(), NO_AUTH_AUTH_SCHEME);
+        for (var scheme : builder.supportedAuthSchemes) {
+            supportedAuthSchemesById.put(scheme.schemeId(), scheme);
         }
         this.supportedAuthSchemesById = Collections.unmodifiableMap(supportedAuthSchemesById);
+        this.supportedAuthSchemes = List.copyOf(supportedAuthSchemesById.values());
 
         this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, AuthSchemeResolver.DEFAULT);
         this.identityResolvers = List.copyOf(builder.identityResolvers);

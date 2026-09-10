@@ -260,6 +260,40 @@ public class ClientPipelineTest {
     }
 
     @Test
+    public void laterAuthSchemeRegistrationReplacesEarlierRegistration() {
+        var service = ShapeId.from("smithy.example#Sprockets");
+        var schemeId = ShapeId.from("smithy.test#replaceableAuth");
+        var first = AuthScheme.of(
+                schemeId,
+                HttpRequest.class,
+                Identity.class,
+                (request, identity, properties) -> new SignResult<>(request));
+        var replacement = AuthScheme.of(
+                schemeId,
+                HttpRequest.class,
+                Identity.class,
+                (request, identity, properties) -> new SignResult<>(request));
+
+        var client = DynamicClient.builder()
+                .serviceId(service)
+                .model(MODEL)
+                .addPlugin(MockPlugin.builder().addQueue(new MockQueue()).build())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://example.com"))
+                .putSupportedAuthSchemes(first)
+                .putSupportedAuthSchemes(replacement)
+                .build();
+
+        Assertions.assertSame(replacement, client.config().supportedAuthSchemesById().get(schemeId));
+        assertThat(
+                client.config()
+                        .supportedAuthSchemes()
+                        .stream()
+                        .filter(scheme -> scheme.schemeId().equals(schemeId))
+                        .count(),
+                equalTo(1L));
+    }
+
+    @Test
     public void endpointAuthSchemeOverridesAugmentSignerProperties() {
         var service = ShapeId.from("smithy.example#Sprockets");
         var testSchemeId = ShapeId.from("smithy.test#testAuth");
