@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":codecs:codec-commons", configuration = "shadow"))
 
     testImplementation(project(":codecs:json-codec", configuration = "shadow"))
+    testImplementation(project(":codecs:xml-codec"))
 }
 
 val jdk25CodegenTest =
@@ -28,7 +29,11 @@ val jdk25CodegenTest =
             javaToolchains.launcherFor {
                 languageVersion = JavaLanguageVersion.of(25)
             }
+        systemProperty("smithy-java.runtime-codegen.json", "strict")
+        systemProperty("smithy-java.runtime-codegen.xml", "strict")
         systemProperty("smithy-java.runtime-codegen.http-binding", "strict")
+        systemProperty("smithy-java.json-provider", "smithy")
+        systemProperty("smithy-java.xml-provider", "smithy")
         useJUnitPlatform {
             includeTags("runtime-codegen-strict")
         }
@@ -45,7 +50,11 @@ val jdk25CodegenCompatibilityTest =
             javaToolchains.launcherFor {
                 languageVersion = JavaLanguageVersion.of(25)
             }
+        systemProperty("smithy-java.runtime-codegen.json", "enabled")
+        systemProperty("smithy-java.runtime-codegen.xml", "enabled")
         systemProperty("smithy-java.runtime-codegen.http-binding", "enabled")
+        systemProperty("smithy-java.json-provider", "smithy")
+        systemProperty("smithy-java.xml-provider", "smithy")
         useJUnitPlatform()
     }
 

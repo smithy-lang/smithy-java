@@ -304,3 +304,173 @@ list PlainStringList {
 list SparsePlainStringList {
     member: String
 }
+
+intEnum Priority {
+    LOW = 1
+    MEDIUM = 5
+    HIGH = 10
+}
+
+/// A union is framed as a structure holding exactly one member: no discriminator, no wrapper element.
+union ValueUnion {
+    stringValue: String
+
+    intValue: Integer
+
+    structValue: NestedStruct
+
+    listValue: IntegerList
+
+    mapValue: StringMap
+
+    @xmlName("Renamed")
+    renamedValue: String
+}
+
+list ValueUnionList {
+    member: ValueUnion
+}
+
+/// Union members in every position a union can appear: alone, wrapped in a list, flattened, in a map.
+structure UnionStruct {
+    @required
+    name: String
+
+    choice: ValueUnion
+
+    choices: ValueUnionList
+
+    @xmlFlattened
+    flatChoices: ValueUnionList
+}
+
+list PriorityList {
+    member: Priority
+}
+
+map PriorityMap {
+    key: String
+    value: Priority
+}
+
+/// intEnum members: written as their integer value, not their name.
+structure IntEnumStruct {
+    priority: Priority
+    priorities: PriorityList
+    priorityMap: PriorityMap
+}
+
+/// Every type the inline attribute writer accepts, on an element that also carries a namespace.
+///
+/// The namespace has to be emitted before the attributes and the `>` deferred until after them, so
+/// this shape is the one that pins down the open-tag byte order.
+@xmlNamespace(uri: "https://example.com/attrs", prefix: "at")
+structure TypedAttributeStruct {
+    /// Required with a default, so it is always present and needs no null check.
+    @required
+    @xmlAttribute
+    flag: PrimitiveBoolean = false
+
+    @xmlAttribute
+    boolAttr: Boolean
+
+    @xmlAttribute
+    intAttr: Integer
+
+    @xmlAttribute
+    longAttr: Long
+
+    @xmlAttribute
+    floatAttr: Float
+
+    @xmlAttribute
+    doubleAttr: Double
+
+    @xmlAttribute
+    @timestampFormat("date-time")
+    timestampAttr: Timestamp
+
+    @xmlAttribute
+    colorAttr: Color
+
+    @xmlAttribute
+    priorityAttr: Priority
+
+    @xmlAttribute
+    @xmlName("renamed")
+    renamedAttr: String
+
+    body: String
+}
+
+list NamespacedList {
+    @xmlNamespace(uri: "https://example.com/item", prefix: "i")
+    @xmlName("Item")
+    member: String
+}
+
+map NamespacedMap {
+    @xmlNamespace(uri: "https://example.com/key", prefix: "k")
+    @xmlName("Name")
+    key: String
+
+    @xmlNamespace(uri: "https://example.com/value", prefix: "v")
+    @xmlName("Text")
+    value: String
+}
+
+/// Namespaces on a member, on a list's item, and on a map's key and value.
+@xmlNamespace(uri: "https://example.com/outer")
+structure NamespacedMembersStruct {
+    @xmlNamespace(uri: "https://example.com/member", prefix: "m")
+    name: String
+
+    items: NamespacedList
+
+    @xmlFlattened
+    flatItems: NamespacedList
+
+    lookup: NamespacedMap
+
+    @xmlFlattened
+    flatLookup: NamespacedMap
+}
+
+/// An attribute whose resolved name carries a namespace prefix.
+///
+/// The prefix is part of the name that is written, but the parser records attributes under their local
+/// name, so reading has to look for `someName` while writing emits `xsi:someName`. This shape only
+/// appears nested, because a prefixed attribute on a root element is not read by the dispatch
+/// deserializer at all: it looks that one up through the struct's name table, which holds the full
+/// name.
+structure PrefixedAttributeStruct {
+    @xmlAttribute
+    @xmlName("xsi:someName")
+    prefixed: String
+
+    value: String
+}
+
+/// Attribute members that memberIndex order places behind an element member.
+///
+/// Attributes can only be written while the start tag is still open, so their position relative to the
+/// elements is the one place member order is semantically meaningful in XML. `body` is required with no
+/// default, which hoists it to the front of `schema.members()` even though both attributes are declared
+/// ahead of it, so this shape only serializes correctly if the writer partitions members itself instead
+/// of following the order the plan hands it.
+structure AttributeAfterElementStruct {
+    @xmlAttribute
+    lateAttr: String
+
+    @xmlAttribute
+    @xmlName("renamed")
+    otherAttr: Integer
+
+    @required
+    body: String
+
+    @xmlNamespace(uri: "https://example.com", prefix: "xsi")
+    nested: PrefixedAttributeStruct
+
+    trailing: String
+}
