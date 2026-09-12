@@ -126,10 +126,10 @@ public final class ValidatedPojo implements SerializableStruct {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.string(de.readString(member));
-                    case 1 -> builder.boxedInteger(de.readInteger(member));
-                    case 2 -> builder.integer(de.readInteger(member));
+                switch (member.memberName()) {
+                    case "string" -> builder.string(de.readString(member));
+                    case "boxedInteger" -> builder.boxedInteger(de.readInteger(member));
+                    case "integer" -> builder.integer(de.readInteger(member));
                 }
             });
             return this;

@@ -41,6 +41,10 @@ public sealed interface AllPrimitiveUnion extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeInteger($SCHEMA_INT_VARIANT, intVariant);
         }
+        @Override
+        public long presenceBits() {
+            return 0x1L;
+        }
 
         @Override
         @SuppressWarnings("unchecked")
@@ -62,6 +66,10 @@ public sealed interface AllPrimitiveUnion extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeBoolean($SCHEMA_BOOL_VARIANT, boolVariant);
         }
+        @Override
+        public long presenceBits() {
+            return 0x2L;
+        }
 
         @Override
         @SuppressWarnings("unchecked")
@@ -82,6 +90,10 @@ public sealed interface AllPrimitiveUnion extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeLong($SCHEMA_LONG_VARIANT, longVariant);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x4L;
         }
 
         @Override

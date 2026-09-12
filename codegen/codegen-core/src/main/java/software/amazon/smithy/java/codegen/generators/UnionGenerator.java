@@ -117,6 +117,7 @@ public final class UnionGenerator
             writer.pushState();
             writer.putContext("objects", Objects.class);
             writer.putContext("collections", Collections.class);
+            var sortedMembers = CodegenUtils.getSortedMembers(model, shape);
             for (var member : shape.members()) {
                 writer.pushState();
                 writer.injectSection(new ClassSection(member));
@@ -137,7 +138,13 @@ public final class UnionGenerator
                                     public void serializeMembers(${shapeSerializer:T} serializer) {
                                         ${serializeMember:C};
                                     }
+                                    ${?hasPresenceBits}
+                                    @Override
+                                    public long presenceBits() {
+                                        return ${presenceBitsValue:L};
+                                    }
 
+                                    ${/hasPresenceBits}
                                     ${valueGetter:C|}
 
                                     ${toString:C|}
@@ -145,6 +152,14 @@ public final class UnionGenerator
                                 """;
                 var memberSymbol = symbolProvider.toSymbol(member);
                 var memberName = symbolProvider.toMemberName(member);
+                // Bit 63 is reserved so PRESENCE_UNKNOWN can never collide with real bits.
+                boolean hasPresenceBits = sortedMembers.size() <= 63;
+                writer.putContext("hasPresenceBits", hasPresenceBits);
+                if (hasPresenceBits) {
+                    writer.putContext(
+                            "presenceBitsValue",
+                            "0x" + Long.toHexString(1L << sortedMembers.indexOf(member)) + "L");
+                }
                 boolean isPrimitive = memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE);
                 boolean isCol = target.isMapShape() || target.isListShape();
                 boolean needsConstructor = !isUnit && (isCol || !isPrimitive);

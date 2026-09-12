@@ -303,17 +303,19 @@ public final class DefaultStructure implements SerializableStruct {
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         serializer.writeBoolean($SCHEMA_BOOLEAN_MEMBER, booleanMember);
+        serializer.writeByte($SCHEMA_BYTE_MEMBER, byteMember);
+        serializer.writeInteger($SCHEMA_INTEGER, integer);
+        serializer.writeLong($SCHEMA_LONG_MEMBER, longMember);
+        serializer.writeShort($SCHEMA_SHORT_MEMBER, shortMember);
+        serializer.writeInteger($SCHEMA_INT_ENUM, intEnum.getValue());
+        serializer.writeFloat($SCHEMA_FLOAT_MEMBER, floatMember);
+        serializer.writeDouble($SCHEMA_DOUBLE_MEMBER, doubleMember);
+        serializer.writeTimestamp($SCHEMA_TIMESTAMP, timestamp);
         serializer.writeBigDecimal($SCHEMA_BIG_DECIMAL, bigDecimal);
         serializer.writeBigDecimal($SCHEMA_BIG_DECIMAL_WITH_DOUBLE_DEFAULT, bigDecimalWithDoubleDefault);
         serializer.writeBigDecimal($SCHEMA_BIG_DECIMAL_WITH_LONG_DEFAULT, bigDecimalWithLongDefault);
         serializer.writeBigInteger($SCHEMA_BIG_INTEGER, bigInteger);
         serializer.writeBigInteger($SCHEMA_BIG_INTEGER_WITH_LONG_DEFAULT, bigIntegerWithLongDefault);
-        serializer.writeByte($SCHEMA_BYTE_MEMBER, byteMember);
-        serializer.writeDouble($SCHEMA_DOUBLE_MEMBER, doubleMember);
-        serializer.writeFloat($SCHEMA_FLOAT_MEMBER, floatMember);
-        serializer.writeInteger($SCHEMA_INTEGER, integer);
-        serializer.writeLong($SCHEMA_LONG_MEMBER, longMember);
-        serializer.writeShort($SCHEMA_SHORT_MEMBER, shortMember);
         serializer.writeString($SCHEMA_STRING, string);
         serializer.writeBlob($SCHEMA_BLOB, blob);
         serializer.writeDataStream($SCHEMA_STREAMING_BLOB, streamingBlob);
@@ -325,9 +327,11 @@ public final class DefaultStructure implements SerializableStruct {
         serializer.writeDocument($SCHEMA_MAP_DOC, mapDoc);
         serializer.writeList($SCHEMA_LIST, list, list.size(), SharedSerde.ListOfStringSerializer.INSTANCE);
         serializer.writeMap($SCHEMA_MAP, map, map.size(), SharedSerde.StringStringMapSerializer.INSTANCE);
-        serializer.writeTimestamp($SCHEMA_TIMESTAMP, timestamp);
         serializer.writeString($SCHEMA_ENUM_MEMBER, enumMember.getValue());
-        serializer.writeInteger($SCHEMA_INT_ENUM, intEnum.getValue());
+    }
+    @Override
+    public long presenceBits() {
+        return 0x3ffffffL;
     }
 
     @Override
@@ -335,31 +339,31 @@ public final class DefaultStructure implements SerializableStruct {
     public <T> T getMemberValue(Schema member) {
         return switch (member.memberIndex()) {
             case 0 -> (T) SchemaUtils.validateSameMember($SCHEMA_BOOLEAN_MEMBER, member, booleanMember);
-            case 1 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL, member, bigDecimal);
-            case 2 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL_WITH_DOUBLE_DEFAULT, member, bigDecimalWithDoubleDefault);
-            case 3 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL_WITH_LONG_DEFAULT, member, bigDecimalWithLongDefault);
-            case 4 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_INTEGER, member, bigInteger);
-            case 5 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_INTEGER_WITH_LONG_DEFAULT, member, bigIntegerWithLongDefault);
-            case 6 -> (T) SchemaUtils.validateSameMember($SCHEMA_BYTE_MEMBER, member, byteMember);
+            case 1 -> (T) SchemaUtils.validateSameMember($SCHEMA_BYTE_MEMBER, member, byteMember);
+            case 2 -> (T) SchemaUtils.validateSameMember($SCHEMA_INTEGER, member, integer);
+            case 3 -> (T) SchemaUtils.validateSameMember($SCHEMA_LONG_MEMBER, member, longMember);
+            case 4 -> (T) SchemaUtils.validateSameMember($SCHEMA_SHORT_MEMBER, member, shortMember);
+            case 5 -> (T) SchemaUtils.validateSameMember($SCHEMA_INT_ENUM, member, intEnum);
+            case 6 -> (T) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, floatMember);
             case 7 -> (T) SchemaUtils.validateSameMember($SCHEMA_DOUBLE_MEMBER, member, doubleMember);
-            case 8 -> (T) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, floatMember);
-            case 9 -> (T) SchemaUtils.validateSameMember($SCHEMA_INTEGER, member, integer);
-            case 10 -> (T) SchemaUtils.validateSameMember($SCHEMA_LONG_MEMBER, member, longMember);
-            case 11 -> (T) SchemaUtils.validateSameMember($SCHEMA_SHORT_MEMBER, member, shortMember);
-            case 12 -> (T) SchemaUtils.validateSameMember($SCHEMA_STRING, member, string);
-            case 13 -> (T) SchemaUtils.validateSameMember($SCHEMA_BLOB, member, blob);
-            case 14 -> (T) SchemaUtils.validateSameMember($SCHEMA_STREAMING_BLOB, member, streamingBlob);
-            case 15 -> (T) SchemaUtils.validateSameMember($SCHEMA_BOOL_DOC, member, boolDoc);
-            case 16 -> (T) SchemaUtils.validateSameMember($SCHEMA_STRING_DOC, member, stringDoc);
-            case 17 -> (T) SchemaUtils.validateSameMember($SCHEMA_NUMBER_DOC, member, numberDoc);
-            case 18 -> (T) SchemaUtils.validateSameMember($SCHEMA_FLOATING_POINTNUMBER_DOC, member, floatingPointnumberDoc);
-            case 19 -> (T) SchemaUtils.validateSameMember($SCHEMA_LIST_DOC, member, listDoc);
-            case 20 -> (T) SchemaUtils.validateSameMember($SCHEMA_MAP_DOC, member, mapDoc);
-            case 21 -> (T) SchemaUtils.validateSameMember($SCHEMA_LIST, member, list);
-            case 22 -> (T) SchemaUtils.validateSameMember($SCHEMA_MAP, member, map);
-            case 23 -> (T) SchemaUtils.validateSameMember($SCHEMA_TIMESTAMP, member, timestamp);
-            case 24 -> (T) SchemaUtils.validateSameMember($SCHEMA_ENUM_MEMBER, member, enumMember);
-            case 25 -> (T) SchemaUtils.validateSameMember($SCHEMA_INT_ENUM, member, intEnum);
+            case 8 -> (T) SchemaUtils.validateSameMember($SCHEMA_TIMESTAMP, member, timestamp);
+            case 9 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL, member, bigDecimal);
+            case 10 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL_WITH_DOUBLE_DEFAULT, member, bigDecimalWithDoubleDefault);
+            case 11 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL_WITH_LONG_DEFAULT, member, bigDecimalWithLongDefault);
+            case 12 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_INTEGER, member, bigInteger);
+            case 13 -> (T) SchemaUtils.validateSameMember($SCHEMA_BIG_INTEGER_WITH_LONG_DEFAULT, member, bigIntegerWithLongDefault);
+            case 14 -> (T) SchemaUtils.validateSameMember($SCHEMA_STRING, member, string);
+            case 15 -> (T) SchemaUtils.validateSameMember($SCHEMA_BLOB, member, blob);
+            case 16 -> (T) SchemaUtils.validateSameMember($SCHEMA_STREAMING_BLOB, member, streamingBlob);
+            case 17 -> (T) SchemaUtils.validateSameMember($SCHEMA_BOOL_DOC, member, boolDoc);
+            case 18 -> (T) SchemaUtils.validateSameMember($SCHEMA_STRING_DOC, member, stringDoc);
+            case 19 -> (T) SchemaUtils.validateSameMember($SCHEMA_NUMBER_DOC, member, numberDoc);
+            case 20 -> (T) SchemaUtils.validateSameMember($SCHEMA_FLOATING_POINTNUMBER_DOC, member, floatingPointnumberDoc);
+            case 21 -> (T) SchemaUtils.validateSameMember($SCHEMA_LIST_DOC, member, listDoc);
+            case 22 -> (T) SchemaUtils.validateSameMember($SCHEMA_MAP_DOC, member, mapDoc);
+            case 23 -> (T) SchemaUtils.validateSameMember($SCHEMA_LIST, member, list);
+            case 24 -> (T) SchemaUtils.validateSameMember($SCHEMA_MAP, member, map);
+            case 25 -> (T) SchemaUtils.validateSameMember($SCHEMA_ENUM_MEMBER, member, enumMember);
             default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
         };
     }
@@ -678,31 +682,31 @@ public final class DefaultStructure implements SerializableStruct {
         public void setMemberValue(Schema member, Object value) {
             switch (member.memberIndex()) {
                 case 0 -> booleanMember((boolean) SchemaUtils.validateSameMember($SCHEMA_BOOLEAN_MEMBER, member, value));
-                case 1 -> bigDecimal((BigDecimal) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL, member, value));
-                case 2 -> bigDecimalWithDoubleDefault((BigDecimal) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL_WITH_DOUBLE_DEFAULT, member, value));
-                case 3 -> bigDecimalWithLongDefault((BigDecimal) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL_WITH_LONG_DEFAULT, member, value));
-                case 4 -> bigInteger((BigInteger) SchemaUtils.validateSameMember($SCHEMA_BIG_INTEGER, member, value));
-                case 5 -> bigIntegerWithLongDefault((BigInteger) SchemaUtils.validateSameMember($SCHEMA_BIG_INTEGER_WITH_LONG_DEFAULT, member, value));
-                case 6 -> byteMember((byte) SchemaUtils.validateSameMember($SCHEMA_BYTE_MEMBER, member, value));
+                case 1 -> byteMember((byte) SchemaUtils.validateSameMember($SCHEMA_BYTE_MEMBER, member, value));
+                case 2 -> integer((int) SchemaUtils.validateSameMember($SCHEMA_INTEGER, member, value));
+                case 3 -> longMember((long) SchemaUtils.validateSameMember($SCHEMA_LONG_MEMBER, member, value));
+                case 4 -> shortMember((short) SchemaUtils.validateSameMember($SCHEMA_SHORT_MEMBER, member, value));
+                case 5 -> intEnum((NestedIntEnum) SchemaUtils.validateSameMember($SCHEMA_INT_ENUM, member, value));
+                case 6 -> floatMember((float) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, value));
                 case 7 -> doubleMember((double) SchemaUtils.validateSameMember($SCHEMA_DOUBLE_MEMBER, member, value));
-                case 8 -> floatMember((float) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, value));
-                case 9 -> integer((int) SchemaUtils.validateSameMember($SCHEMA_INTEGER, member, value));
-                case 10 -> longMember((long) SchemaUtils.validateSameMember($SCHEMA_LONG_MEMBER, member, value));
-                case 11 -> shortMember((short) SchemaUtils.validateSameMember($SCHEMA_SHORT_MEMBER, member, value));
-                case 12 -> string((String) SchemaUtils.validateSameMember($SCHEMA_STRING, member, value));
-                case 13 -> blob((ByteBuffer) SchemaUtils.validateSameMember($SCHEMA_BLOB, member, value));
-                case 14 -> streamingBlob((DataStream) SchemaUtils.validateSameMember($SCHEMA_STREAMING_BLOB, member, value));
-                case 15 -> boolDoc((Document) SchemaUtils.validateSameMember($SCHEMA_BOOL_DOC, member, value));
-                case 16 -> stringDoc((Document) SchemaUtils.validateSameMember($SCHEMA_STRING_DOC, member, value));
-                case 17 -> numberDoc((Document) SchemaUtils.validateSameMember($SCHEMA_NUMBER_DOC, member, value));
-                case 18 -> floatingPointnumberDoc((Document) SchemaUtils.validateSameMember($SCHEMA_FLOATING_POINTNUMBER_DOC, member, value));
-                case 19 -> listDoc((Document) SchemaUtils.validateSameMember($SCHEMA_LIST_DOC, member, value));
-                case 20 -> mapDoc((Document) SchemaUtils.validateSameMember($SCHEMA_MAP_DOC, member, value));
-                case 21 -> list((List<String>) SchemaUtils.validateSameMember($SCHEMA_LIST, member, value));
-                case 22 -> map((Map<String, String>) SchemaUtils.validateSameMember($SCHEMA_MAP, member, value));
-                case 23 -> timestamp((Instant) SchemaUtils.validateSameMember($SCHEMA_TIMESTAMP, member, value));
-                case 24 -> enumMember((NestedEnum) SchemaUtils.validateSameMember($SCHEMA_ENUM_MEMBER, member, value));
-                case 25 -> intEnum((NestedIntEnum) SchemaUtils.validateSameMember($SCHEMA_INT_ENUM, member, value));
+                case 8 -> timestamp((Instant) SchemaUtils.validateSameMember($SCHEMA_TIMESTAMP, member, value));
+                case 9 -> bigDecimal((BigDecimal) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL, member, value));
+                case 10 -> bigDecimalWithDoubleDefault((BigDecimal) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL_WITH_DOUBLE_DEFAULT, member, value));
+                case 11 -> bigDecimalWithLongDefault((BigDecimal) SchemaUtils.validateSameMember($SCHEMA_BIG_DECIMAL_WITH_LONG_DEFAULT, member, value));
+                case 12 -> bigInteger((BigInteger) SchemaUtils.validateSameMember($SCHEMA_BIG_INTEGER, member, value));
+                case 13 -> bigIntegerWithLongDefault((BigInteger) SchemaUtils.validateSameMember($SCHEMA_BIG_INTEGER_WITH_LONG_DEFAULT, member, value));
+                case 14 -> string((String) SchemaUtils.validateSameMember($SCHEMA_STRING, member, value));
+                case 15 -> blob((ByteBuffer) SchemaUtils.validateSameMember($SCHEMA_BLOB, member, value));
+                case 16 -> streamingBlob((DataStream) SchemaUtils.validateSameMember($SCHEMA_STREAMING_BLOB, member, value));
+                case 17 -> boolDoc((Document) SchemaUtils.validateSameMember($SCHEMA_BOOL_DOC, member, value));
+                case 18 -> stringDoc((Document) SchemaUtils.validateSameMember($SCHEMA_STRING_DOC, member, value));
+                case 19 -> numberDoc((Document) SchemaUtils.validateSameMember($SCHEMA_NUMBER_DOC, member, value));
+                case 20 -> floatingPointnumberDoc((Document) SchemaUtils.validateSameMember($SCHEMA_FLOATING_POINTNUMBER_DOC, member, value));
+                case 21 -> listDoc((Document) SchemaUtils.validateSameMember($SCHEMA_LIST_DOC, member, value));
+                case 22 -> mapDoc((Document) SchemaUtils.validateSameMember($SCHEMA_MAP_DOC, member, value));
+                case 23 -> list((List<String>) SchemaUtils.validateSameMember($SCHEMA_LIST, member, value));
+                case 24 -> map((Map<String, String>) SchemaUtils.validateSameMember($SCHEMA_MAP, member, value));
+                case 25 -> enumMember((NestedEnum) SchemaUtils.validateSameMember($SCHEMA_ENUM_MEMBER, member, value));
                 default -> ShapeBuilder.super.setMemberValue(member, value);
             }
         }
@@ -727,31 +731,31 @@ public final class DefaultStructure implements SerializableStruct {
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
                     case 0 -> builder.booleanMember(de.readBoolean(member));
-                    case 1 -> builder.bigDecimal(de.readBigDecimal(member));
-                    case 2 -> builder.bigDecimalWithDoubleDefault(de.readBigDecimal(member));
-                    case 3 -> builder.bigDecimalWithLongDefault(de.readBigDecimal(member));
-                    case 4 -> builder.bigInteger(de.readBigInteger(member));
-                    case 5 -> builder.bigIntegerWithLongDefault(de.readBigInteger(member));
-                    case 6 -> builder.byteMember(de.readByte(member));
+                    case 1 -> builder.byteMember(de.readByte(member));
+                    case 2 -> builder.integer(de.readInteger(member));
+                    case 3 -> builder.longMember(de.readLong(member));
+                    case 4 -> builder.shortMember(de.readShort(member));
+                    case 5 -> builder.intEnum(NestedIntEnum.builder().deserializeMember(de, member).build());
+                    case 6 -> builder.floatMember(de.readFloat(member));
                     case 7 -> builder.doubleMember(de.readDouble(member));
-                    case 8 -> builder.floatMember(de.readFloat(member));
-                    case 9 -> builder.integer(de.readInteger(member));
-                    case 10 -> builder.longMember(de.readLong(member));
-                    case 11 -> builder.shortMember(de.readShort(member));
-                    case 12 -> builder.string(de.readString(member));
-                    case 13 -> builder.blob(de.readBlob(member));
-                    case 14 -> builder.streamingBlob(de.readDataStream(member));
-                    case 15 -> builder.boolDoc(de.readDocument());
-                    case 16 -> builder.stringDoc(de.readDocument());
-                    case 17 -> builder.numberDoc(de.readDocument());
-                    case 18 -> builder.floatingPointnumberDoc(de.readDocument());
-                    case 19 -> builder.listDoc(de.readDocument());
-                    case 20 -> builder.mapDoc(de.readDocument());
-                    case 21 -> builder.list(SharedSerde.deserializeListOfString(member, de));
-                    case 22 -> builder.map(SharedSerde.deserializeStringStringMap(member, de));
-                    case 23 -> builder.timestamp(de.readTimestamp(member));
-                    case 24 -> builder.enumMember(NestedEnum.builder().deserializeMember(de, member).build());
-                    case 25 -> builder.intEnum(NestedIntEnum.builder().deserializeMember(de, member).build());
+                    case 8 -> builder.timestamp(de.readTimestamp(member));
+                    case 9 -> builder.bigDecimal(de.readBigDecimal(member));
+                    case 10 -> builder.bigDecimalWithDoubleDefault(de.readBigDecimal(member));
+                    case 11 -> builder.bigDecimalWithLongDefault(de.readBigDecimal(member));
+                    case 12 -> builder.bigInteger(de.readBigInteger(member));
+                    case 13 -> builder.bigIntegerWithLongDefault(de.readBigInteger(member));
+                    case 14 -> builder.string(de.readString(member));
+                    case 15 -> builder.blob(de.readBlob(member));
+                    case 16 -> builder.streamingBlob(de.readDataStream(member));
+                    case 17 -> builder.boolDoc(de.readDocument());
+                    case 18 -> builder.stringDoc(de.readDocument());
+                    case 19 -> builder.numberDoc(de.readDocument());
+                    case 20 -> builder.floatingPointnumberDoc(de.readDocument());
+                    case 21 -> builder.listDoc(de.readDocument());
+                    case 22 -> builder.mapDoc(de.readDocument());
+                    case 23 -> builder.list(SharedSerde.deserializeListOfString(member, de));
+                    case 24 -> builder.map(SharedSerde.deserializeStringStringMap(member, de));
+                    case 25 -> builder.enumMember(NestedEnum.builder().deserializeMember(de, member).build());
                     default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
                 }
             }

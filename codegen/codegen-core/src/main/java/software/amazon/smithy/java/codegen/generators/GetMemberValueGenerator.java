@@ -10,11 +10,13 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
+import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
-record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider, Shape shape) implements Runnable {
+record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider, Shape shape, Model model)
+        implements Runnable {
     @Override
     public void run() {
         writer.pushState();
@@ -50,7 +52,7 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
     private void generateMemberSwitchCases(JavaWriter writer) {
         int idx = 0;
         var isError = shape.hasTrait(ErrorTrait.class);
-        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
+        for (var iter = CodegenUtils.getSortedMembers(model, shape).iterator(); iter.hasNext(); idx++) {
             var member = iter.next();
             writer.pushState();
             writer.putContext("schemaUtilsClass", SchemaUtils.class);

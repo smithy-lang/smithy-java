@@ -183,7 +183,9 @@ public final class StructureGenerator<
                             directive.symbolProvider(),
                             directive.model(),
                             directive.getRenames()));
-            writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
+            writer.putContext(
+                    "getMemberValue",
+                    new GetMemberValueGenerator(writer, directive.symbolProvider(), shape, directive.model()));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.writeNullMarkedAnnotation();
             writer.write(template);
@@ -665,7 +667,9 @@ public final class StructureGenerator<
                 Map<ShapeId, String> renames
         ) {
             super(writer, shape, symbolProvider, model, renames);
-            this.requiredMembers = shape.members()
+            // Bit positions are assigned by each required member's position among required members in
+            // sorted (memberIndex) order, matching the validation indexes the runtime schema assigns.
+            this.requiredMembers = CodegenUtils.getSortedMembers(model, shape)
                     .stream()
                     .filter(CodegenUtils::isRequiredWithNoDefault)
                     .toList();

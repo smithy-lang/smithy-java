@@ -37,6 +37,7 @@ dependencies {
     itImplementation(project(":client:client-waiters"))
     itImplementation(project(":aws:client:aws-client-restjson"))
     itImplementation(project(":codecs:json-codec", configuration = "shadow"))
+    itImplementation(project(":codecs:sparrowhawk-codec"))
     itImplementation(libs.smithy.aws.traits)
     itImplementation(libs.smithy.rules)
 

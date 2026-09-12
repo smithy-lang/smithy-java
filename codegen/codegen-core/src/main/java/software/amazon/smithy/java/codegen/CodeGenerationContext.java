@@ -19,6 +19,7 @@ import software.amazon.smithy.codegen.core.WriterDelegator;
 import software.amazon.smithy.codegen.core.directed.CreateContextDirective;
 import software.amazon.smithy.java.codegen.generators.SchemaFieldOrder;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.schema.IdxTrait;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -95,6 +96,10 @@ public class CodeGenerationContext
             RetryableTrait.ID,
             RequestCompressionTrait.ID,
             StreamingTrait.ID,
+            // Indexed-protocol member index. Always a runtime trait: the runtime schema builder sorts
+            // members by it, so it must be visible at runtime whenever codegen saw it in the model or the
+            // generated memberIndex positions would diverge from the runtime's.
+            IdxTrait.ID,
             // AI traits (experimental)
             ShapeId.from("smithy.ai#prompts"));
 

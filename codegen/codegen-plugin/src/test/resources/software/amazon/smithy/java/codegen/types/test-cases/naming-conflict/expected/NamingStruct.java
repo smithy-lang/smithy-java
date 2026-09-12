@@ -174,6 +174,38 @@ public final class NamingStruct implements SerializableStruct {
             serializer.writeMap($SCHEMA_MAP_OF_MAP, mapOfMap, mapOfMap.size(), SharedSerde.MapOfMapSerializer.INSTANCE);
         }
     }
+    @Override
+    public long presenceBits() {
+        long bits = 0x0L;
+        if (other != null) {
+            bits |= 0x1L;
+        }
+        if (builderMember != null) {
+            bits |= 0x2L;
+        }
+        if (type != null) {
+            bits |= 0x4L;
+        }
+        if (objectMember != null) {
+            bits |= 0x8L;
+        }
+        if (union != null) {
+            bits |= 0x10L;
+        }
+        if (map != null) {
+            bits |= 0x20L;
+        }
+        if (list != null) {
+            bits |= 0x40L;
+        }
+        if (listOfList != null) {
+            bits |= 0x80L;
+        }
+        if (mapOfMap != null) {
+            bits |= 0x100L;
+        }
+        return bits;
+    }
 
     @Override
     @SuppressWarnings("unchecked")

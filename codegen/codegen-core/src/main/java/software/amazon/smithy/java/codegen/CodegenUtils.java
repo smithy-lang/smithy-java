@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -22,6 +23,8 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.codegen.core.directed.ShapeDirective;
 import software.amazon.smithy.java.core.schema.ApiService;
+import software.amazon.smithy.java.core.schema.IdxTrait;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.NullableIndex;
 import software.amazon.smithy.model.selector.PathFinder;
@@ -212,21 +215,31 @@ public final class CodegenUtils {
     }
 
     /**
-     * Sorts shape members to ensure that required members with no default value come before other members.
+     * Sorts shape members by their wire category (varint scalars, four-byte, eight-byte, then
+     * length-delimited values), then by the {@code smithy.protocols#idx} trait value, mirroring the sort
+     * the runtime applies when building schemas.
      *
+     * <p>This order determines the memberIndex positions hard-coded into generated code, so it must stay in
+     * lockstep with the {@link SchemaUtils#memberSortRank} and idx based sorting in the core schema builder.
+     *
+     * @param model Model containing the shape's member targets
      * @param shape Shape to sort members of
      * @return list of sorted members
      */
-    public static List<MemberShape> getSortedMembers(Shape shape) {
+    public static List<MemberShape> getSortedMembers(Model model, Shape shape) {
         return shape.members()
                 .stream()
-                .sorted(
-                        (a, b) -> {
-                            int aRequiredWithNoDefault = isRequiredWithNoDefault(a) ? 1 : 0;
-                            int bRequiredWithNoDefault = isRequiredWithNoDefault(b) ? 1 : 0;
-                            return bRequiredWithNoDefault - aRequiredWithNoDefault;
-                        })
+                .sorted(Comparator
+                        .<MemberShape>comparingInt(
+                                m -> SchemaUtils.memberSortRank(model.expectShape(m.getTarget()).getType()))
+                        .thenComparingInt(CodegenUtils::idxOrMax))
                 .collect(Collectors.toList());
+    }
+
+    private static int idxOrMax(MemberShape member) {
+        return member.findTrait(IdxTrait.ID)
+                .map(t -> t.toNode().expectNumberNode().getValue().intValue())
+                .orElse(Integer.MAX_VALUE);
     }
 
     /**

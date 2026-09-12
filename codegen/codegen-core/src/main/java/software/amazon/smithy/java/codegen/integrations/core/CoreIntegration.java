@@ -75,6 +75,7 @@ public class CoreIntegration implements JavaCodegenIntegration {
                 new XmlNamespaceTraitInitializer(),
                 new EndpointTraitInitializer(),
                 new RetryableTraitInitializer(),
+                new IdxTraitInitializer(),
                 new LengthTraitInitializer(),
                 new RangeTraitInitializer(),
                 new AnnotationTraitInitializer(),

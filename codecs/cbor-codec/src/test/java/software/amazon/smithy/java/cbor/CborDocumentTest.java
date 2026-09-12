@@ -317,11 +317,11 @@ public class CborDocumentTest {
 
         @Override
         public <T> T getMemberValue(Schema member) {
-            return switch (member.memberIndex()) {
-                case 0 -> (T) name;
-                case 1 -> (T) binary;
-                case 2 -> (T) date;
-                case 3 -> (T) numbers;
+            return switch (member.memberName()) {
+                case "name" -> (T) name;
+                case "binary" -> (T) binary;
+                case "date" -> (T) date;
+                case "numbers" -> (T) numbers;
                 default -> throw new UnsupportedOperationException(member.toString());
             };
         }

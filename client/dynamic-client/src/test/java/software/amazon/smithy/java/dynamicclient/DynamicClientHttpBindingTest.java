@@ -132,9 +132,10 @@ public class DynamicClientHttpBindingTest {
         // Path label.
         assertThat(request.uri().getPath(), equalTo("/widgets/abc"));
 
-        // Query params (enum + integer).
+        // Query params (enum + integer). Params serialize in schema member order: the integer sorts
+        // before the enum under the wire-category member sort.
         var query = request.uri().getQuery();
-        assertThat(query, equalTo("color=GREEN&count=7"));
+        assertThat(query, equalTo("count=7&color=GREEN"));
     }
 
     private static ClientTransport<HttpRequest, HttpResponse> capturingTransport(AtomicReference<HttpRequest> sink) {

@@ -48,6 +48,7 @@ dependencies {
     jmh(project(":logging"))
     jmh(project(":codecs:json-codec", configuration = "shadow"))
     jmh(project(":codecs:cbor-codec"))
+    jmh(project(":codecs:sparrowhawk-codec"))
     jmh(project(":codecs:xml-codec"))
 
     // Client protocols — every benchmark drives the corresponding

@@ -106,14 +106,14 @@ public final class Person implements SerializableStruct {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        return switch (member.memberIndex()) {
-            case 0 -> (T) name;
-            case 1 -> (T) favoriteColor;
-            case 2 -> (T) (Integer) age;
-            case 3 -> (T) birthday;
-            case 4 -> (T) binary;
-            case 5 -> (T) queryParams;
-            default -> throw new IllegalArgumentException("Unknown member index: " + member);
+        return switch (member.memberName()) {
+            case "name" -> (T) name;
+            case "favoriteColor" -> (T) favoriteColor;
+            case "age" -> (T) (Integer) age;
+            case "birthday" -> (T) birthday;
+            case "binary" -> (T) binary;
+            case "queryParams" -> (T) queryParams;
+            default -> throw new IllegalArgumentException("Unknown member: " + member);
         };
     }
 
@@ -213,13 +213,13 @@ public final class Person implements SerializableStruct {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.name(de.readString(member));
-                    case 1 -> builder.favoriteColor(de.readString(member));
-                    case 2 -> builder.age(de.readInteger(member));
-                    case 3 -> builder.birthday(de.readTimestamp(member));
-                    case 4 -> builder.binary(de.readBlob(member));
-                    case 5 -> {
+                switch (member.memberName()) {
+                    case "name" -> builder.name(de.readString(member));
+                    case "favoriteColor" -> builder.favoriteColor(de.readString(member));
+                    case "age" -> builder.age(de.readInteger(member));
+                    case "birthday" -> builder.birthday(de.readTimestamp(member));
+                    case "binary" -> builder.binary(de.readBlob(member));
+                    case "queryParams" -> {
                         Map<String, List<String>> result = new LinkedHashMap<>();
                         de.readStringMap(SCHEMA_QUERY_PARAMS, result, (mapData, key, v) -> {
                             List<String> listValue = mapData.computeIfAbsent(key, k -> new ArrayList<>());

@@ -47,6 +47,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeBlob($SCHEMA_BLOB_VALUE, blobValue);
         }
+        @Override
+        public long presenceBits() {
+            return 0x200L;
+        }
 
         @Override
         public ByteBuffer getValue() {
@@ -66,6 +70,10 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeBoolean($SCHEMA_BOOLEAN_VALUE, booleanValue);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x1L;
         }
 
         @Override
@@ -91,6 +99,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeList($SCHEMA_LIST_VALUE, listValue, listValue.size(), SharedSerde.ListOfStringSerializer.INSTANCE);
         }
+        @Override
+        public long presenceBits() {
+            return 0x400L;
+        }
 
         @Override
         public List<String> getValue() {
@@ -113,6 +125,10 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeMap($SCHEMA_MAP_VALUE, mapValue, mapValue.size(), SharedSerde.StringStringMapSerializer.INSTANCE);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x800L;
         }
 
         @Override
@@ -137,6 +153,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeBigDecimal($SCHEMA_BIG_DECIMAL_VALUE, bigDecimalValue);
         }
+        @Override
+        public long presenceBits() {
+            return 0x1000L;
+        }
 
         @Override
         public BigDecimal getValue() {
@@ -160,6 +180,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeBigInteger($SCHEMA_BIG_INTEGER_VALUE, bigIntegerValue);
         }
+        @Override
+        public long presenceBits() {
+            return 0x2000L;
+        }
 
         @Override
         public BigInteger getValue() {
@@ -179,6 +203,10 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeByte($SCHEMA_BYTE_VALUE, byteValue);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x2L;
         }
 
         @Override
@@ -201,6 +229,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeDouble($SCHEMA_DOUBLE_VALUE, doubleValue);
         }
+        @Override
+        public long presenceBits() {
+            return 0x80L;
+        }
 
         @Override
         @SuppressWarnings("unchecked")
@@ -221,6 +253,10 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeFloat($SCHEMA_FLOAT_VALUE, floatValue);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x40L;
         }
 
         @Override
@@ -243,6 +279,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeInteger($SCHEMA_INTEGER_VALUE, integerValue);
         }
+        @Override
+        public long presenceBits() {
+            return 0x4L;
+        }
 
         @Override
         @SuppressWarnings("unchecked")
@@ -264,6 +304,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeLong($SCHEMA_LONG_VALUE, longValue);
         }
+        @Override
+        public long presenceBits() {
+            return 0x8L;
+        }
 
         @Override
         @SuppressWarnings("unchecked")
@@ -284,6 +328,10 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeShort($SCHEMA_SHORT_VALUE, shortValue);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x10L;
         }
 
         @Override
@@ -309,6 +357,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeString($SCHEMA_STRING_VALUE, stringValue);
         }
+        @Override
+        public long presenceBits() {
+            return 0x4000L;
+        }
 
         @Override
         public String getValue() {
@@ -331,6 +383,10 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeStruct($SCHEMA_STRUCTURE_VALUE, structureValue);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x8000L;
         }
 
         @Override
@@ -355,6 +411,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeTimestamp($SCHEMA_TIMESTAMP_VALUE, timestampValue);
         }
+        @Override
+        public long presenceBits() {
+            return 0x100L;
+        }
 
         @Override
         public Instant getValue() {
@@ -377,6 +437,10 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeStruct($SCHEMA_UNION_VALUE, unionValue);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x10000L;
         }
 
         @Override
@@ -401,6 +465,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeString($SCHEMA_ENUM_VALUE, enumValue.getValue());
         }
+        @Override
+        public long presenceBits() {
+            return 0x20000L;
+        }
 
         @Override
         public NestedEnum getValue() {
@@ -424,6 +492,10 @@ public sealed interface UnionType extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeInteger($SCHEMA_INT_ENUM_VALUE, intEnumValue.getValue());
         }
+        @Override
+        public long presenceBits() {
+            return 0x20L;
+        }
 
         @Override
         public NestedIntEnum getValue() {
@@ -443,6 +515,10 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeStruct($SCHEMA_UNIT_VALUE, Unit.getInstance());
+        }
+        @Override
+        public long presenceBits() {
+            return 0x40000L;
         }
 
         @Override
@@ -604,24 +680,24 @@ public sealed interface UnionType extends SerializableStruct {
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
             switch (member.memberIndex()) {
-                case 0 -> blobValue((ByteBuffer) SchemaUtils.validateSameMember(BlobValueMember.$SCHEMA_BLOB_VALUE, member, value));
-                case 1 -> booleanValue((boolean) SchemaUtils.validateSameMember(BooleanValueMember.$SCHEMA_BOOLEAN_VALUE, member, value));
-                case 2 -> listValue((List<String>) SchemaUtils.validateSameMember(ListValueMember.$SCHEMA_LIST_VALUE, member, value));
-                case 3 -> mapValue((Map<String, String>) SchemaUtils.validateSameMember(MapValueMember.$SCHEMA_MAP_VALUE, member, value));
-                case 4 -> bigDecimalValue((BigDecimal) SchemaUtils.validateSameMember(BigDecimalValueMember.$SCHEMA_BIG_DECIMAL_VALUE, member, value));
-                case 5 -> bigIntegerValue((BigInteger) SchemaUtils.validateSameMember(BigIntegerValueMember.$SCHEMA_BIG_INTEGER_VALUE, member, value));
-                case 6 -> byteValue((byte) SchemaUtils.validateSameMember(ByteValueMember.$SCHEMA_BYTE_VALUE, member, value));
+                case 0 -> booleanValue((boolean) SchemaUtils.validateSameMember(BooleanValueMember.$SCHEMA_BOOLEAN_VALUE, member, value));
+                case 1 -> byteValue((byte) SchemaUtils.validateSameMember(ByteValueMember.$SCHEMA_BYTE_VALUE, member, value));
+                case 2 -> integerValue((int) SchemaUtils.validateSameMember(IntegerValueMember.$SCHEMA_INTEGER_VALUE, member, value));
+                case 3 -> longValue((long) SchemaUtils.validateSameMember(LongValueMember.$SCHEMA_LONG_VALUE, member, value));
+                case 4 -> shortValue((short) SchemaUtils.validateSameMember(ShortValueMember.$SCHEMA_SHORT_VALUE, member, value));
+                case 5 -> intEnumValue((NestedIntEnum) SchemaUtils.validateSameMember(IntEnumValueMember.$SCHEMA_INT_ENUM_VALUE, member, value));
+                case 6 -> floatValue((float) SchemaUtils.validateSameMember(FloatValueMember.$SCHEMA_FLOAT_VALUE, member, value));
                 case 7 -> doubleValue((double) SchemaUtils.validateSameMember(DoubleValueMember.$SCHEMA_DOUBLE_VALUE, member, value));
-                case 8 -> floatValue((float) SchemaUtils.validateSameMember(FloatValueMember.$SCHEMA_FLOAT_VALUE, member, value));
-                case 9 -> integerValue((int) SchemaUtils.validateSameMember(IntegerValueMember.$SCHEMA_INTEGER_VALUE, member, value));
-                case 10 -> longValue((long) SchemaUtils.validateSameMember(LongValueMember.$SCHEMA_LONG_VALUE, member, value));
-                case 11 -> shortValue((short) SchemaUtils.validateSameMember(ShortValueMember.$SCHEMA_SHORT_VALUE, member, value));
-                case 12 -> stringValue((String) SchemaUtils.validateSameMember(StringValueMember.$SCHEMA_STRING_VALUE, member, value));
-                case 13 -> structureValue((NestedStruct) SchemaUtils.validateSameMember(StructureValueMember.$SCHEMA_STRUCTURE_VALUE, member, value));
-                case 14 -> timestampValue((Instant) SchemaUtils.validateSameMember(TimestampValueMember.$SCHEMA_TIMESTAMP_VALUE, member, value));
-                case 15 -> unionValue((NestedUnion) SchemaUtils.validateSameMember(UnionValueMember.$SCHEMA_UNION_VALUE, member, value));
-                case 16 -> enumValue((NestedEnum) SchemaUtils.validateSameMember(EnumValueMember.$SCHEMA_ENUM_VALUE, member, value));
-                case 17 -> intEnumValue((NestedIntEnum) SchemaUtils.validateSameMember(IntEnumValueMember.$SCHEMA_INT_ENUM_VALUE, member, value));
+                case 8 -> timestampValue((Instant) SchemaUtils.validateSameMember(TimestampValueMember.$SCHEMA_TIMESTAMP_VALUE, member, value));
+                case 9 -> blobValue((ByteBuffer) SchemaUtils.validateSameMember(BlobValueMember.$SCHEMA_BLOB_VALUE, member, value));
+                case 10 -> listValue((List<String>) SchemaUtils.validateSameMember(ListValueMember.$SCHEMA_LIST_VALUE, member, value));
+                case 11 -> mapValue((Map<String, String>) SchemaUtils.validateSameMember(MapValueMember.$SCHEMA_MAP_VALUE, member, value));
+                case 12 -> bigDecimalValue((BigDecimal) SchemaUtils.validateSameMember(BigDecimalValueMember.$SCHEMA_BIG_DECIMAL_VALUE, member, value));
+                case 13 -> bigIntegerValue((BigInteger) SchemaUtils.validateSameMember(BigIntegerValueMember.$SCHEMA_BIG_INTEGER_VALUE, member, value));
+                case 14 -> stringValue((String) SchemaUtils.validateSameMember(StringValueMember.$SCHEMA_STRING_VALUE, member, value));
+                case 15 -> structureValue((NestedStruct) SchemaUtils.validateSameMember(StructureValueMember.$SCHEMA_STRUCTURE_VALUE, member, value));
+                case 16 -> unionValue((NestedUnion) SchemaUtils.validateSameMember(UnionValueMember.$SCHEMA_UNION_VALUE, member, value));
+                case 17 -> enumValue((NestedEnum) SchemaUtils.validateSameMember(EnumValueMember.$SCHEMA_ENUM_VALUE, member, value));
                 case 18 -> unitValue((Unit) SchemaUtils.validateSameMember(UnitValueMember.$SCHEMA_UNIT_VALUE, member, value));
                 default -> ShapeBuilder.super.setMemberValue(member, value);
             }
@@ -646,24 +722,24 @@ public sealed interface UnionType extends SerializableStruct {
             @SuppressWarnings("unchecked")
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
-                    case 0 -> builder.blobValue(de.readBlob(member));
-                    case 1 -> builder.booleanValue(de.readBoolean(member));
-                    case 2 -> builder.listValue(SharedSerde.deserializeListOfString(member, de));
-                    case 3 -> builder.mapValue(SharedSerde.deserializeStringStringMap(member, de));
-                    case 4 -> builder.bigDecimalValue(de.readBigDecimal(member));
-                    case 5 -> builder.bigIntegerValue(de.readBigInteger(member));
-                    case 6 -> builder.byteValue(de.readByte(member));
+                    case 0 -> builder.booleanValue(de.readBoolean(member));
+                    case 1 -> builder.byteValue(de.readByte(member));
+                    case 2 -> builder.integerValue(de.readInteger(member));
+                    case 3 -> builder.longValue(de.readLong(member));
+                    case 4 -> builder.shortValue(de.readShort(member));
+                    case 5 -> builder.intEnumValue(NestedIntEnum.builder().deserializeMember(de, member).build());
+                    case 6 -> builder.floatValue(de.readFloat(member));
                     case 7 -> builder.doubleValue(de.readDouble(member));
-                    case 8 -> builder.floatValue(de.readFloat(member));
-                    case 9 -> builder.integerValue(de.readInteger(member));
-                    case 10 -> builder.longValue(de.readLong(member));
-                    case 11 -> builder.shortValue(de.readShort(member));
-                    case 12 -> builder.stringValue(de.readString(member));
-                    case 13 -> builder.structureValue(NestedStruct.builder().deserializeMember(de, member).build());
-                    case 14 -> builder.timestampValue(de.readTimestamp(member));
-                    case 15 -> builder.unionValue(NestedUnion.builder().deserializeMember(de, member).build());
-                    case 16 -> builder.enumValue(NestedEnum.builder().deserializeMember(de, member).build());
-                    case 17 -> builder.intEnumValue(NestedIntEnum.builder().deserializeMember(de, member).build());
+                    case 8 -> builder.timestampValue(de.readTimestamp(member));
+                    case 9 -> builder.blobValue(de.readBlob(member));
+                    case 10 -> builder.listValue(SharedSerde.deserializeListOfString(member, de));
+                    case 11 -> builder.mapValue(SharedSerde.deserializeStringStringMap(member, de));
+                    case 12 -> builder.bigDecimalValue(de.readBigDecimal(member));
+                    case 13 -> builder.bigIntegerValue(de.readBigInteger(member));
+                    case 14 -> builder.stringValue(de.readString(member));
+                    case 15 -> builder.structureValue(NestedStruct.builder().deserializeMember(de, member).build());
+                    case 16 -> builder.unionValue(NestedUnion.builder().deserializeMember(de, member).build());
+                    case 17 -> builder.enumValue(NestedEnum.builder().deserializeMember(de, member).build());
                     case 18 -> builder.unitValue(Unit.builder().deserializeMember(de, member).build());
                     default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
                 }

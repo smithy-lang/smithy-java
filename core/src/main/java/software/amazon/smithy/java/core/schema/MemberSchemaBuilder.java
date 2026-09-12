@@ -77,10 +77,17 @@ final class MemberSchemaBuilder {
         return targetBuilder != null ? new DeferredMemberSchema(this) : new MemberSchema(this);
     }
 
-    // Setting the member index has to be deferred until a shape is built because members need to be sorted based
-    // on if they are required by validation. This method is called when a Schema is built.
+    // Setting the member index has to be deferred until a shape is built because members are sorted by their
+    // wire category when the containing shape is built. This method is called when a Schema is built.
     void setMemberIndex(int index) {
         this.memberIndex = index;
-        this.requiredByValidationBitmask = isRequiredByValidation ? 1L << memberIndex : 0L;
+    }
+
+    // The validation index is this member's sequential position among the containing structure's
+    // required-by-validation members, in memberIndex order. It determines the member's bit in the required
+    // member bitfield and is independent of memberIndex, so member sorting places no constraints on where
+    // required members land. Generated builders assign bits by the same rule.
+    void setValidationIndex(int index) {
+        this.requiredByValidationBitmask = index < 64 ? 1L << index : 0L;
     }
 }

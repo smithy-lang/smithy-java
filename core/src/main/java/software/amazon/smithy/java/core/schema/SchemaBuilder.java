@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -357,18 +358,31 @@ public final class SchemaBuilder {
 
     static void sortMembers(List<MemberSchemaBuilder> members) {
         if (members.size() > 1) {
-            // Sort members to ensure that required members with no default come before other members.
-            members.sort((a, b) -> {
-                int aRequiredWithNoDefault = a.isRequiredByValidation ? 1 : 0;
-                int bRequiredWithNoDefault = b.isRequiredByValidation ? 1 : 0;
-                return bRequiredWithNoDefault - aRequiredWithNoDefault;
-            });
+            // Stable-sort members by their wire category so that serializers that dispatch members in
+            // memberIndex order emit fixed-width primitives before variable-length values, then by the
+            // smithy.protocols#idx trait so dispatch order within a category matches the field order of
+            // indexed binary formats (e.g., Sparrowhawk type sections). This is harmless for
+            // self-describing formats. Codegen mirrors this comparator in CodegenUtils#getSortedMembers; the
+            // two must stay in lockstep because generated code hard-codes memberIndex positions.
+            members.sort(
+                    Comparator.<MemberSchemaBuilder>comparingInt(m -> SchemaUtils.memberSortRank(m.type))
+                            .thenComparingInt(SchemaBuilder::idxOrMax));
         }
     }
 
+    private static int idxOrMax(MemberSchemaBuilder member) {
+        var idx = member.directTraits.get(TraitKey.IDX_TRAIT);
+        return idx == null ? Integer.MAX_VALUE : idx.getValue();
+    }
+
     static void assignMemberIndex(List<MemberSchemaBuilder> members) {
+        int validationIndex = 0;
         for (int i = 0; i < members.size(); i++) {
-            members.get(i).setMemberIndex(i);
+            var member = members.get(i);
+            member.setMemberIndex(i);
+            if (member.isRequiredByValidation) {
+                member.setValidationIndex(validationIndex++);
+            }
         }
     }
 

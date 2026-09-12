@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.client.aws.jsonprotocols;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -36,16 +34,18 @@ public class AwsJson1ProtocolTests {
             },
             skipOperations = "aws.protocoltests.json10#OperationWithRequiredMembersWithDefaults")
     public void requestTest(DataStream expected, DataStream actual) {
-        String expectedJson = "{}";
+        if (expected.contentType() == null) { // Skip request compression tests since they do not have expected body
+            return;
+        }
+        // Compare as parsed nodes: JSON member order is not significant and follows schema member order.
+        Node expectedNode = Node.objectNode();
         if (expected.contentLength() != 0) {
-            // Use the node parser to strip out white space.
-            expectedJson = Node.printJson(
-                    Node.parse(new String(ByteBufferUtils.getBytes(expected.asByteBuffer()),
-                            StandardCharsets.UTF_8)));
+            expectedNode = Node.parse(
+                    new String(ByteBufferUtils.getBytes(expected.asByteBuffer()), StandardCharsets.UTF_8));
         }
-        if (expected.contentType() != null) { // Skip request compression tests since they do not have expected body
-            assertEquals(expectedJson, new StringBuildingSubscriber(actual).getResult());
-        }
+        String actualJson = new StringBuildingSubscriber(actual).getResult();
+        Node actualNode = actualJson.isEmpty() ? Node.objectNode() : Node.parse(actualJson);
+        Node.assertEquals(actualNode, expectedNode);
     }
 
     @HttpClientResponseTests

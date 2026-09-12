@@ -40,6 +40,7 @@ include(":retries")
 include(":codecs:codec-commons")
 include(":codecs:cbor-codec")
 include(":codecs:json-codec")
+include(":codecs:sparrowhawk-codec")
 include(":codecs:xml-codec")
 
 // Client

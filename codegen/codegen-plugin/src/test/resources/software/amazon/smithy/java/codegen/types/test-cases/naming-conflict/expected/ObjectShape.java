@@ -159,6 +159,38 @@ public final class ObjectShape implements SerializableStruct {
             serializer.writeString($SCHEMA_FINALIZE_MEMBER, finalizeMember);
         }
     }
+    @Override
+    public long presenceBits() {
+        long bits = 0x0L;
+        if (classMember != null) {
+            bits |= 0x1L;
+        }
+        if (getClassMember != null) {
+            bits |= 0x2L;
+        }
+        if (hashCodeMember != null) {
+            bits |= 0x4L;
+        }
+        if (cloneMember != null) {
+            bits |= 0x8L;
+        }
+        if (toStringMember != null) {
+            bits |= 0x10L;
+        }
+        if (notifyMember != null) {
+            bits |= 0x20L;
+        }
+        if (notifyAllMember != null) {
+            bits |= 0x40L;
+        }
+        if (waitMember != null) {
+            bits |= 0x80L;
+        }
+        if (finalizeMember != null) {
+            bits |= 0x100L;
+        }
+        return bits;
+    }
 
     @Override
     @SuppressWarnings("unchecked")

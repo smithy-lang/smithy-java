@@ -128,15 +128,41 @@ public final class PrimitivesNullable implements SerializableStruct {
         if (longMember != null) {
             serializer.writeLong($SCHEMA_LONG_MEMBER, longMember);
         }
+        if (booleanMember != null) {
+            serializer.writeBoolean($SCHEMA_BOOLEAN_MEMBER, booleanMember);
+        }
         if (floatMember != null) {
             serializer.writeFloat($SCHEMA_FLOAT_MEMBER, floatMember);
         }
         if (doubleMember != null) {
             serializer.writeDouble($SCHEMA_DOUBLE_MEMBER, doubleMember);
         }
-        if (booleanMember != null) {
-            serializer.writeBoolean($SCHEMA_BOOLEAN_MEMBER, booleanMember);
+    }
+    @Override
+    public long presenceBits() {
+        long bits = 0x0L;
+        if (byteMember != null) {
+            bits |= 0x1L;
         }
+        if (shortMember != null) {
+            bits |= 0x2L;
+        }
+        if (intMember != null) {
+            bits |= 0x4L;
+        }
+        if (longMember != null) {
+            bits |= 0x8L;
+        }
+        if (booleanMember != null) {
+            bits |= 0x10L;
+        }
+        if (floatMember != null) {
+            bits |= 0x20L;
+        }
+        if (doubleMember != null) {
+            bits |= 0x40L;
+        }
+        return bits;
     }
 
     @Override
@@ -147,9 +173,9 @@ public final class PrimitivesNullable implements SerializableStruct {
             case 1 -> (T) SchemaUtils.validateSameMember($SCHEMA_SHORT_MEMBER, member, shortMember);
             case 2 -> (T) SchemaUtils.validateSameMember($SCHEMA_INT_MEMBER, member, intMember);
             case 3 -> (T) SchemaUtils.validateSameMember($SCHEMA_LONG_MEMBER, member, longMember);
-            case 4 -> (T) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, floatMember);
-            case 5 -> (T) SchemaUtils.validateSameMember($SCHEMA_DOUBLE_MEMBER, member, doubleMember);
-            case 6 -> (T) SchemaUtils.validateSameMember($SCHEMA_BOOLEAN_MEMBER, member, booleanMember);
+            case 4 -> (T) SchemaUtils.validateSameMember($SCHEMA_BOOLEAN_MEMBER, member, booleanMember);
+            case 5 -> (T) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, floatMember);
+            case 6 -> (T) SchemaUtils.validateSameMember($SCHEMA_DOUBLE_MEMBER, member, doubleMember);
             default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
         };
     }
@@ -268,9 +294,9 @@ public final class PrimitivesNullable implements SerializableStruct {
                 case 1 -> shortMember((Short) SchemaUtils.validateSameMember($SCHEMA_SHORT_MEMBER, member, value));
                 case 2 -> intMember((Integer) SchemaUtils.validateSameMember($SCHEMA_INT_MEMBER, member, value));
                 case 3 -> longMember((Long) SchemaUtils.validateSameMember($SCHEMA_LONG_MEMBER, member, value));
-                case 4 -> floatMember((Float) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, value));
-                case 5 -> doubleMember((Double) SchemaUtils.validateSameMember($SCHEMA_DOUBLE_MEMBER, member, value));
-                case 6 -> booleanMember((Boolean) SchemaUtils.validateSameMember($SCHEMA_BOOLEAN_MEMBER, member, value));
+                case 4 -> booleanMember((Boolean) SchemaUtils.validateSameMember($SCHEMA_BOOLEAN_MEMBER, member, value));
+                case 5 -> floatMember((Float) SchemaUtils.validateSameMember($SCHEMA_FLOAT_MEMBER, member, value));
+                case 6 -> doubleMember((Double) SchemaUtils.validateSameMember($SCHEMA_DOUBLE_MEMBER, member, value));
                 default -> ShapeBuilder.super.setMemberValue(member, value);
             }
         }
@@ -298,9 +324,9 @@ public final class PrimitivesNullable implements SerializableStruct {
                     case 1 -> builder.shortMember(de.readShort(member));
                     case 2 -> builder.intMember(de.readInteger(member));
                     case 3 -> builder.longMember(de.readLong(member));
-                    case 4 -> builder.floatMember(de.readFloat(member));
-                    case 5 -> builder.doubleMember(de.readDouble(member));
-                    case 6 -> builder.booleanMember(de.readBoolean(member));
+                    case 4 -> builder.booleanMember(de.readBoolean(member));
+                    case 5 -> builder.floatMember(de.readFloat(member));
+                    case 6 -> builder.doubleMember(de.readDouble(member));
                     default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
                 }
             }

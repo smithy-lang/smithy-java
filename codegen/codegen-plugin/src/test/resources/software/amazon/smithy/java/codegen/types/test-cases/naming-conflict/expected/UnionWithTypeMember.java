@@ -39,6 +39,10 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeStruct($SCHEMA_TYPE, type);
         }
+        @Override
+        public long presenceBits() {
+            return 0x1L;
+        }
 
         @Override
         public Type getValue() {

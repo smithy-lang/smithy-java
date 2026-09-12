@@ -130,6 +130,23 @@ public final class CollectionsStruct implements SerializableStruct {
             serializer.writeMap($SCHEMA_SPARSE_MAP, sparseMap, sparseMap.size(), SharedSerde.SparseMapSerializer.INSTANCE);
         }
     }
+    @Override
+    public long presenceBits() {
+        long bits = 0x0L;
+        if (denseList != null) {
+            bits |= 0x1L;
+        }
+        if (sparseList != null) {
+            bits |= 0x2L;
+        }
+        if (denseMap != null) {
+            bits |= 0x4L;
+        }
+        if (sparseMap != null) {
+            bits |= 0x8L;
+        }
+        return bits;
+    }
 
     @Override
     @SuppressWarnings("unchecked")

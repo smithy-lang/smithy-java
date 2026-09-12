@@ -62,6 +62,14 @@ public final class Schema implements SerializableStruct {
             serializer.writeString($SCHEMA_ONE_MEMBER, oneMember);
         }
     }
+    @Override
+    public long presenceBits() {
+        long bits = 0x0L;
+        if (oneMember != null) {
+            bits |= 0x1L;
+        }
+        return bits;
+    }
 
     @Override
     @SuppressWarnings("unchecked")

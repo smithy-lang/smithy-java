@@ -99,8 +99,10 @@ public abstract sealed class Schema implements MemberLookup
         this.shapeBuilder = shapeBuilder;
         this.shapeClass = shapeClass;
 
-        // Structure shapes need to sort members so that required members come before optional members.
-        if (type == ShapeType.STRUCTURE) {
+        // Structure and union members are sorted by wire category (varint scalars, four-byte, eight-byte,
+        // then length-delimited values) so serializers dispatching in memberIndex order match the layout
+        // required by size-prefixed binary formats. Generated code relies on codegen applying the same sort.
+        if (type == ShapeType.STRUCTURE || type == ShapeType.UNION) {
             SchemaBuilder.sortMembers(members);
         }
 

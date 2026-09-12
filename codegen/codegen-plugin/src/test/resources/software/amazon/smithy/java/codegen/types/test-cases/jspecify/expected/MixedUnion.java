@@ -41,6 +41,10 @@ public sealed interface MixedUnion extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeInteger($SCHEMA_INT_VARIANT, intVariant);
         }
+        @Override
+        public long presenceBits() {
+            return 0x1L;
+        }
 
         @Override
         @SuppressWarnings("unchecked")
@@ -65,6 +69,10 @@ public sealed interface MixedUnion extends SerializableStruct {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeString($SCHEMA_STRING_VARIANT, stringVariant);
         }
+        @Override
+        public long presenceBits() {
+            return 0x4L;
+        }
 
         @Override
         public String getValue() {
@@ -84,6 +92,10 @@ public sealed interface MixedUnion extends SerializableStruct {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeBoolean($SCHEMA_BOOL_VARIANT, boolVariant);
+        }
+        @Override
+        public long presenceBits() {
+            return 0x2L;
         }
 
         @Override
@@ -183,8 +195,8 @@ public sealed interface MixedUnion extends SerializableStruct {
         public void setMemberValue(Schema member, Object value) {
             switch (member.memberIndex()) {
                 case 0 -> intVariant((int) SchemaUtils.validateSameMember(IntVariantMember.$SCHEMA_INT_VARIANT, member, value));
-                case 1 -> stringVariant((String) SchemaUtils.validateSameMember(StringVariantMember.$SCHEMA_STRING_VARIANT, member, value));
-                case 2 -> boolVariant((boolean) SchemaUtils.validateSameMember(BoolVariantMember.$SCHEMA_BOOL_VARIANT, member, value));
+                case 1 -> boolVariant((boolean) SchemaUtils.validateSameMember(BoolVariantMember.$SCHEMA_BOOL_VARIANT, member, value));
+                case 2 -> stringVariant((String) SchemaUtils.validateSameMember(StringVariantMember.$SCHEMA_STRING_VARIANT, member, value));
                 default -> ShapeBuilder.super.setMemberValue(member, value);
             }
         }
@@ -209,8 +221,8 @@ public sealed interface MixedUnion extends SerializableStruct {
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
                     case 0 -> builder.intVariant(de.readInteger(member));
-                    case 1 -> builder.stringVariant(de.readString(member));
-                    case 2 -> builder.boolVariant(de.readBoolean(member));
+                    case 1 -> builder.boolVariant(de.readBoolean(member));
+                    case 2 -> builder.stringVariant(de.readString(member));
                     default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
                 }
             }

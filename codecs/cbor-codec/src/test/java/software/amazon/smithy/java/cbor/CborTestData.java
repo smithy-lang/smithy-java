@@ -93,12 +93,12 @@ final class CborTestData {
         @Override
         public ShapeBuilder<Bird> deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(schema(), this, (builder, member, de) -> {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.name(de.readString(member));
-                    case 1 -> builder.bytes(de.readBlob(member));
-                    case 2 -> builder.lastSquawkAt(de.readTimestamp(member));
-                    case 3 -> builder.flightRange(de.readBigInteger(member));
-                    case 4 -> builder.wingspan(de.readBigDecimal(member));
+                switch (member.memberName()) {
+                    case "name" -> builder.name(de.readString(member));
+                    case "bytes" -> builder.bytes(de.readBlob(member));
+                    case "lastSquawkAt" -> builder.lastSquawkAt(de.readTimestamp(member));
+                    case "flightRange" -> builder.flightRange(de.readBigInteger(member));
+                    case "wingspan" -> builder.wingspan(de.readBigDecimal(member));
                 }
             });
             return this;

@@ -165,7 +165,7 @@ abstract class BuilderGenerator implements Runnable {
 
     protected void generateMemberValueSetters(JavaWriter writer) {
         int idx = 0;
-        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
+        for (var iter = CodegenUtils.getSortedMembers(model, shape).iterator(); iter.hasNext(); idx++) {
             var member = iter.next();
             writer.pushState();
             writer.putContext("memberName", symbolProvider.toMemberName(member));

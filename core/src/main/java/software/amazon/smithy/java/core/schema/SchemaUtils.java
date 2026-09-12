@@ -5,9 +5,33 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import software.amazon.smithy.model.shapes.ShapeType;
+
 public final class SchemaUtils {
 
     private SchemaUtils() {}
+
+    /**
+     * Ranks a structure or union member's target type by its wire category: varint-encoded scalars first,
+     * then four-byte values, then eight-byte values, then everything that is length-delimited (strings,
+     * blobs, collections, structures, and so on).
+     *
+     * <p>Structure and union members are stable-sorted by this rank when schemas are built, and codegen
+     * applies the same sort when assigning member index positions in generated code. The two must stay in
+     * lockstep because generated code hard-codes memberIndex positions. Size-prefixed binary formats
+     * (e.g., Sparrowhawk type sections) rely on members dispatching in this order.
+     *
+     * @param type shape type of the member's target.
+     * @return the wire-category rank (lower ranks serialize first).
+     */
+    public static int memberSortRank(ShapeType type) {
+        return switch (type) {
+            case BOOLEAN, BYTE, SHORT, INTEGER, INT_ENUM, LONG -> 0;
+            case FLOAT -> 1;
+            case DOUBLE, TIMESTAMP -> 2;
+            default -> 3;
+        };
+    }
 
     /**
      * Ensures that {@code member} is contained in {@code parent}, and if so returns {@code value}.

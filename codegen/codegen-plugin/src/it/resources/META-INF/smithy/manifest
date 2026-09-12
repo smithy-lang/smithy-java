@@ -57,5 +57,6 @@ test-auth-scheme.smithy
 bdd-test.smithy
 a.smithy
 b.smithy
+sparrowhawk-serde.smithy
 nested/c.smithy
 required-members.smithy

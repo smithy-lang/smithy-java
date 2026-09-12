@@ -75,18 +75,19 @@ public abstract sealed class PresenceTracker {
         int missingCount = Long.bitCount(missingBits);
         if (missingCount == 0) {
             return;
-        } else if (missingCount == 1) {
-            int memberIndex = Long.numberOfTrailingZeros(missingBits);
-            throw new SerializationException(
-                    "Missing required members: [" + schema.member(memberIndex).memberName() + "]");
         }
 
+        // Bits are validation indexes: each required member's sequential position among the schema's
+        // required-by-validation members, not its memberIndex.
         String[] missing = new String[missingCount];
         int missingIndex = 0;
-        while (missingBits != 0L) {
-            int memberIndex = Long.numberOfTrailingZeros(missingBits);
-            missing[missingIndex++] = schema.member(memberIndex).memberName();
-            missingBits &= missingBits - 1;
+        for (var member : schema.members()) {
+            if (member.isRequiredByValidation && (missingBits & member.requiredByValidationBitmask()) != 0L) {
+                missing[missingIndex++] = member.memberName();
+            }
+        }
+        if (missingCount == 1) {
+            throw new SerializationException("Missing required members: [" + missing[0] + "]");
         }
         Arrays.sort(missing);
         throw new SerializationException("Missing required members: " + Arrays.toString(missing));
