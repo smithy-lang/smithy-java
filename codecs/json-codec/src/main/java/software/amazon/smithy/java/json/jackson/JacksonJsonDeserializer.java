@@ -261,8 +261,9 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
         try {
             var fieldToMember = settings.fieldMapper().fieldToMember(schema);
             for (var memberName = parser.nextName(); memberName != null; memberName = parser.nextName()) {
-                if (parser.nextToken() != VALUE_NULL) {
-                    var member = fieldToMember.member(memberName);
+                var member = fieldToMember.member(memberName);
+                if (parser.nextToken() != VALUE_NULL
+                        || (member != null && structMemberConsumer.supportsNullValues(member))) {
                     if (member != null) {
                         structMemberConsumer.accept(state, member, this);
                     } else if (schema.type() == ShapeType.STRUCTURE) {
