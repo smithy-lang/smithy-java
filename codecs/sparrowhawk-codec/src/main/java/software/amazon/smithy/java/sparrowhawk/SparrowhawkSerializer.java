@@ -135,6 +135,16 @@ final class SparrowhawkSerializer implements ShapeSerializer {
     private boolean cSparse;
     private int depth;
 
+    // Per-site one-entry layout memos: collection-heavy payloads resolve the same value schema
+    // repeatedly, but structs and maps alternate schemas in nested shapes, so each container writer
+    // memoizes independently.
+    private Schema structSchema;
+    private SparrowhawkSchemaExtensions.Layout structLayout;
+    private Schema listSchema;
+    private SparrowhawkSchemaExtensions.Layout listLayout;
+    private Schema mapSchema;
+    private SparrowhawkSchemaExtensions.Layout mapLayout;
+
     private final OutputStream sink;
     private final SparrowhawkMapSerializer mapSerializer = new SparrowhawkMapSerializer();
 
@@ -353,7 +363,14 @@ final class SparrowhawkSerializer implements ShapeSerializer {
 
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
-        SparrowhawkSchemaExtensions.Layout layout = schema.getExtension(SparrowhawkSchemaExtensions.KEY);
+        SparrowhawkSchemaExtensions.Layout layout;
+        if (schema == structSchema) {
+            layout = structLayout;
+        } else {
+            layout = schema.getExtension(SparrowhawkSchemaExtensions.KEY);
+            structSchema = schema;
+            structLayout = layout;
+        }
         if (layout == null || (layout.memberInfo == null && layout.memberCount != 0)) {
             throw new SerializationException("Not a Sparrowhawk structure schema: " + targetId(schema));
         }
@@ -539,7 +556,14 @@ final class SparrowhawkSerializer implements ShapeSerializer {
 
     @Override
     public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
-        SparrowhawkSchemaExtensions.Layout layout = schema.getExtension(SparrowhawkSchemaExtensions.KEY);
+        SparrowhawkSchemaExtensions.Layout layout;
+        if (schema == listSchema) {
+            layout = listLayout;
+        } else {
+            layout = schema.getExtension(SparrowhawkSchemaExtensions.KEY);
+            listSchema = schema;
+            listLayout = layout;
+        }
         if (layout == null || layout.memberInfo != null) {
             throw new SerializationException("Not a Sparrowhawk list schema: " + targetId(schema));
         }
@@ -582,7 +606,14 @@ final class SparrowhawkSerializer implements ShapeSerializer {
 
     @Override
     public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
-        SparrowhawkSchemaExtensions.Layout layout = schema.getExtension(SparrowhawkSchemaExtensions.KEY);
+        SparrowhawkSchemaExtensions.Layout layout;
+        if (schema == mapSchema) {
+            layout = mapLayout;
+        } else {
+            layout = schema.getExtension(SparrowhawkSchemaExtensions.KEY);
+            mapSchema = schema;
+            mapLayout = layout;
+        }
         if (layout == null || layout.memberInfo != null) {
             throw new SerializationException("Not a Sparrowhawk map schema: " + targetId(schema));
         }
@@ -724,16 +755,7 @@ final class SparrowhawkSerializer implements ShapeSerializer {
             }
             cCount++;
             int from = kPos;
-            // Encode the key into keyScratch by temporarily swapping it in as the write target.
-            byte[] b = buf;
-            int p = pos;
-            buf = keyScratch;
-            pos = kPos;
-            putUtf8ByteList(key);
-            keyScratch = buf;
-            kPos = pos;
-            buf = b;
-            pos = p;
+            putUtf8ByteListToKeys(key);
             cKeyBytes += kPos - from;
             // Coalesce with the previous span when the keys are adjacent (no nested map wrote keys in
             // between) and it belongs to this map (never merge across the span mark).
@@ -1522,35 +1544,42 @@ final class SparrowhawkSerializer implements ShapeSerializer {
     }
 
     private static int countHigh(byte[] latin1) {
-        // Count bytes >= 0x80: each becomes two UTF-8 bytes.
+        // Count bytes >= 0x80 (each becomes two UTF-8 bytes), eight bytes at a stride: the sign bits of a
+        // word, masked and popcounted, are exactly the high-byte count.
         int high = 0;
-        for (byte b : latin1) {
-            if (b < 0) {
+        int n = latin1.length;
+        int i = 0;
+        for (; i + 8 <= n; i += 8) {
+            high += Long.bitCount((long) LONG_LE.get(latin1, i) & 0x8080808080808080L);
+        }
+        for (; i < n; i++) {
+            if (latin1[i] < 0) {
                 high++;
             }
         }
         return high;
     }
 
-    private void putLatin1AsUtf8(byte[] latin1, int high) {
-        int utf8Len = latin1.length + high;
-        ensureBuf(utf8Len);
+    private static int rawLatin1AsUtf8(byte[] latin1, int high, byte[] dst, int at) {
         if (high == 0) {
-            System.arraycopy(latin1, 0, buf, pos, latin1.length);
-            pos += latin1.length;
-        } else {
-            int p = pos;
-            for (byte b : latin1) {
-                int c = b & 0xFF;
-                if (c < 0x80) {
-                    buf[p++] = (byte) c;
-                } else {
-                    buf[p++] = (byte) (0xC0 | (c >>> 6));
-                    buf[p++] = (byte) (0x80 | (c & 0x3F));
-                }
-            }
-            pos = p;
+            System.arraycopy(latin1, 0, dst, at, latin1.length);
+            return at + latin1.length;
         }
+        for (byte b : latin1) {
+            int c = b & 0xFF;
+            if (c < 0x80) {
+                dst[at++] = (byte) c;
+            } else {
+                dst[at++] = (byte) (0xC0 | (c >>> 6));
+                dst[at++] = (byte) (0x80 | (c & 0x3F));
+            }
+        }
+        return at;
+    }
+
+    private void putLatin1AsUtf8(byte[] latin1, int high) {
+        ensureBuf(latin1.length + high);
+        pos = rawLatin1AsUtf8(latin1, high, buf, pos);
     }
 
     private void putUtf8ByteList(String s) {
@@ -1563,6 +1592,29 @@ final class SparrowhawkSerializer implements ShapeSerializer {
             byte[] utf8 = s.getBytes(StandardCharsets.UTF_8);
             putUVarint(Sparrowhawk.byteListHeader(utf8.length));
             putBytes(utf8);
+        }
+    }
+
+    /** Like {@link #putUtf8ByteList} but writing into keyScratch. */
+    private void putUtf8ByteListToKeys(String s) {
+        byte[] latin1 = CompactStringAccess.latin1Bytes(s);
+        if (latin1 != null) {
+            int high = countHigh(latin1);
+            ensureKeys(9 + latin1.length + high);
+            kPos = rawUVarint(keyScratch, kPos, Sparrowhawk.byteListHeader(latin1.length + high));
+            kPos = rawLatin1AsUtf8(latin1, high, keyScratch, kPos);
+        } else {
+            byte[] utf8 = s.getBytes(StandardCharsets.UTF_8);
+            ensureKeys(9 + utf8.length);
+            kPos = rawUVarint(keyScratch, kPos, Sparrowhawk.byteListHeader(utf8.length));
+            System.arraycopy(utf8, 0, keyScratch, kPos, utf8.length);
+            kPos += utf8.length;
+        }
+    }
+
+    private void ensureKeys(int needed) {
+        if (keyScratch.length - kPos < needed) {
+            keyScratch = Arrays.copyOf(keyScratch, Math.max(keyScratch.length * 2, kPos + needed));
         }
     }
 
