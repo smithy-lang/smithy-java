@@ -124,6 +124,9 @@ val codegenProjections =
         "rest-json-client",
         "rest-xml-client",
         "rpc-v2-cbor-client",
+        // Same service generated with reverseMemberSerialization for the experimental
+        // backward Sparrowhawk writer; only valid with that serializer.
+        "rpc-v2-cbor-desc-client",
     )
 
 afterEvaluate {

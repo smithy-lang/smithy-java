@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -109,7 +110,11 @@ record StructureSerializerGenerator(
     private void writeMemberSerialization(JavaWriter writer) {
         boolean isError = shape.hasTrait(ErrorTrait.class);
 
-        for (var member : CodegenUtils.getSortedMembers(model, shape)) {
+        var members = new ArrayList<>(CodegenUtils.getSortedMembers(model, shape));
+        if (directive.context().settings().reverseMemberSerialization()) {
+            Collections.reverse(members);
+        }
+        for (var member : members) {
             var memberName = symbolProvider.toMemberName(member);
             // if the shape is an error we need to use the `getMessage()` method for message field.
             if (isError && memberName.equalsIgnoreCase("message")) {

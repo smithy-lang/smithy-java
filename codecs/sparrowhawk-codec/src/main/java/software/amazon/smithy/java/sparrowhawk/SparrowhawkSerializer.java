@@ -1543,7 +1543,7 @@ final class SparrowhawkSerializer implements ShapeSerializer {
         pos += b.length;
     }
 
-    private static int countHigh(byte[] latin1) {
+    static int countHigh(byte[] latin1) {
         // Count bytes >= 0x80 (each becomes two UTF-8 bytes), eight bytes at a stride: the sign bits of a
         // word, masked and popcounted, are exactly the high-byte count.
         int high = 0;
@@ -1560,7 +1560,7 @@ final class SparrowhawkSerializer implements ShapeSerializer {
         return high;
     }
 
-    private static int rawLatin1AsUtf8(byte[] latin1, int high, byte[] dst, int at) {
+    static int rawLatin1AsUtf8(byte[] latin1, int high, byte[] dst, int at) {
         if (high == 0) {
             System.arraycopy(latin1, 0, dst, at, latin1.length);
             return at + latin1.length;

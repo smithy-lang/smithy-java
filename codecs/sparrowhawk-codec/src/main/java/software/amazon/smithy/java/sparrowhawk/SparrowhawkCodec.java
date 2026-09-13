@@ -35,6 +35,50 @@ public final class SparrowhawkCodec implements Codec {
         return INSTANCE;
     }
 
+    /**
+     * Gets the EXPERIMENTAL backward-writing Sparrowhawk codec. Serialization requires shapes generated
+     * with the {@code reverseMemberSerialization} codegen setting (descending member dispatch and
+     * reverse-iterating list consumers); map entries are emitted in reversed order, which decodes
+     * identically but is not byte-identical to {@link #get()}. Deserialization is shared with the
+     * standard codec. See perf-opt/backward-writer.md.
+     *
+     * @return the backward codec instance.
+     */
+    public static Codec backward() {
+        return BackwardCodec.INSTANCE;
+    }
+
+    private static final class BackwardCodec implements Codec {
+        static final BackwardCodec INSTANCE = new BackwardCodec();
+
+        @Override
+        public ByteBuffer serialize(SerializableShape shape) {
+            var serializer = SparrowhawkBackwardSerializer.acquire();
+            try {
+                shape.serialize(serializer);
+                return serializer.finish();
+            } finally {
+                SparrowhawkBackwardSerializer.release(serializer);
+            }
+        }
+
+        @Override
+        public ShapeSerializer createSerializer(OutputStream sink) {
+            throw new UnsupportedOperationException(
+                    "The backward Sparrowhawk codec does not support streaming serialization");
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer(byte[] source) {
+            return new SparrowhawkDeserializer(source);
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer(ByteBuffer source) {
+            return new SparrowhawkDeserializer(source);
+        }
+    }
+
     @Override
     public ByteBuffer serialize(SerializableShape shape) {
         var serializer = SparrowhawkSerializer.acquire();

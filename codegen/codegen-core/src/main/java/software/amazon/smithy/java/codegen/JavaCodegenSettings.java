@@ -54,6 +54,7 @@ public final class JavaCodegenSettings {
     private static final String MODES = "modes";
     private static final String CLOSURE = "closure";
     private static final String INPUT_SUFFIX = "inputSuffix";
+    private static final String REVERSE_MEMBER_SERIALIZATION = "reverseMemberSerialization";
     private static final String OUTPUT_SUFFIX = "outputSuffix";
 
     // Legacy default name for types-only generation. Before types generation was driven by a shape
@@ -80,7 +81,8 @@ public final class JavaCodegenSettings {
             MODES,
             CLOSURE,
             INPUT_SUFFIX,
-            OUTPUT_SUFFIX);
+            OUTPUT_SUFFIX,
+            REVERSE_MEMBER_SERIALIZATION);
 
     private final ShapeId service;
     private final String closure;
@@ -88,6 +90,7 @@ public final class JavaCodegenSettings {
     private final String packageNamespace;
     private final String header;
     private final boolean addNullnessAnnotations;
+    private final boolean reverseMemberSerialization;
     private final ShapeId defaultProtocol;
     private final String transportName;
     private final ObjectNode transportSettings;
@@ -110,6 +113,7 @@ public final class JavaCodegenSettings {
         this.packageNamespace = Objects.requireNonNull(builder.packageNamespace);
         this.header = getHeader(builder.headerFilePath, builder.sourceLocation);
         this.addNullnessAnnotations = builder.addNullnessAnnotations;
+        this.reverseMemberSerialization = builder.reverseMemberSerialization;
         this.defaultProtocol = builder.defaultProtocol;
         this.transportName = builder.transportName;
         this.transportSettings = builder.transportSettings;
@@ -154,6 +158,7 @@ public final class JavaCodegenSettings {
                 .expectStringMember(NAMESPACE, builder::packageNamespace)
                 .getStringMember(HEADER_FILE, builder::headerFilePath)
                 .getBooleanMember(ADD_NULLNESS_ANNOTATIONS, builder::addNullnessAnnotations)
+                .getBooleanMember(REVERSE_MEMBER_SERIALIZATION, builder::reverseMemberSerialization)
                 .getStringMember(DEFAULT_PROTOCOL, builder::defaultProtocol)
                 .getObjectMember(TRANSPORT, builder::transportNode)
                 .getArrayMember(DEFAULT_PLUGINS, n -> n.expectStringNode().getValue(), builder::defaultPlugins)
@@ -224,6 +229,18 @@ public final class JavaCodegenSettings {
 
     public boolean addNullnessAnnotations() {
         return addNullnessAnnotations;
+    }
+
+    /**
+     * Whether generated {@code serializeMembers} implementations dispatch members in descending
+     * memberIndex order and generated list serializers iterate in reverse. Only valid for serializers
+     * that write output back-to-front (an experimental Sparrowhawk mode); the generated code produces
+     * incorrect member order with ordinary forward serializers.
+     *
+     * @return true when members serialize in reverse order.
+     */
+    public boolean reverseMemberSerialization() {
+        return reverseMemberSerialization;
     }
 
     public ShapeId defaultProtocol() {
@@ -363,6 +380,7 @@ public final class JavaCodegenSettings {
         private String headerFilePath;
         private String sourceLocation;
         private boolean addNullnessAnnotations;
+        private boolean reverseMemberSerialization;
         private ShapeId defaultProtocol;
         private String transportName;
         private ObjectNode transportSettings;
@@ -425,6 +443,11 @@ public final class JavaCodegenSettings {
 
         public Builder sourceLocation(String sourceLocation) {
             this.sourceLocation = sourceLocation;
+            return this;
+        }
+
+        public Builder reverseMemberSerialization(boolean reverseMemberSerialization) {
+            this.reverseMemberSerialization = reverseMemberSerialization;
             return this;
         }
 

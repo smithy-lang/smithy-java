@@ -52,7 +52,7 @@ public final class ListGenerator
                                                 public void accept(${shape:B} values, ${shapeSerializer:T} serializer) {
                                                     var $$m = ${valueSchema:L};
                                                     if (values instanceof ${randomAccess:T}) {
-                                                        for (int i = 0, size = values.size(); i < size; i++) {
+                                                        for (int i = ${^reverse}0, size = values.size(); i < size; i++${/reverse}${?reverse}values.size() - 1; i >= 0; i--${/reverse}) {
                                                             var value = values.get(i);
                                                             ${?sparse}if (value == null) {
                                                                 serializer.writeNull($$m);
@@ -61,7 +61,8 @@ public final class ListGenerator
                                                             ${/sparse}${memberSerializer:C|};
                                                         }
                                                     } else {
-                                                        for (var value : values) {
+                                                        ${^reverse}for (var value : values) {${/reverse}${?reverse}for (var it = values.listIterator(values.size()); it.hasPrevious();) {
+                                                            var value = it.previous();${/reverse}
                                                             ${?sparse}if (value == null) {
                                                                 serializer.writeNull($$m);
                                                                 continue;
@@ -106,6 +107,9 @@ public final class ListGenerator
                             writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
                             writer.putContext("valueSchema", valueSchema);
                             writer.putContext("randomAccess", RandomAccess.class);
+                            writer.putContext(
+                                    "reverse",
+                                    directive.context().settings().reverseMemberSerialization());
                             writer.putContext(
                                     "memberSerializer",
                                     new SerializerMemberGenerator(
