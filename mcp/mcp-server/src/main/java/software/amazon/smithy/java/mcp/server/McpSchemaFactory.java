@@ -71,16 +71,8 @@ final class McpSchemaFactory {
         var info = ToolInfo.builder()
                 .name(operationName)
                 .description(createDescription(service.schema().id().getName(), operationName, operationSchema))
-                .inputSchema(createObjectSchema(
-                        operation.getApiOperation().inputSchema(),
-                        operation.getApiOperation().inputSchema(),
-                        new HashSet<>(),
-                        cache))
-                .outputSchema(createObjectSchema(
-                        operation.getApiOperation().outputSchema(),
-                        operation.getApiOperation().outputSchema(),
-                        new HashSet<>(),
-                        cache))
+                .inputSchema(createRootSchema(operation.getApiOperation().inputSchema(), cache))
+                .outputSchema(createRootSchema(operation.getApiOperation().outputSchema(), cache))
                 .annotations(createAnnotations(operationSchema))
                 .build();
         return new McpToolDescriptor(
@@ -126,23 +118,8 @@ final class McpSchemaFactory {
         var targetId = target.id();
         var cached = cache.get(targetId);
         if (cached != null) {
-            return asJsonObjectSchema(withDescription(cached, memberDescription(member)));
+            return (JsonObjectSchema) withDescription(cached, memberDescription(member));
         }
-
-        // A document carrying the oneOf trait (a discriminated polymorphic type) can be asked
-        // for in an object position — most notably as an operation's input or output, which
-        // model bundles load without validation. Build it through the oneOf path, which caches
-        // a JsonOneOfSchema for other references to reuse, and re-shape the result into the
-        // object-typed schema this position requires. Scoped to documents (the trait's
-        // selector) so any other shape kind carrying the trait keeps its regular rendering,
-        // matching what runtime input/output adaptation recognizes.
-        if (target.type() == ShapeType.DOCUMENT) {
-            var oneOf = target.getTrait(ONE_OF_TRAIT);
-            if (oneOf != null) {
-                return asJsonObjectSchema(createOneOfSchema(oneOf, member, visited, cache));
-            }
-        }
-
         if (!visited.add(targetId)) {
             return JsonObjectSchema.builder().build();
         }
@@ -153,7 +130,7 @@ final class McpSchemaFactory {
             if (child.hasTrait(TraitKey.REQUIRED_TRAIT)) {
                 required.add(child.memberName());
             }
-            properties.put(child.memberName(), Document.of(createMemberSchema(child, visited, cache)));
+            properties.put(child.memberName(), Document.of(createSchema(child, visited, cache)));
         }
         visited.remove(targetId);
 
@@ -162,23 +139,35 @@ final class McpSchemaFactory {
                 .required(required)
                 .build();
         cache.put(targetId, result);
-        return asJsonObjectSchema(withDescription(result, memberDescription(member)));
+        return (JsonObjectSchema) withDescription(result, memberDescription(member));
+    }
+
+    private JsonObjectSchema createRootSchema(Schema root, Map<ShapeId, SerializableShape> cache) {
+        return asJsonObjectSchema(root, createSchema(root, new HashSet<>(), cache));
     }
 
     /**
-     * Re-shapes a schema for a position that requires an object-typed schema, such as a tool's
-     * input or output (the MCP spec requires both to have {@code "type": "object"}). A
-     * discriminated polymorphic type renders as a {@link JsonOneOfSchema}; it is carried over as
-     * an object schema constrained by the same {@code oneOf} variants. Anything else degrades to
-     * a permissive object schema rather than failing the entire tool listing.
+     * Coerces a rendered root schema into the object-typed schema {@link ToolInfo} requires. A
+     * polymorphic root ({@link JsonOneOfSchema}) becomes an object constrained by the same
+     * {@code oneOf} variants; on the wire this only adds the {@code $schema} annotation, since
+     * {@link JsonOneOfSchema} already declares {@code "type": "object"}. An untyped document root
+     * becomes a permissive object. Anything else has no object representation and degrades to a
+     * permissive object schema with a warning rather than failing the entire tool listing.
      */
-    private static JsonObjectSchema asJsonObjectSchema(SerializableShape schema) {
+    private static JsonObjectSchema asJsonObjectSchema(Schema root, SerializableShape schema) {
         return switch (schema) {
             case JsonObjectSchema object -> object;
             case JsonOneOfSchema oneOf -> {
                 var builder = JsonObjectSchema.builder().oneOf(oneOf.getOneOf());
                 if (oneOf.getDescription() != null) {
                     builder.description(oneOf.getDescription());
+                }
+                yield builder.build();
+            }
+            case JsonDocumentSchema document -> {
+                var builder = JsonObjectSchema.builder();
+                if (document.getDescription() != null) {
+                    builder.description(document.getDescription());
                 }
                 yield builder.build();
             }
@@ -192,7 +181,7 @@ final class McpSchemaFactory {
             Set<ShapeId> visited,
             Map<ShapeId, SerializableShape> cache
     ) {
-        var items = createMemberSchema(target.listMember(), visited, cache);
+        var items = createSchema(target.listMember(), visited, cache);
         var itemDocument = target.hasTrait(TraitKey.SPARSE_TRAIT)
                 ? Document.of(Map.of(
                         "anyOf",
@@ -269,10 +258,9 @@ final class McpSchemaFactory {
 
         var variants = new ArrayList<Document>();
         for (var definition : oneOf.getMembers()) {
-            var target = schemaIndex.getSchema(definition.getTarget());
             variants.add(createUnionVariant(
                     definition.getName(),
-                    createObjectSchema(target, target, visited, cache)));
+                    createSchema(schemaIndex.getSchema(definition.getTarget()), visited, cache)));
         }
         visited.remove(targetId);
 
@@ -300,7 +288,7 @@ final class McpSchemaFactory {
         for (var child : target.members()) {
             variants.add(createUnionVariant(
                     child.memberName(),
-                    createMemberSchema(child, visited, cache)));
+                    createSchema(child, visited, cache)));
         }
         visited.remove(targetId);
 
@@ -309,18 +297,22 @@ final class McpSchemaFactory {
         return withDescription(result, memberDescription(member));
     }
 
-    private SerializableShape createMemberSchema(
-            Schema member,
+    /**
+     * Renders any schema, member or not, by dispatching on the type of the shape it resolves to.
+     */
+    private SerializableShape createSchema(
+            Schema schema,
             Set<ShapeId> visited,
             Map<ShapeId, SerializableShape> cache
     ) {
-        return switch (member.type()) {
-            case LIST, SET -> createArraySchema(member, member.memberTarget(), visited, cache);
-            case MAP -> createMapSchema(member, member.memberTarget(), visited, cache);
-            case STRUCTURE -> createObjectSchema(member, member.memberTarget(), visited, cache);
-            case UNION -> createUnionSchema(member, member.memberTarget(), visited, cache);
-            case DOCUMENT -> createDocumentSchema(member, visited, cache);
-            default -> createPrimitiveSchema(member);
+        var target = schema.isMember() ? schema.memberTarget() : schema;
+        return switch (target.type()) {
+            case LIST, SET -> createArraySchema(schema, target, visited, cache);
+            case MAP -> createMapSchema(schema, target, visited, cache);
+            case STRUCTURE -> createObjectSchema(schema, target, visited, cache);
+            case UNION -> createUnionSchema(schema, target, visited, cache);
+            case DOCUMENT -> createDocumentSchema(schema, visited, cache);
+            default -> createPrimitiveSchema(schema);
         };
     }
 
@@ -330,7 +322,7 @@ final class McpSchemaFactory {
             Set<ShapeId> visited,
             Map<ShapeId, SerializableShape> cache
     ) {
-        var value = createMemberSchema(target.mapValueMember(), visited, cache);
+        var value = createSchema(target.mapValueMember(), visited, cache);
         var additionalProperties = target.hasTrait(TraitKey.SPARSE_TRAIT)
                 ? Document.of(Map.of(
                         "anyOf",
