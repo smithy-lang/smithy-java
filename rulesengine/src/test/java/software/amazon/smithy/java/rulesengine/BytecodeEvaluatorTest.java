@@ -223,6 +223,40 @@ class BytecodeEvaluatorTest {
     }
 
     @Test
+    void testBuildTemplate() {
+        int greeting = writer.getConstantIndex("Hello ");
+        int separator = writer.getConstantIndex(" at ");
+        int property = writer.getConstantIndex("suffix");
+        int expected = writer.getConstantIndex("Hello \u4e16\u754c at example.com");
+
+        writer.markConditionStart();
+        writer.writeByte(Opcodes.BUILD_TEMPLATE);
+        writer.writeByte(4);
+        writer.writeByte(TemplateSegmentType.LITERAL);
+        writer.writeShort(greeting);
+        writer.writeByte(TemplateSegmentType.REGISTER);
+        writer.writeByte(0);
+        writer.writeByte(TemplateSegmentType.LITERAL);
+        writer.writeShort(separator);
+        writer.writeByte(TemplateSegmentType.REGISTER_PROPERTY);
+        writer.writeByte(1);
+        writer.writeShort(property);
+        writer.writeByte(Opcodes.LOAD_CONST);
+        writer.writeByte(expected);
+        writer.writeByte(Opcodes.STRING_EQUALS);
+        writer.writeByte(Opcodes.RETURN_VALUE);
+
+        RegisterDefinition[] registers = {
+                new RegisterDefinition("name", false, "\u4e16\u754c", null, false),
+                new RegisterDefinition("metadata", false, Map.of("suffix", "example.com"), null, false)
+        };
+        bytecode = buildBytecode(registers);
+        evaluator = createEvaluator(bytecode);
+
+        assertTrue(evaluator.test(0));
+    }
+
+    @Test
     void testJumpNotNullOrPop() {
         writer.markConditionStart();
         writer.writeByte(Opcodes.LOAD_CONST);
