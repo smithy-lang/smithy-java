@@ -1843,9 +1843,51 @@ public class StdioMcpServerTest {
                         output: ShapeHolder
                     }
 
+                    @aws.protocols#awsJson1_0
+                    service TestUnionOutputRootService {
+                        operations: [GetUnionShape]
+                    }
+
+                    @aws.protocols#awsJson1_0
+                    service TestUnionInputRootService {
+                        operations: [PutUnionShape]
+                    }
+
+                    @aws.protocols#awsJson1_0
+                    service TestDocumentOutputRootService {
+                        operations: [GetAnyDocument]
+                    }
+
+                    /// Same orderings as GetShape/PutShape, with a plain union as the polymorphic root.
+                    operation GetUnionShape {
+                        input: UnionShapeHolder
+                        output: ShapeUnion
+                    }
+
+                    operation PutUnionShape {
+                        input: ShapeUnion
+                        output: UnionShapeHolder
+                    }
+
+                    /// An untyped document as the output root.
+                    operation GetAnyDocument {
+                        output: AnyDocument
+                    }
+
                     structure ShapeHolder {
                         shape: ShapeWithOneOf
                     }
+
+                    structure UnionShapeHolder {
+                        shape: ShapeUnion
+                    }
+
+                    union ShapeUnion {
+                        circle: Circle
+                        square: Square
+                    }
+
+                    document AnyDocument
 
                     @oneOf(discriminator: "__type", members: [
                         {name: "circle", target: Circle},
@@ -1964,7 +2006,7 @@ public class StdioMcpServerTest {
         assertEquals(2, oneOf.size(), "Document with @oneOf should have 2 oneOf variants");
     }
 
-    private Map<String, Document> oneOfRootTools(String serviceName) {
+    private Map<String, Document> rootSchemaTools(String serviceName) {
         server = StdioMcpServer.builder()
                 .name("smithy-mcp-server")
                 .input(input)
@@ -2005,7 +2047,7 @@ public class StdioMcpServerTest {
         // input member caches the document's JsonOneOfSchema before the output requests the same
         // shape as its root. This is the order that used to throw ClassCastException while
         // building the tool list.
-        var tool = oneOfRootTools("TestOneOfOutputRootService").get("GetShape");
+        var tool = rootSchemaTools("TestOneOfOutputRootService").get("GetShape");
 
         // The root must be object-typed (required by the MCP spec) and still carry the variants.
         var outputSchema = tool.asStringMap().get("outputSchema").asStringMap();
@@ -2023,7 +2065,7 @@ public class StdioMcpServerTest {
         // PutShape's input root is built first. This order used to render the member-less
         // document as an empty object schema and cache it, so the nested output member then
         // silently lost its oneOf variants.
-        var tool = oneOfRootTools("TestOneOfInputRootService").get("PutShape");
+        var tool = rootSchemaTools("TestOneOfInputRootService").get("PutShape");
 
         var inputSchema = tool.asStringMap().get("inputSchema").asStringMap();
         assertEquals("object", inputSchema.get("type").asString());
@@ -2033,6 +2075,51 @@ public class StdioMcpServerTest {
         assertEquals(2,
                 nestedShapeSchema(tool, "outputSchema").get("oneOf").asList().size(),
                 "Nested reference to the polymorphic document should keep its oneOf variants");
+    }
+
+    @Test
+    void testUnionAsOperationOutputRootWithCachedSchema() {
+        // Same ordering as GetShape with a plain union: the nested input member caches the
+        // union's JsonOneOfSchema before the output requests the union as its root.
+        var tool = rootSchemaTools("TestUnionOutputRootService").get("GetUnionShape");
+
+        var outputSchema = tool.asStringMap().get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        assertEquals(2, outputSchema.get("oneOf").asList().size(), "Union output root should have 2 variants");
+        assertNull(outputSchema.get("properties"), "Union root must not render its members as properties");
+
+        assertEquals(2,
+                nestedShapeSchema(tool, "inputSchema").get("oneOf").asList().size(),
+                "Nested reference to the union should keep its oneOf variants");
+    }
+
+    @Test
+    void testUnionAsOperationInputRootBeforeNestedReference() {
+        // Same ordering as PutShape with a plain union: the union root is built first, then the
+        // output references it as a nested member. Rendering the root as a plain object would
+        // flatten the variants into sibling properties and cache that for the nested reference.
+        var tool = rootSchemaTools("TestUnionInputRootService").get("PutUnionShape");
+
+        var inputSchema = tool.asStringMap().get("inputSchema").asStringMap();
+        assertEquals("object", inputSchema.get("type").asString());
+        assertEquals(2, inputSchema.get("oneOf").asList().size(), "Union input root should have 2 variants");
+        assertNull(inputSchema.get("properties"), "Union root must not render its members as properties");
+
+        assertEquals(2,
+                nestedShapeSchema(tool, "outputSchema").get("oneOf").asList().size(),
+                "Nested reference to the union should keep its oneOf variants");
+    }
+
+    @Test
+    void testPlainDocumentAsOperationOutputRoot() {
+        // An untyped document root has no members and no variants; it renders as a permissive
+        // object schema rather than failing or claiming an empty property set.
+        var tool = rootSchemaTools("TestDocumentOutputRootService").get("GetAnyDocument");
+
+        var outputSchema = tool.asStringMap().get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        assertNull(outputSchema.get("oneOf"));
+        assertNull(outputSchema.get("properties"));
     }
 
     @Test
