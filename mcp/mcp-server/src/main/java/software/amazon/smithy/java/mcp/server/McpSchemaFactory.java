@@ -126,8 +126,23 @@ final class McpSchemaFactory {
         var targetId = target.id();
         var cached = cache.get(targetId);
         if (cached != null) {
-            return (JsonObjectSchema) withDescription(cached, memberDescription(member));
+            return asJsonObjectSchema(withDescription(cached, memberDescription(member)));
         }
+
+        // A document carrying the oneOf trait (a discriminated polymorphic type) can be asked
+        // for in an object position — most notably as an operation's input or output, which
+        // model bundles load without validation. Build it through the oneOf path, which caches
+        // a JsonOneOfSchema for other references to reuse, and re-shape the result into the
+        // object-typed schema this position requires. Scoped to documents (the trait's
+        // selector) so any other shape kind carrying the trait keeps its regular rendering,
+        // matching what runtime input/output adaptation recognizes.
+        if (target.type() == ShapeType.DOCUMENT) {
+            var oneOf = target.getTrait(ONE_OF_TRAIT);
+            if (oneOf != null) {
+                return asJsonObjectSchema(createOneOfSchema(oneOf, member, visited, cache));
+            }
+        }
+
         if (!visited.add(targetId)) {
             return JsonObjectSchema.builder().build();
         }
@@ -147,7 +162,28 @@ final class McpSchemaFactory {
                 .required(required)
                 .build();
         cache.put(targetId, result);
-        return (JsonObjectSchema) withDescription(result, memberDescription(member));
+        return asJsonObjectSchema(withDescription(result, memberDescription(member)));
+    }
+
+    /**
+     * Re-shapes a schema for a position that requires an object-typed schema, such as a tool's
+     * input or output (the MCP spec requires both to have {@code "type": "object"}). A
+     * discriminated polymorphic type renders as a {@link JsonOneOfSchema}; it is carried over as
+     * an object schema constrained by the same {@code oneOf} variants. Anything else degrades to
+     * a permissive object schema rather than failing the entire tool listing.
+     */
+    private static JsonObjectSchema asJsonObjectSchema(SerializableShape schema) {
+        return switch (schema) {
+            case JsonObjectSchema object -> object;
+            case JsonOneOfSchema oneOf -> {
+                var builder = JsonObjectSchema.builder().oneOf(oneOf.getOneOf());
+                if (oneOf.getDescription() != null) {
+                    builder.description(oneOf.getDescription());
+                }
+                yield builder.build();
+            }
+            default -> JsonObjectSchema.builder().build();
+        };
     }
 
     private JsonArraySchema createArraySchema(

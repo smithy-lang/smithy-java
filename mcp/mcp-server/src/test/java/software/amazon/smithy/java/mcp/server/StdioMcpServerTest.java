@@ -1810,6 +1810,68 @@ public class StdioMcpServerTest {
             .assemble()
             .unwrap();
 
+    private static final String ONE_OF_ROOT_MODEL_STR =
+            """
+                    $version: "2"
+
+                    namespace smithy.test.oneofroot
+
+                    use smithy.mcp#oneOf
+
+                    // One service per operation so each tool list exercises exactly one ordering.
+                    @aws.protocols#awsJson1_0
+                    service TestOneOfOutputRootService {
+                        operations: [GetShape]
+                    }
+
+                    @aws.protocols#awsJson1_0
+                    service TestOneOfInputRootService {
+                        operations: [PutShape]
+                    }
+
+                    /// Nested reference in the input (built first) caches the document's oneOf
+                    /// schema; the output then requests the same shape as its root.
+                    operation GetShape {
+                        input: ShapeHolder
+                        output: ShapeWithOneOf
+                    }
+
+                    /// The polymorphic document is the input root (built first); the output then
+                    /// references the same shape as a nested member.
+                    operation PutShape {
+                        input: ShapeWithOneOf
+                        output: ShapeHolder
+                    }
+
+                    structure ShapeHolder {
+                        shape: ShapeWithOneOf
+                    }
+
+                    @oneOf(discriminator: "__type", members: [
+                        {name: "circle", target: Circle},
+                        {name: "square", target: Square}
+                    ])
+                    document ShapeWithOneOf
+
+                    structure Circle {
+                        @required
+                        radius: Integer
+                    }
+
+                    structure Square {
+                        @required
+                        side: Integer
+                    }""";
+
+    // Assembled without validation, mirroring ModelBundles: bundled models reach the MCP server
+    // with document-typed operation inputs and outputs, which strict validation would reject.
+    private static final Model ONE_OF_ROOT_MODEL = Model.assembler()
+            .addUnparsedModel("test-oneof-root.smithy", ONE_OF_ROOT_MODEL_STR)
+            .discoverModels()
+            .disableValidation()
+            .assemble()
+            .unwrap();
+
     @Test
     void testUnionSchemaGeneratesOneOfWithWrappedMembers() {
         server = StdioMcpServer.builder()
@@ -1900,6 +1962,77 @@ public class StdioMcpServerTest {
         // Document with @oneOf should have oneOf array generated from trait members
         var oneOf = shapeProperty.get("oneOf").asList();
         assertEquals(2, oneOf.size(), "Document with @oneOf should have 2 oneOf variants");
+    }
+
+    private Map<String, Document> oneOfRootTools(String serviceName) {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.oneofroot#" + serviceName))
+                                .proxyEndpoint("http://localhost")
+                                .model(ONE_OF_ROOT_MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = new HashMap<String, Document>();
+        for (var tool : response.getResult().asStringMap().get("tools").asList()) {
+            tools.put(tool.asStringMap().get("name").asString(), tool);
+        }
+        return tools;
+    }
+
+    private static Map<String, Document> nestedShapeSchema(Document tool, String schemaKey) {
+        return tool.asStringMap()
+                .get(schemaKey)
+                .asStringMap()
+                .get("properties")
+                .asStringMap()
+                .get("shape")
+                .asStringMap();
+    }
+
+    @Test
+    void testOneOfDocumentAsOperationOutputRootWithCachedSchema() {
+        // The schema cache is per operation and the input is built first, so GetShape's nested
+        // input member caches the document's JsonOneOfSchema before the output requests the same
+        // shape as its root. This is the order that used to throw ClassCastException while
+        // building the tool list.
+        var tool = oneOfRootTools("TestOneOfOutputRootService").get("GetShape");
+
+        // The root must be object-typed (required by the MCP spec) and still carry the variants.
+        var outputSchema = tool.asStringMap().get("outputSchema").asStringMap();
+        assertEquals("object", outputSchema.get("type").asString());
+        assertEquals(2, outputSchema.get("oneOf").asList().size(), "Polymorphic output root should have 2 variants");
+
+        // The nested reference keeps its full oneOf schema.
+        assertEquals(2,
+                nestedShapeSchema(tool, "inputSchema").get("oneOf").asList().size(),
+                "Nested reference to the polymorphic document should keep its oneOf variants");
+    }
+
+    @Test
+    void testOneOfDocumentAsOperationInputRootBeforeNestedReference() {
+        // PutShape's input root is built first. This order used to render the member-less
+        // document as an empty object schema and cache it, so the nested output member then
+        // silently lost its oneOf variants.
+        var tool = oneOfRootTools("TestOneOfInputRootService").get("PutShape");
+
+        var inputSchema = tool.asStringMap().get("inputSchema").asStringMap();
+        assertEquals("object", inputSchema.get("type").asString());
+        assertEquals(2, inputSchema.get("oneOf").asList().size(), "Polymorphic input root should have 2 variants");
+
+        // Rendering the shape in an object position must not pollute the cache for nested uses.
+        assertEquals(2,
+                nestedShapeSchema(tool, "outputSchema").get("oneOf").asList().size(),
+                "Nested reference to the polymorphic document should keep its oneOf variants");
     }
 
     @Test
