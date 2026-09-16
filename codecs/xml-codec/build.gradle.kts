@@ -38,3 +38,26 @@ tasks.named("compileTestJava") {
 tasks.named("processTestResources") {
     dependsOn("smithyBuild")
 }
+
+val jdk25CodegenTest =
+    tasks.register<Test>("jdk25CodegenTest") {
+        description = "Run the XML test suite with runtime code generation enabled."
+        group = "verification"
+
+        testClassesDirs = sourceSets.test.get().output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        javaLauncher =
+            javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(25)
+            }
+        // Strict rather than enabled: a bug in the emitter is otherwise indistinguishable from a shape
+        // the backend declines to support — both fall back to the dispatch path and the suite passes
+        // having proved nothing.
+        systemProperty("smithy-java.runtime-codegen.xml", "strict")
+        systemProperty("smithy-java.xml-provider", "smithy")
+        useJUnitPlatform()
+    }
+
+tasks.named("check") {
+    dependsOn(jdk25CodegenTest)
+}
