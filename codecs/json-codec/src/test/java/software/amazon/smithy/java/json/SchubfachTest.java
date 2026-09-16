@@ -25,7 +25,7 @@ class SchubfachTest {
     private static final SmithyJsonSerdeProvider SMITHY = new SmithyJsonSerdeProvider();
 
     private String serializeDouble(double v) throws Exception {
-        try (var codec = JsonCodec.builder().overrideSerdeProvider(SMITHY).build();
+        try (var codec = JsonCodec.builder().overrideSerdeProvider(SMITHY).runtimeCodegen(false).build();
                 var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeDouble(PreludeSchemas.DOUBLE, v);
@@ -35,7 +35,7 @@ class SchubfachTest {
     }
 
     private String serializeFloat(float v) throws Exception {
-        try (var codec = JsonCodec.builder().overrideSerdeProvider(SMITHY).build();
+        try (var codec = JsonCodec.builder().overrideSerdeProvider(SMITHY).runtimeCodegen(false).build();
                 var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeFloat(PreludeSchemas.FLOAT, v);

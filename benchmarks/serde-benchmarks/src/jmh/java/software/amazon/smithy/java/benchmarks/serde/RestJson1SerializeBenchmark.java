@@ -29,6 +29,9 @@ public class RestJson1SerializeBenchmark {
     private static final ShapeId SERVICE_ID =
             ShapeId.from("com.amazonaws.sdk.benchmark#AwsRestJsonDataPlane");
 
+    @Param("generic")
+    public String implementation;
+
     @Param({
             "restJson1_WideTypesRequest_S",
             "restJson1_WideTypesRequest_M",
@@ -38,6 +41,9 @@ public class RestJson1SerializeBenchmark {
             "restJson1_PutObject_S",
             "restJson1_PutObject_M",
             "restJson1_PutObject_L",
+            "awsQuery_PutMetricDataRequest_S",
+            "awsQuery_PutMetricDataRequest_M",
+            "awsQuery_PutMetricDataRequest_L",
     })
     public String testCaseId;
 
@@ -46,15 +52,23 @@ public class RestJson1SerializeBenchmark {
 
     @Setup
     public void setup() {
+        boolean generated = "generated".equals(implementation);
+        if (generated && Runtime.version().feature() < 25) {
+            throw new IllegalStateException("Runtime codegen unavailable on " + Runtime.version());
+        }
+        System.setProperty("smithy-java.runtime-codegen", generated ? "enabled" : "disabled");
+        System.setProperty("smithy-java.json-provider", "smithy");
         protocol = new RestJsonClientProtocol(SERVICE_ID);
         state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID);
     }
 
     @Benchmark
     public void serialize(Blackhole bh) {
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        ApiOperation<SerializableStruct, SerializableStruct> op =
-                (ApiOperation) state.operation;
-        bh.consume(protocol.createRequest(op, state.input, state.context, state.endpoint));
+        bh.consume(protocol.createRequest(operation(), state.input, state.context, state.endpoint));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ApiOperation<SerializableStruct, SerializableStruct> operation() {
+        return (ApiOperation) state.operation;
     }
 }

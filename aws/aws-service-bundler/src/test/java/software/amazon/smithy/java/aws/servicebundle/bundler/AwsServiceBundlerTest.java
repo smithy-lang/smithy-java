@@ -82,9 +82,11 @@ public class AwsServiceBundlerTest {
     }
 
     @Test
-    public void cw() {
-        assertThat(AwsServiceBundler.builder().serviceName("cloudwatch").build().bundle())
-                .isNotNull();
+    public void cloudWatchModelIsRegistered() {
+        assertThat(AwsServiceBundler.GH_URIS_BY_SERVICE)
+                .containsEntry(
+                        "cloudwatch",
+                        "cloudwatch/service/2010-08-01/cloudwatch-2010-08-01.json");
     }
 
     @Test

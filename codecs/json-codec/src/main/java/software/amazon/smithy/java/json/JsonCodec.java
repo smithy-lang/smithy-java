@@ -7,9 +7,12 @@ package software.amazon.smithy.java.json;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
@@ -27,7 +30,7 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
  *
  * <p>Blobs are base64 encoded as strings.
  */
-public final class JsonCodec implements Codec {
+public final class JsonCodec implements Codec, MemberSubsetCodec {
 
     private final JsonSettings settings;
 
@@ -54,7 +57,38 @@ public final class JsonCodec implements Codec {
     }
 
     @Override
+    public ByteBuffer serialize(SerializableStruct struct, MemberSubset subset) {
+        return settings.provider() instanceof CodegenJsonSerdeProvider generated
+                ? generated.serializeMemberSubset(struct, subset, settings)
+                : null;
+    }
+
+    @Override
+    public boolean deserialize(
+            Schema schema,
+            ShapeBuilder<?> builder,
+            ByteBuffer source,
+            MemberSubset subset
+    ) {
+        return settings.provider() instanceof CodegenJsonSerdeProvider generated
+                && generated.deserializeMemberSubset(schema, builder, source, subset, settings);
+    }
+
+    @Override
+    public boolean deserialize(
+            Schema schema,
+            ShapeBuilder<?> builder,
+            ByteBuffer source
+    ) {
+        return settings.provider() instanceof CodegenJsonSerdeProvider generated
+                && generated.deserializeInto(schema, builder, source, settings);
+    }
+
+    @Override
     public <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
+        if (settings.provider() instanceof CodegenJsonSerdeProvider generated) {
+            return generated.deserialize(source, builder, settings);
+        }
         var deserializer = createDeserializer(source);
         T result;
         try {
@@ -69,6 +103,9 @@ public final class JsonCodec implements Codec {
 
     @Override
     public <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
+        if (settings.provider() instanceof CodegenJsonSerdeProvider generated) {
+            return generated.deserialize(source, builder, settings);
+        }
         var deserializer = createDeserializer(source);
         T result;
         try {
@@ -218,6 +255,12 @@ public final class JsonCodec implements Codec {
          */
         public Builder useStringForArbitraryPrecision(boolean useStringForArbitraryPrecision) {
             settingsBuilder.useStringForArbitraryPrecision(useStringForArbitraryPrecision);
+            return this;
+        }
+
+        /** Enables runtime-generated codecs when supported by the current JVM. */
+        public Builder runtimeCodegen(boolean runtimeCodegen) {
+            settingsBuilder.runtimeCodegen(runtimeCodegen);
             return this;
         }
 

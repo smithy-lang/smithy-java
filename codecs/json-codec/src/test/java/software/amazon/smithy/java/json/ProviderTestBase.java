@@ -8,6 +8,7 @@ package software.amazon.smithy.java.json;
 import java.util.List;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.params.provider.Arguments;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
 import software.amazon.smithy.java.json.jackson.JacksonJsonSerdeProvider;
 import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 
@@ -22,13 +23,22 @@ abstract class ProviderTestBase {
     static final JacksonJsonSerdeProvider JACKSON = new JacksonJsonSerdeProvider();
     static final SmithyJsonSerdeProvider SMITHY = new SmithyJsonSerdeProvider();
 
+    static List<JsonSerdeProvider> providerInstances() {
+        return RuntimeCodegenFeature.strict("json")
+                ? List.of(SMITHY)
+                : List.of(JACKSON, SMITHY);
+    }
+
     static List<Arguments> providers() {
-        return List.of(
-                Arguments.of(Named.of("jackson", JACKSON)),
-                Arguments.of(Named.of("smithy", SMITHY)));
+        return providerInstances().stream()
+                .map(provider -> Arguments.of(Named.of(provider.getName(), provider)))
+                .toList();
     }
 
     static List<Arguments> crossProviders() {
+        if (RuntimeCodegenFeature.strict("json")) {
+            return List.of(Arguments.of(Named.of("smithy->smithy", SMITHY), SMITHY));
+        }
         return List.of(
                 Arguments.of(Named.of("jackson->jackson", JACKSON), JACKSON),
                 Arguments.of(Named.of("smithy->smithy", SMITHY), SMITHY),
@@ -40,13 +50,15 @@ abstract class ProviderTestBase {
      * Creates a codec with default settings using the given provider.
      */
     static JsonCodec codec(JsonSerdeProvider provider) {
-        return JsonCodec.builder().overrideSerdeProvider(provider).build();
+        return codecBuilder(provider).build();
     }
 
     /**
      * Creates a codec with custom settings using the given provider.
      */
     static JsonCodec.Builder codecBuilder(JsonSerdeProvider provider) {
-        return JsonCodec.builder().overrideSerdeProvider(provider);
+        return JsonCodec.builder()
+                .overrideSerdeProvider(provider)
+                .runtimeCodegen(false);
     }
 }
