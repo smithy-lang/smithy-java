@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "plugins": {
+    "java-codegen": {
+      "namespace": "software.amazon.smithy.java.aws.client.awsquery.bench",
+      "modes": ["types"],
+      "runtimeTraits": ["aws.protocols#ec2QueryName"]
+    }
+  }
+}
