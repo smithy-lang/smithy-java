@@ -31,7 +31,7 @@ dependencies {
     // plugin (and the runtime stack) read shape definitions through these
     // JARs at build time and at runtime.
     implementation("software.amazon.api.models:dynamodb:1.0.14")
-    implementation("software.amazon.api.models:s3:1.0.22")
+    implementation("software.amazon.api.models:s3:1.0.23")
 
     // Runtime stack the generated clients depend on.
     implementation(project(":core"))
