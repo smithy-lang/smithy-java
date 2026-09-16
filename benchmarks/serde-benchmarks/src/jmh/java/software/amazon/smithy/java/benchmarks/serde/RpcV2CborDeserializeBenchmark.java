@@ -16,15 +16,6 @@ import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-/**
- * JMH benchmarks for RPC v2 CBOR response deserialization. Drives
- * {@link RpcV2CborProtocol#deserializeResponse}.
- *
- * <p>The body strings stored in the smithy model for CBOR responses are
- * base64-encoded (the smithy protocol-tests convention for binary media
- * types). They are decoded once at setup; the benchmark loop measures only
- * the deserialization.
- */
 @State(Scope.Benchmark)
 public class RpcV2CborDeserializeBenchmark {
 
@@ -32,9 +23,11 @@ public class RpcV2CborDeserializeBenchmark {
             "software.amazon.smithy.java.benchmarks.serde.generated.rpcv2cbor.model";
     private static final ShapeId SERVICE_ID =
             ShapeId.from("com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane");
-    /** Single-byte CBOR encoding of {@code {}} (empty map). */
     private static final byte[] EMPTY_CBOR_BODY = new byte[] {(byte) 0xa0};
     private static final String CONTENT_TYPE = "application/cbor";
+
+    @Param("generic")
+    public String implementation;
 
     @Param({
             "rpcv2Cbor_WideTypesResponse_S",
@@ -56,6 +49,11 @@ public class RpcV2CborDeserializeBenchmark {
 
     @Setup
     public void setup() {
+        boolean generated = "generated".equals(implementation);
+        if (generated && Runtime.version().feature() < 25) {
+            throw new IllegalStateException("Runtime codegen unavailable on " + Runtime.version());
+        }
+        System.setProperty("smithy-java.runtime-codegen", generated ? "enabled" : "disabled");
         protocol = new RpcV2CborProtocol(SERVICE_ID);
         state = DeserializeState
                 .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_CBOR_BODY, CONTENT_TYPE, true);
@@ -63,10 +61,17 @@ public class RpcV2CborDeserializeBenchmark {
 
     @Benchmark
     public void deserialize(Blackhole bh) {
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        ApiOperation<SerializableStruct, SerializableStruct> op =
-                (ApiOperation) state.operation;
         bh.consume(
-                protocol.deserializeResponse(op, state.context, state.typeRegistry, state.request, state.response));
+                protocol.deserializeResponse(
+                        operation(),
+                        state.context,
+                        state.typeRegistry,
+                        state.request,
+                        state.response));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ApiOperation<SerializableStruct, SerializableStruct> operation() {
+        return (ApiOperation) state.operation;
     }
 }

@@ -16,10 +16,6 @@ import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-/**
- * JMH benchmarks for RPC v2 CBOR request serialization. Drives
- * {@link RpcV2CborProtocol#createRequest}.
- */
 @State(Scope.Benchmark)
 public class RpcV2CborSerializeBenchmark {
 
@@ -27,6 +23,9 @@ public class RpcV2CborSerializeBenchmark {
             "software.amazon.smithy.java.benchmarks.serde.generated.rpcv2cbor.model";
     private static final ShapeId SERVICE_ID =
             ShapeId.from("com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane");
+
+    @Param("generic")
+    public String implementation;
 
     @Param({
             "rpcv2Cbor_WideTypesRequest_S",
@@ -52,15 +51,22 @@ public class RpcV2CborSerializeBenchmark {
 
     @Setup
     public void setup() {
+        boolean generated = "generated".equals(implementation);
+        if (generated && Runtime.version().feature() < 25) {
+            throw new IllegalStateException("Runtime codegen unavailable on " + Runtime.version());
+        }
+        System.setProperty("smithy-java.runtime-codegen", generated ? "enabled" : "disabled");
         protocol = new RpcV2CborProtocol(SERVICE_ID);
         state = SerializeState.forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID);
     }
 
     @Benchmark
     public void serialize(Blackhole bh) {
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        ApiOperation<SerializableStruct, SerializableStruct> op =
-                (ApiOperation) state.operation;
-        bh.consume(protocol.createRequest(op, state.input, state.context, state.endpoint));
+        bh.consume(protocol.createRequest(operation(), state.input, state.context, state.endpoint));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ApiOperation<SerializableStruct, SerializableStruct> operation() {
+        return (ApiOperation) state.operation;
     }
 }

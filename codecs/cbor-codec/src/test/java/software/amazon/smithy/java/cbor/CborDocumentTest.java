@@ -242,7 +242,7 @@ public class CborDocumentTest {
         base.binary = ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8));
         base.date = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         base.numbers.addAll(List.of(1, 2, 3));
-        var codec = Rpcv2CborCodec.builder().build();
+        var codec = Rpcv2CborCodec.builder().runtimeCodegen(false).build();
         var ser = codec.serialize(base.build());
         var de = codec.createDeserializer(ser);
         var document = de.readDocument();
