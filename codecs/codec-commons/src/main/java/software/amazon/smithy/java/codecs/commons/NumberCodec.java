@@ -434,6 +434,7 @@ public final class NumberCodec {
     }
 
     public static int writeBigDecimal(byte[] buf, int pos, BigDecimal value) {
+        // TODO: Bound plain-notation expansion before calling BigDecimal.toPlainString.
         int scale = value.scale();
         if (value.unscaledValue().bitLength() < 64) {
             if (scale == 0) {
