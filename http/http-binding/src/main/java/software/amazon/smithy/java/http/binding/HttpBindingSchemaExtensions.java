@@ -204,6 +204,7 @@ public final class HttpBindingSchemaExtensions
         final int headerCount;
         // Lazy PathSerializer — built on first request through {@link #pathSerializer}.
         private volatile PathSerializer pathSerializer;
+        private volatile HttpBindingWriter bindingWriter;
 
         RequestBinding(
                 Binding[] bindings,
@@ -251,6 +252,22 @@ public final class HttpBindingSchemaExtensions
             p = new PathSerializer(httpTrait, inputSchema);
             pathSerializer = p;
             return p;
+        }
+
+        HttpBindingWriter bindingWriter(Schema schema, boolean strict) {
+            var w = bindingWriter;
+            if (w == null) {
+                w = HttpBindingCodegen.writerOrSentinel(schema, false, strict);
+                bindingWriter = w;
+            }
+            if (w == HttpBindingCodegen.NO_BINDING_WRITER) {
+                if (strict) {
+                    // Surface the cached decline or generation failure.
+                    HttpBindingCodegen.writerOrSentinel(schema, false, true);
+                }
+                return null;
+            }
+            return w;
         }
 
         boolean writeBody(boolean omitEmptyPayload) {
@@ -309,6 +326,7 @@ public final class HttpBindingSchemaExtensions
         // Lazy cache for the codec output of an empty struct (no body members + no payload + force-write-empty).
         // Bytes are determined by codec + schema, so caching once and duplicating views per request is safe.
         private volatile ByteBuffer cachedEmptyBody;
+        private volatile HttpBindingWriter bindingWriter;
 
         ResponseBinding(
                 Binding[] bindings,
@@ -351,6 +369,22 @@ public final class HttpBindingSchemaExtensions
                 cachedEmptyBody = b;
             }
             return b.duplicate();
+        }
+
+        HttpBindingWriter bindingWriter(Schema schema, boolean strict) {
+            var w = bindingWriter;
+            if (w == null) {
+                w = HttpBindingCodegen.writerOrSentinel(schema, true, strict);
+                bindingWriter = w;
+            }
+            if (w == HttpBindingCodegen.NO_BINDING_WRITER) {
+                if (strict) {
+                    // Surface the cached decline or generation failure.
+                    HttpBindingCodegen.writerOrSentinel(schema, true, true);
+                }
+                return null;
+            }
+            return w;
         }
     }
 
@@ -574,8 +608,7 @@ public final class HttpBindingSchemaExtensions
         Schema[] queryArr = toArray(queries);
         String[] queryWireNames = queryWireNames(queryArr);
 
-        // +4 covers auto-set headers (Content-Type, Content-Length, …); cap at 32 to avoid
-        // over-allocating for AWS-S3-style structs that declare 50+ headers but populate few.
+        // +4 covers auto-set headers; cap at 32 to avoid over-allocating sparse, wide inputs.
         int headerCount = Math.min(headers.size() + prefixHeaders.size() + 4, 32);
 
         // True iff the @httpPayload member targets a STRUCTURE shape

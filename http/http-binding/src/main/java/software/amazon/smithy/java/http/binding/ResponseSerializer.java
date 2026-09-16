@@ -12,6 +12,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.RuntimeCodegenMode;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.core.serde.event.ProtocolEventStreamWriter;
@@ -31,8 +32,11 @@ public final class ResponseSerializer {
     private boolean omitEmptyPayload = false;
     private HeaderErrorSerializer headerErrorSerializer = HeaderErrorSerializer.AMZN_ERROR_HEADER;
     private Context context = Context.empty();
+    private final RuntimeCodegenMode runtimeCodegen;
 
-    ResponseSerializer() {}
+    ResponseSerializer(RuntimeCodegenMode runtimeCodegen) {
+        this.runtimeCodegen = runtimeCodegen;
+    }
 
     /**
      * Schema of the operation response to serialize.
@@ -160,7 +164,8 @@ public final class ResponseSerializer {
                 isFailure,
                 false,
                 headerErrorSerializer,
-                context);
+                context,
+                runtimeCodegen);
         shapeValue.serialize(serializer);
         serializer.flush();
 
