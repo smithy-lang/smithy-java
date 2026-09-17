@@ -319,6 +319,37 @@ public class JsonSerializerTest extends ProviderTestBase {
     }
 
     @PerProvider
+    public void writesModeledStructureDocumentInsideStructure(JsonSerdeProvider provider) throws Exception {
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Outer"))
+                .putMember("payload", PreludeSchemas.DOCUMENT)
+                .build();
+        var value = new SerializableStruct() {
+            @Override
+            public Schema schema() {
+                return schema;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                serializer.writeDocument(schema.member("payload"), Document.of(new NestedStruct()));
+            }
+
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                return null;
+            }
+        };
+
+        try (var codec = codecBuilder(provider).serializeTypeInDocuments(false).build();
+                var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeStruct(schema, value);
+            }
+            assertThat(output.toString(StandardCharsets.UTF_8), equalTo("{\"payload\":{\"number\":10}}"));
+        }
+    }
+
+    @PerProvider
     public void writesDunderTypeForEmptyStruct(JsonSerdeProvider provider) throws Exception {
         var struct = new EmptyStruct();
         var document = Document.of(struct);

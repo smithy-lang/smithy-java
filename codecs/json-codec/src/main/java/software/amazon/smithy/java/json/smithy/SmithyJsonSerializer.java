@@ -709,15 +709,27 @@ final class SmithyJsonSerializer implements ShapeSerializer {
                 throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
             }
             parent.needsComma[parent.depth] = false;
+
+            byte[][] savedTable = parent.currentFieldNameTable;
+            Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
+            var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
+            if (ext != null) {
+                parent.currentFieldNameTable =
+                        parent.useJsonName ? ext.jsonFieldNameTable() : ext.memberFieldNameTable();
+            } else {
+                parent.currentFieldNameTable = null;
+            }
+
             if (parent.settings.serializeTypeInDocuments()) {
                 parent.needsComma[parent.depth] = true;
-                String typeValue = schema.id().toString();
+                String typeValue = structSchema.id().toString();
                 parent.ensureCapacity("__type".length() + 2 + 1 + typeValue.length() + 2);
                 parent.writeQuotedStringExact("__type");
                 parent.buf[parent.pos++] = ':';
                 parent.writeQuotedStringExact(typeValue);
             }
             struct.serializeMembers(parent.structSerializer);
+            parent.currentFieldNameTable = savedTable;
             parent.depth--;
             parent.ensureCapacity(1);
             parent.buf[parent.pos++] = '}';
