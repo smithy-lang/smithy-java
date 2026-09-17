@@ -98,7 +98,7 @@ public final class RequestDeserializer {
             throw new IllegalStateException("inputShapeBuilder must be set");
         }
 
-        deserBuilder.isResponse(false);
+        deserBuilder.isResponse(false).directBodyBuilder(inputShapeBuilder);
         HttpBindingDeserializer deserializer = deserBuilder.build();
 
         inputShapeBuilder.deserialize(deserializer);
