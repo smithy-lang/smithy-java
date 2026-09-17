@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -199,9 +200,13 @@ public final class CborReadUtil {
         if (CborDeserializer.isIndefinite(len)) {
             return new String(readBytesIndefinite(buffer, off, CborDeserializer.itemLength(len)),
                     StandardCharsets.UTF_8);
-        } else {
-            return new String(buffer, off, len, StandardCharsets.UTF_8);
         }
+        // The UTF-8 constructor already uses an intrinsic; avoid an extra scalar scan.
+        if (CompactStringAccess.isCountPositivesIntrinsic()
+                && CompactStringAccess.countPositives(buffer, off, len) == len) {
+            return CompactStringAccess.asciiString(buffer, off, len);
+        }
+        return new String(buffer, off, len, StandardCharsets.UTF_8);
     }
 
     public static byte[] readByteString(byte[] buffer, int off, int len) {
