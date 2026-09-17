@@ -9,8 +9,10 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,6 +33,14 @@ import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 public class XmlCodecTest extends ProviderTestBase {
+
+    @Test
+    public void defaultsToSmithyProvider() {
+        try (var codec = XmlCodec.builder().build();
+                var serializer = codec.createSerializer(new ByteArrayOutputStream())) {
+            assertInstanceOf(LazyXmlSerializer.class, serializer);
+        }
+    }
 
     @PerProvider
     public void deserializesXml(boolean useNative) {

@@ -17,8 +17,8 @@ import software.amazon.smithy.java.json.jackson.JacksonJsonSerdeProvider;
 /**
  * Native JSON serde provider for smithy-java.
  *
- * <p>Can be explicitly selected via system property:
- * {@code -Dsmithy-java.json-provider=smithy}
+ * <p>This is the default provider. Jackson can be selected using
+ * {@code -Dsmithy-java.json-provider=jackson}.
  */
 public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
 
@@ -26,7 +26,7 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
 
     @Override
     public int getPriority() {
-        return 5;
+        return 10;
     }
 
     @Override

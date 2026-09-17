@@ -27,7 +27,7 @@ import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 public final class XmlCodec implements Codec {
 
     private static final boolean USE_SMITHY_NATIVE =
-            "smithy".equals(System.getProperty("smithy-java.xml-provider"));
+            !"stax".equals(System.getProperty("smithy-java.xml-provider"));
 
     private volatile XMLInputFactory xmlInputFactory;
     private volatile XMLOutputFactory xmlOutputFactory;
@@ -176,9 +176,9 @@ public final class XmlCodec implements Codec {
         }
 
         /**
-         * Override the native provider selection for testing. When set to true, the native
-         * (high-performance) implementation is used regardless of system property. When false,
-         * the StAX implementation is used.
+         * Override the native provider selection for testing. When set to true, the Smithy
+         * implementation is used regardless of system property. When false, the StAX
+         * implementation is used.
          */
         Builder useNative(boolean useNative) {
             this.useNative = useNative;

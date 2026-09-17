@@ -590,7 +590,14 @@ public class JsonSerializerTest extends ProviderTestBase {
     public void smithyProviderNameAndPriority() {
         var provider = new SmithyJsonSerdeProvider();
         assertThat(provider.getName(), equalTo("smithy"));
-        assertThat(provider.getPriority(), equalTo(5));
+        assertThat(provider.getPriority(), equalTo(10));
+    }
+
+    @Test
+    public void defaultsToSmithyProvider() {
+        Assertions.assertInstanceOf(
+                SmithyJsonSerdeProvider.class,
+                JsonSettings.builder().build().provider());
     }
 
     @Test
