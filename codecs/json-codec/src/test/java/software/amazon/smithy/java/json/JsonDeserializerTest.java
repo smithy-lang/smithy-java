@@ -1579,6 +1579,64 @@ public class JsonDeserializerTest extends ProviderTestBase {
         }
     }
 
+    @PerProvider
+    public void nullMemberValuePassedToConsumerWhenSupported(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    "{\"name\":null,\"Color\":\"red\"}".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            List<Boolean> nullFlags = new ArrayList<>();
+            de.readStruct(JsonTestData.BIRD, members, new ShapeDeserializer.StructMemberConsumer<>() {
+                @Override
+                public void accept(Set<String> state, Schema member, ShapeDeserializer deser) {
+                    state.add(member.memberName());
+                    nullFlags.add(deser.isNull());
+                    if (deser.isNull()) {
+                        deser.readNull();
+                    } else {
+                        deser.readString(member);
+                    }
+                }
+
+                @Override
+                public boolean supportsNullValues(Schema memberSchema) {
+                    return true;
+                }
+            });
+            // "name" was null but consumer was still called because supportsNullValues is true
+            assertThat(members, contains("name", "color"));
+            assertThat(nullFlags, contains(true, false));
+        }
+    }
+
+    @PerProvider
+    public void nullMemberValueSkippedWhenNotSupportedBySpecificMember(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useJsonName(true).build()) {
+            var de = codec.createDeserializer(
+                    "{\"name\":null,\"Color\":null,\"nested\":\"hi\"}".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+            de.readStruct(JsonTestData.BIRD, members, new ShapeDeserializer.StructMemberConsumer<>() {
+                @Override
+                public void accept(Set<String> state, Schema member, ShapeDeserializer deser) {
+                    state.add(member.memberName());
+                    if (deser.isNull()) {
+                        deser.readNull();
+                    } else {
+                        deser.readString(member);
+                    }
+                }
+
+                @Override
+                public boolean supportsNullValues(Schema memberSchema) {
+                    // Only support null for "name", not for "color"
+                    return memberSchema.memberName().equals("name");
+                }
+            });
+            // "name" null is passed through, "color" null is skipped
+            assertThat(members, contains("name", "nested"));
+        }
+    }
+
     @ParameterizedTest
     @MethodSource("smithyOnly")
     public void rejectsNonObjectForMap(JsonSerdeProvider provider) {

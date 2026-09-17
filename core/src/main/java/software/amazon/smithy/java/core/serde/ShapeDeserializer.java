@@ -254,6 +254,20 @@ public interface ShapeDeserializer extends AutoCloseable {
         void accept(T state, Schema memberSchema, ShapeDeserializer memberDeserializer);
 
         default void unknownMember(T state, String memberName) {}
+
+        /**
+         * Returns whether a given member supports explicit null values during deserialization.
+         *
+         * <p>When this returns {@code true}, the deserializer will invoke {@link #accept} for the member
+         * even when the serialized value is null, allowing the consumer to distinguish between an absent
+         * field and an explicitly null value.
+         *
+         * @param memberSchema Schema of the member to check.
+         * @return {@code true} if the member should receive null values, {@code false} to skip them.
+         */
+        default boolean supportsNullValues(Schema memberSchema) {
+            return false;
+        }
     }
 
     /**

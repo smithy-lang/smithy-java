@@ -8,10 +8,12 @@ package software.amazon.smithy.java.codegen.generators;
 import java.util.Map;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.ErrorTrait;
@@ -56,7 +58,15 @@ record StructureDeserializerGenerator(
                             @Override
                             public void unknownMember(Builder builder, ${string:T} memberName) {
                                 builder.$$unknownMember(memberName);
-                            }${/union}
+                            }${/union}${?supportsNullValues}
+
+                            @Override
+                            public boolean supportsNullValues(${sdkSchema:T} member) {
+                                return switch (member.memberIndex()) {
+                                    ${nullValueCases:C|}
+                                    default -> false;
+                                };
+                            }${/supportsNullValues}
                         }""";
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
@@ -66,6 +76,8 @@ record StructureDeserializerGenerator(
         writer.putContext("union", shape.isUnionShape());
         writer.putContext("illegalArg", IllegalArgumentException.class);
         writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
+        writer.putContext("supportsNullValues", hasMembersThatSupportsNullValues(shape));
+        writer.putContext("nullValueCases", writer.consumer(this::generateMemberNullValuesSwitchCases));
         writer.write(template);
         writer.popState();
     }
@@ -82,5 +94,32 @@ record StructureDeserializerGenerator(
                     new DeserializerGenerator(writer, member, symbolProvider, model, renames, "de", "member"));
             writer.popState();
         }
+    }
+
+    private void generateMemberNullValuesSwitchCases(JavaWriter writer) {
+        int idx = 0;
+        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
+            var member = iter.next();
+
+            if (memberSupportsNullValues(member)) {
+                writer.write("case $L -> true;", idx);
+            }
+        }
+    }
+
+    private boolean hasMembersThatSupportsNullValues(Shape shape) {
+        return shape.getAllMembers()
+                .values()
+                .stream()
+                .anyMatch(this::memberSupportsNullValues);
+    }
+
+    private boolean memberSupportsNullValues(MemberShape member) {
+        var memberSymbol = symbolProvider.toSymbol(member);
+        if (memberSymbol == null) {
+            return false;
+        }
+
+        return memberSymbol.getProperty(SymbolProperties.SUPPORTS_NULL_VALUES).orElse(false);
     }
 }
