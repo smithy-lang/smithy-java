@@ -42,9 +42,6 @@ public final class WorkloadRunner {
         if (System.getProperty("jdk.httpclient.maxframesize") == null) {
             System.setProperty("jdk.httpclient.maxframesize", "65536");
         }
-        if (System.getProperty("smithy-java.json-provider") == null) {
-            System.setProperty("smithy-java.json-provider", "smithy");
-        }
         if (!"true".equals(System.getProperty("smithy.bench.debug"))) {
             LogManager.getLogManager().reset();
             Logger.getLogger("").setLevel(java.util.logging.Level.WARNING);

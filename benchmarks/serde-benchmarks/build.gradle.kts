@@ -182,8 +182,6 @@ jmh {
         "-Xmx1g",
         "-XX:+UseG1GC",
         "-XX:+AlwaysPreTouch",
-        "-Dsmithy-java.json-provider=smithy",
-        "-Dsmithy-java.xml-provider=smithy",
     )
     providers.gradleProperty("jmh.testCaseId").orNull?.let { id ->
         val prop = objects.listProperty(String::class.java)

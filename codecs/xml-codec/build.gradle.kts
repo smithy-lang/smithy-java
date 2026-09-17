@@ -15,10 +15,6 @@ dependencies {
     smithyBuild(project(":codegen:codegen-plugin"))
 }
 
-tasks.named<Test>("test") {
-    systemProperty("smithy-java.xml-provider", "smithy")
-}
-
 afterEvaluate {
     val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen").get()
     sourceSets.named("test") {
