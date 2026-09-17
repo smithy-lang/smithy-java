@@ -111,6 +111,11 @@ public sealed interface IntEnumType extends SmithyIntEnum, SerializableShape {
     record $Unknown(int value) implements IntEnumType {
 
         @Override
+        public void serialize(ShapeSerializer serializer) {
+            throw new UnsupportedOperationException("Cannot serialize enum with unknown value " + this.value);
+        }
+
+        @Override
         public int getValue() {
             return value;
         }
