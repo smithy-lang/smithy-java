@@ -217,11 +217,18 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.pushState();
             writer.putContext("objects", Objects.class);
             writer.putContext("toString", new ToStringGenerator(writer));
+            writer.putContext("shapeSerializer", ShapeSerializer.class);
+            writer.putContext("unsupportedOperation", UnsupportedOperationException.class);
             var template = """
                     record $$Unknown(${value:T} value) implements ${shape:T} {${?string}
                         public $$Unknown {
                             ${objects:T}.requireNonNull(value, "Value cannot be null");
                         }${/string}
+
+                        @Override
+                        public void serialize(${shapeSerializer:T} serializer) {
+                            throw new ${unsupportedOperation:T}("Cannot serialize enum with unknown value " + this.value);
+                        }
 
                         @Override
                         public ${value:T} getValue() {
