@@ -112,6 +112,52 @@ class BytecodeWalkerTest {
     }
 
     @Test
+    void testBuildTemplateInstruction() {
+        byte[] bytecode = {
+                Opcodes.BUILD_TEMPLATE,
+                3,
+                TemplateSegmentType.LITERAL,
+                0,
+                5,
+                TemplateSegmentType.REGISTER,
+                2,
+                TemplateSegmentType.REGISTER_PROPERTY,
+                3,
+                0,
+                10,
+                Opcodes.RETURN_VALUE
+        };
+        BytecodeWalker walker = new BytecodeWalker(bytecode);
+
+        assertEquals(11, walker.getInstructionLength());
+        assertEquals(1, walker.getOperandCount());
+        assertEquals(3, walker.getOperand(0));
+        assertTrue(walker.advance());
+        assertEquals(11, walker.getPosition());
+        assertEquals(Opcodes.RETURN_VALUE, walker.currentOpcode());
+    }
+
+    @Test
+    void rejectsMalformedBuildTemplateInstruction() {
+        BytecodeWalker unknownSegment = new BytecodeWalker(new byte[] {
+                Opcodes.BUILD_TEMPLATE,
+                1,
+                99
+        });
+        BytecodeWalker truncatedSegment = new BytecodeWalker(new byte[] {
+                Opcodes.BUILD_TEMPLATE,
+                1,
+                TemplateSegmentType.REGISTER_PROPERTY,
+                0
+        });
+
+        assertEquals(-1, unknownSegment.getInstructionLength());
+        assertFalse(unknownSegment.advance());
+        assertEquals(-1, truncatedSegment.getInstructionLength());
+        assertFalse(truncatedSegment.advance());
+    }
+
+    @Test
     void testEmptyBytecode() {
         BytecodeWalker walker = new BytecodeWalker(new byte[0]);
 

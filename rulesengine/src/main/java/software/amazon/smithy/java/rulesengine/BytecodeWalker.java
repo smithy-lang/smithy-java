@@ -67,7 +67,10 @@ final class BytecodeWalker {
         if (!hasNext()) {
             return -1;
         }
-        int length = getInstructionLength(code.get(pc));
+        byte opcode = code.get(pc);
+        int length = opcode == Opcodes.BUILD_TEMPLATE
+                ? getBuildTemplateInstructionLength()
+                : getInstructionLength(opcode);
         // Validate the full instruction fits within the buffer
         if (length > 0 && pc + length > code.limit()) {
             return -1;
@@ -93,7 +96,7 @@ final class BytecodeWalker {
                     Opcodes.TEST_REGISTER_IS_TRUE, Opcodes.TEST_REGISTER_IS_FALSE, Opcodes.RETURN_ENDPOINT,
                     Opcodes.LOAD_CONST_W, Opcodes.GET_PROPERTY, Opcodes.JNN_OR_POP, Opcodes.GET_NEGATIVE_INDEX,
                     Opcodes.JMP_IF_FALSE, Opcodes.JUMP, Opcodes.SET_REG_RETURN, Opcodes.BUILD_URI,
-                    Opcodes.RESOLVE_TEMPLATE ->
+                    Opcodes.RESOLVE_TEMPLATE, Opcodes.BUILD_TEMPLATE ->
                 1;
             case Opcodes.GET_PROPERTY_REG, Opcodes.GET_INDEX_REG, Opcodes.GET_NEGATIVE_INDEX_REG,
                     Opcodes.STRING_EQUALS_REG_CONST ->
@@ -161,8 +164,9 @@ final class BytecodeWalker {
                 break;
 
             case Opcodes.RESOLVE_TEMPLATE:
+            case Opcodes.BUILD_TEMPLATE:
                 if (index == 0) {
-                    return code.get(pc + 1) & 0xFF; // arg count
+                    return code.get(pc + 1) & 0xFF; // argument or segment count
                 }
                 break;
 
@@ -223,6 +227,35 @@ final class BytecodeWalker {
         }
 
         throw new IllegalArgumentException("Invalid operand index " + index + " for opcode " + opcode);
+    }
+
+    private int getBuildTemplateInstructionLength() {
+        if (pc + 2 > code.limit()) {
+            return -1;
+        }
+
+        int segmentCount = code.get(pc + 1) & 0xFF;
+        int cursor = pc + 2;
+        for (int i = 0; i < segmentCount; i++) {
+            if (cursor >= code.limit()) {
+                return -1;
+            }
+            int segmentType = code.get(cursor++) & 0xFF;
+            int operandLength = switch (segmentType) {
+                case TemplateSegmentType.LITERAL -> 2;
+                case TemplateSegmentType.REGISTER -> 1;
+                case TemplateSegmentType.REGISTER_PROPERTY -> 3;
+                default -> -1;
+            };
+            if (operandLength < 0) {
+                return -1;
+            }
+            cursor += operandLength;
+            if (cursor > code.limit()) {
+                return -1;
+            }
+        }
+        return cursor - pc;
     }
 
     public int getJumpTarget() {
