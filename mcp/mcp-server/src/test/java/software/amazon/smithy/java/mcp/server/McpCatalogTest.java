@@ -175,8 +175,7 @@ class McpCatalogTest {
     }
 
     @Test
-    void refreshRetainsAdvertisedPagesAndExistingCursors() throws Exception {
-        var refreshComplete = new CountDownLatch(1);
+    void refreshRetainsAdvertisedPagesAndExistingCursors() {
         var listings = new AtomicInteger();
         var remote = new TestRemoteClient("refreshing-pages") {
             @Override
@@ -186,7 +185,6 @@ class McpCatalogTest {
                             List.of(tool("FirstTool")),
                             () -> McpPage.last(List.of(tool("SecondTool"))));
                 }
-                refreshComplete.countDown();
                 return McpPage.last(List.of(tool("RefreshedFirstTool")));
             }
         };
@@ -204,7 +202,9 @@ class McpCatalogTest {
                     .jsonrpc("2.0")
                     .method(McpMethod.Standard.NOTIFICATIONS_TOOLS_LIST_CHANGED.wireName())
                     .build());
-            assertTrue(refreshComplete.await(2, SECONDS));
+            assertEquals(1, listings.get(), "Notifications must not fetch on their own");
+            assertEquals(List.of("RefreshedFirstTool"), toolNames(catalog.listTools(null)));
+            assertEquals(2, listings.get());
 
             assertNotNull(catalog.tool("SecondTool"));
             assertEquals(
@@ -587,47 +587,6 @@ class McpCatalogTest {
             engine.addRemoteClient(remote);
 
             assertEquals(KnownProtocolVersion.V2024_11_05, observedVersion.get());
-        }
-    }
-
-    @Test
-    void notificationRefreshDoesNotRunOnTheNotifyingThread() throws Exception {
-        var refreshEntered = new CountDownLatch(1);
-        var releaseRefresh = new CountDownLatch(1);
-        var calls = new AtomicInteger();
-        var remote = new TestRemoteClient("notifying") {
-            @Override
-            public McpPage<ToolInfo> listTools() {
-                if (calls.incrementAndGet() > 1) {
-                    refreshEntered.countDown();
-                    try {
-                        assertTrue(releaseRefresh.await(5, SECONDS));
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new McpRemoteException("interrupted", e);
-                    }
-                }
-                return McpPage.last(List.of(tool("notifying-tool")));
-            }
-        };
-
-        try (var catalog = new McpCatalog(Map.of(), List.of(remote))) {
-            try {
-                catalog.bindTransport(ignored -> {}, ignored -> {});
-                catalog.initializeRemoteClients(
-                        BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25));
-
-                var notification = JsonRpcRequest.builder()
-                        .jsonrpc("2.0")
-                        .method(McpMethod.Standard.NOTIFICATIONS_TOOLS_LIST_CHANGED.wireName())
-                        .build();
-                assertTimeoutPreemptively(
-                        Duration.ofMillis(500),
-                        () -> remote.sendNotification(notification));
-                assertTrue(refreshEntered.await(2, SECONDS));
-            } finally {
-                releaseRefresh.countDown();
-            }
         }
     }
 

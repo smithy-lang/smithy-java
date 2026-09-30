@@ -2123,7 +2123,7 @@ public class StdioMcpServerTest {
     }
 
     @Test
-    void testToolsListChangedNotificationInvalidatesCache() throws InterruptedException {
+    void testToolsListChangedNotificationInvalidatesCache() {
         var callCounter = new AtomicInteger(0);
         var mockProxy = new CacheTestProxy(callCounter);
 
@@ -2176,15 +2176,9 @@ public class StdioMcpServerTest {
         assertEquals(1, notifications.size());
         assertEquals("notifications/tools/list_changed", notifications.get(0).getMethod());
 
-        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
-            while (callCounter.get() < 2) {
-                Thread.sleep(10);
-            }
-        });
-
-        // Third tools/list - should use the asynchronously refreshed cache
+        // Third tools/list - waits for the asynchronously refreshed cache
         service.execute(toolsRequest, ProtocolVersion.defaultVersion());
-        assertEquals(2, callCounter.get(), "Notification should refresh before the third call");
+        assertEquals(2, callCounter.get(), "Listing must wait for the refresh");
 
         // Fourth tools/list - uses cache again (counter should NOT increment)
         service.execute(toolsRequest, ProtocolVersion.defaultVersion());

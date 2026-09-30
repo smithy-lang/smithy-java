@@ -16,12 +16,12 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.function.UnaryOperator;
@@ -54,7 +54,6 @@ final class McpCatalog implements McpSources {
     private final AtomicReference<CompletableFuture<Void>> remoteStart = new AtomicReference<>();
     private final Map<RemoteCatalogKey, RemoteLoadState> remoteCatalogLoads =
             new ConcurrentHashMap<>();
-    private final ExecutorService notificationRefreshes = Executors.newVirtualThreadPerTaskExecutor();
     private final Map<McpRemoteClient, RefreshState> toolRefreshStates = new ConcurrentHashMap<>();
     private final Map<McpRemoteClient, RefreshState> promptRefreshStates = new ConcurrentHashMap<>();
     private final Map<String, PageCursor<ToolInfo>> toolCursors = new ConcurrentHashMap<>();
@@ -139,6 +138,7 @@ final class McpCatalog implements McpSources {
     @Override
     public McpCursorPage<McpToolDescriptor> listTools(String cursor) {
         if (cursor == null) {
+            ensureFresh(toolRefreshStates);
             var current = state.get();
             var pending = current.toolContinuations()
                     .entrySet()
@@ -163,6 +163,7 @@ final class McpCatalog implements McpSources {
     @Override
     public McpCursorPage<McpPromptDescriptor> listPrompts(String cursor) {
         if (cursor == null) {
+            ensureFresh(promptRefreshStates);
             var current = state.get();
             var pending = current.promptContinuations()
                     .entrySet()
@@ -303,7 +304,6 @@ final class McpCatalog implements McpSources {
 
     @Override
     public void close() {
-        notificationRefreshes.shutdownNow();
         remoteClients().values().forEach(client -> {
             try {
                 client.close();
@@ -393,9 +393,9 @@ final class McpCatalog implements McpSources {
 
     private void onRemoteNotification(McpRemoteClient client, JsonRpcRequest notification) {
         if (McpMethod.Standard.NOTIFICATIONS_TOOLS_LIST_CHANGED.wireName().equals(notification.getMethod())) {
-            scheduleRefresh(client, toolRefreshStates, this::refreshTools);
+            invalidate(client, toolRefreshStates, this::refreshTools);
         } else if (McpMethod.Standard.NOTIFICATIONS_PROMPTS_LIST_CHANGED.wireName().equals(notification.getMethod())) {
-            scheduleRefresh(client, promptRefreshStates, this::refreshPrompts);
+            invalidate(client, promptRefreshStates, this::refreshPrompts);
         }
         notificationWriters.forEach(writer -> writer.accept(notification));
     }
@@ -404,25 +404,26 @@ final class McpCatalog implements McpSources {
         responseWriters.forEach(writer -> writer.accept(response));
     }
 
-    private void scheduleRefresh(
+    private void invalidate(
             McpRemoteClient client,
             Map<McpRemoteClient, RefreshState> states,
             Consumer<McpRemoteClient> refresh
     ) {
-        var state = states.computeIfAbsent(client, ignored -> new RefreshState());
-        if (state.request()) {
-            notificationRefreshes.submit(() -> runScheduledRefreshes(client, state, refresh));
-        }
+        states.computeIfAbsent(client, ignored -> new RefreshState(client.name(), () -> refresh.accept(client)))
+                .invalidate();
     }
 
-    private void runScheduledRefreshes(
-            McpRemoteClient client,
-            RefreshState state,
-            Consumer<McpRemoteClient> refresh
-    ) {
-        while (state.takeRequest()) {
-            refresh.accept(client);
-        }
+    private void ensureFresh(Map<McpRemoteClient, RefreshState> states) {
+        states.values().forEach(state -> {
+            try {
+                state.ensureFresh();
+            } catch (RuntimeException e) {
+                // RefreshState logs the failure; a protocol error avoids a second engine log.
+                var error = new McpProtocolException(-32603, "Internal error");
+                error.initCause(e);
+                throw error;
+            }
+        });
     }
 
     private void refresh(McpRemoteClient client) {
@@ -452,29 +453,21 @@ final class McpCatalog implements McpSources {
     }
 
     private void refreshTools(McpRemoteClient client) {
-        try {
-            mergeRemoteSnapshot(
-                    client,
-                    client.listTools(),
-                    true,
-                    McpPage.last(List.of()),
-                    false);
-        } catch (RuntimeException e) {
-            LOG.error("Failed to refresh tools from remote MCP client: " + client.name(), e);
-        }
+        mergeRemoteSnapshot(
+                client,
+                client.listTools(),
+                true,
+                McpPage.last(List.of()),
+                false);
     }
 
     private void refreshPrompts(McpRemoteClient client) {
-        try {
-            mergeRemoteSnapshot(
-                    client,
-                    McpPage.last(List.of()),
-                    false,
-                    client.listPrompts(),
-                    true);
-        } catch (RuntimeException e) {
-            LOG.error("Failed to refresh prompts from remote MCP client: " + client.name(), e);
-        }
+        mergeRemoteSnapshot(
+                client,
+                McpPage.last(List.of()),
+                false,
+                client.listPrompts(),
+                true);
     }
 
     private void mergeRemoteSnapshot(
@@ -874,30 +867,54 @@ final class McpCatalog implements McpSources {
         }
     }
 
-    private static final class RefreshState {
-        private static final int RUNNING = 1;
-        private static final int REQUESTED = 1 << 1;
+    /**
+     * Tracks whether a remote catalog listing is stale after a list-changed notification.
+     *
+     * <p>Notifications only mark the state dirty. The next top-level listing performs the
+     * fetch under a lock so that concurrent listings share a single refresh and none of
+     * them observe the catalog before that refresh has been merged.
+     */
+    private final class RefreshState {
+        private final String clientName;
+        private final Runnable action;
+        private final ReentrantLock lock = new ReentrantLock();
+        private final AtomicBoolean dirty = new AtomicBoolean();
+        private RuntimeException lastFailure;
+        private long retryAfterNanos;
 
-        private final AtomicInteger state = new AtomicInteger();
-
-        boolean request() {
-            while (true) {
-                var current = state.get();
-                var updated = current | RUNNING | REQUESTED;
-                if (state.compareAndSet(current, updated)) {
-                    return (current & RUNNING) == 0;
-                }
-            }
+        RefreshState(String clientName, Runnable action) {
+            this.clientName = clientName;
+            this.action = action;
         }
 
-        boolean takeRequest() {
-            while (true) {
-                var current = state.get();
-                var hasRequest = (current & REQUESTED) != 0;
-                var updated = hasRequest ? current & ~REQUESTED : 0;
-                if (state.compareAndSet(current, updated)) {
-                    return hasRequest;
+        void invalidate() {
+            dirty.set(true);
+        }
+
+        void ensureFresh() {
+            lock.lock();
+            try {
+                while (dirty.get()) {
+                    if (lastFailure != null && nanoTime.getAsLong() < retryAfterNanos) {
+                        throw new McpRemoteException(
+                                "Catalog refresh from " + clientName + " is cooling down",
+                                lastFailure);
+                    }
+                    // Cleared before the fetch so an invalidation during it triggers another pass.
+                    dirty.set(false);
+                    try {
+                        action.run();
+                        lastFailure = null;
+                    } catch (RuntimeException e) {
+                        dirty.set(true);
+                        lastFailure = e;
+                        retryAfterNanos = nanoTime.getAsLong() + remoteRetryCooldownNanos;
+                        LOG.error("Failed to refresh catalog from: " + clientName, e);
+                        throw e;
+                    }
                 }
+            } finally {
+                lock.unlock();
             }
         }
     }
