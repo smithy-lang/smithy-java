@@ -11,6 +11,7 @@ import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -21,11 +22,14 @@ import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.mcp.OneOfTrait;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
  * Adapts schemaless MCP documents to and from Smithy runtime values.
@@ -67,7 +71,7 @@ final class SmithyDocumentAdapter {
                 case BLOB -> document;
                 default -> badType(fromType, toType);
             };
-            case TIMESTAMP -> adaptTimestamp(document);
+            case TIMESTAMP -> adaptTimestamp(document, schema, false);
             case STRUCTURE -> {
                 var converted = new HashMap<String, Document>();
                 for (var member : schema.members()) {
@@ -119,7 +123,7 @@ final class SmithyDocumentAdapter {
             case BIG_DECIMAL -> Document.of(document.asBigDecimal().toString());
             case BIG_INTEGER -> Document.of(document.asBigInteger().toString());
             case BLOB -> Document.of(Base64.getEncoder().encodeToString(ByteBufferUtils.getBytes(document.asBlob())));
-            case TIMESTAMP -> adaptTimestamp(document);
+            case TIMESTAMP -> adaptTimestamp(document, schema, true);
             case STRUCTURE -> {
                 var converted = new HashMap<String, Document>();
                 for (var member : schema.members()) {
@@ -189,15 +193,28 @@ final class SmithyDocumentAdapter {
         }
 
         var discriminator = document.getMember(oneOf.getDiscriminator());
-        if (discriminator == null) {
+        var shapeId = discriminator == null
+                ? oneOf.getDefaultTarget().orElse(null)
+                : ShapeId.from(discriminator.asString());
+        if (shapeId == null) {
             return document;
         }
 
-        var shapeId = ShapeId.from(discriminator.asString());
+        // Bundle loading may skip model validation.
+        if (discriminator == null
+                && oneOf.getMembers().stream().filter(member -> member.getTarget().equals(shapeId)).count() != 1) {
+            throw new SerializationException("The oneOf defaultTarget `" + shapeId
+                    + "` must identify exactly one member of " + targetSchema.id());
+        }
         for (var member : oneOf.getMembers()) {
             if (member.getTarget().equals(shapeId)) {
+                var variantSchema = schemaIndex.getSchema(shapeId);
+                if (discriminator == null && variantSchema.type() != ShapeType.STRUCTURE) {
+                    throw new SerializationException("The oneOf defaultTarget `" + shapeId
+                            + "` must target a structure");
+                }
                 var converted = new HashMap<>(
-                        fromSmithy(document, schemaIndex.getSchema(shapeId)).asStringMap());
+                        fromSmithy(document, variantSchema).asStringMap());
                 converted.remove(oneOf.getDiscriminator());
                 return Document.of(Map.of(member.getName(), Document.of(converted)));
             }
@@ -237,18 +254,33 @@ final class SmithyDocumentAdapter {
         throw new IllegalArgumentException("Cannot convert from " + from + " to " + to);
     }
 
-    private static Document adaptTimestamp(Document document) {
+    private static Document adaptTimestamp(Document document, Schema schema, boolean output) {
         if (document.isType(ShapeType.TIMESTAMP)) {
             return Document.of(DATE_TIME.writeString(document.asTimestamp()));
+        }
+        var timestamp = readTimestamp(document, schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT));
+        return output ? Document.of(DATE_TIME.writeString(timestamp)) : Document.of(timestamp);
+    }
+
+    private static Instant readTimestamp(Document document, TimestampFormatTrait trait) {
+        if (trait != null) {
+            var formatter = TimestampFormatter.of(trait);
+            try {
+                return document.isType(ShapeType.STRING)
+                        ? formatter.readFromString(document.asString(), false)
+                        : formatter.readFromNumber(document.asNumber());
+            } catch (RuntimeException e) {
+                // Fall back to legacy parsing for format mismatches.
+            }
         }
         if (document.isType(ShapeType.STRING)) {
             var value = document.asString();
             try {
-                return Document.of(DATE_TIME.readFromString(value, false));
+                return DATE_TIME.readFromString(value, false);
             } catch (RuntimeException e) {
-                return Document.of(HTTP_DATE.readFromString(value, false));
+                return HTTP_DATE.readFromString(value, false);
             }
         }
-        return Document.of(EPOCH_SECONDS.readFromNumber(document.asNumber()));
+        return EPOCH_SECONDS.readFromNumber(document.asNumber());
     }
 }

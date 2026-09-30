@@ -114,6 +114,43 @@ public abstract class McpRemoteClient implements AutoCloseable {
 
     protected void onToolsPage(List<ToolInfo> tools) {}
 
+    /**
+     * Call after {@link #start()} and before listing tools or prompts.
+     * Engine-managed clients are initialized by their engine.
+     *
+     * @param clientInfo identity to advertise to the remote server
+     * @param version stateful protocol version to request
+     */
+    public final void initialize(McpServerIdentity clientInfo, ProtocolVersion version) {
+        Objects.requireNonNull(clientInfo, "clientInfo");
+        var protocols = McpProtocolRegistry.create(List.of(), List.of(), true);
+        var protocol = protocols.require(Objects.requireNonNull(version, "version"));
+        if (!protocol.supportedMethods().contains(McpMethod.Standard.INITIALIZE)) {
+            throw new IllegalArgumentException("Protocol does not support initialization: " + version.identifier());
+        }
+        initialize(
+                ignored -> {},
+                ignored -> {},
+                JsonRpcRequest.builder()
+                        .jsonrpc("2.0")
+                        .id(generateRequestId())
+                        .method(McpMethod.Standard.INITIALIZE.wireName())
+                        .params(Document.of(Map.of(
+                                "protocolVersion",
+                                Document.of(version.identifier()),
+                                "capabilities",
+                                Document.of(Map.of()),
+                                "clientInfo",
+                                Document.of(Map.of(
+                                        "name",
+                                        Document.of(clientInfo.name()),
+                                        "version",
+                                        Document.of(clientInfo.version()))))))
+                        .build(),
+                protocol,
+                protocols);
+    }
+
     final void initialize(
             Consumer<JsonRpcResponse> responseNotificationConsumer,
             Consumer<JsonRpcRequest> requestNotificationConsumer,

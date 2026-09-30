@@ -514,6 +514,22 @@ class StdioMcpServerIntegrationTest {
         assertEquals(dateTimeStr, echo.getMember("timestampUnion").getMember("defaultTimestamp").asString());
     }
 
+    static Stream<Arguments> timestampCompatibilityCases() {
+        return Stream.of(
+                Arguments.of("dateTimeTimestamp", "1700000000"),
+                Arguments.of("epochSecondsTimestamp", "\"2023-11-14T22:13:20Z\""),
+                Arguments.of("epochSecondsTimestamp", "\"1700000000\""));
+    }
+
+    @ParameterizedTest
+    @MethodSource("timestampCompatibilityCases")
+    void testTimestampInputUsesModeledFormatWithLegacyFallback(String member, String value) {
+        initializeLatestProtocol();
+        var timestamp = CODEC.createDeserializer(value.getBytes(StandardCharsets.UTF_8)).readDocument();
+        var echo = echoSingleField("timestampUnion", Document.of(Map.of(member, timestamp)));
+        assertEquals("2023-11-14T22:13:20Z", echo.getMember("timestampUnion").getMember(member).asString());
+    }
+
     // ========== List Tests ==========
 
     @Test
@@ -1961,6 +1977,95 @@ class StdioMcpServerIntegrationTest {
 
     // ========== OneOf Schema Tests ==========
 
+    static Stream<Arguments> defaultDiscriminators() {
+        return Stream.of(Arguments.of(""), Arguments.of("\"__type\":null,"));
+    }
+
+    static Stream<Arguments> outputDiscriminators() {
+        return Stream.of("", "\"__type\":null,", "\"__type\":\"smithy.java.mcp.test#CircleWithNested\",")
+                .flatMap(discriminator -> Stream.of(
+                        Arguments.of(discriminator, "epochSecondsTimestamp", "1700000000"),
+                        Arguments.of(discriminator, "dateTimeTimestamp", "\"2023-11-14T22:13:20Z\""),
+                        Arguments.of(discriminator, "httpDateTimestamp", "\"Tue, 14 Nov 2023 22:13:20 GMT\""),
+                        Arguments.of(discriminator, "defaultTimestamp", "1700000000"),
+                        Arguments.of(discriminator, "dateTimeTimestamp", "1700000000"),
+                        Arguments.of(discriminator, "epochSecondsTimestamp", "\"2023-11-14T22:13:20Z\""),
+                        Arguments.of(discriminator, "epochSecondsTimestamp", "\"1700000000\"")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("outputDiscriminators")
+    void testOneOfDefaultOutputMatchesSchemaInStructuresListsAndMaps(
+            String discriminator,
+            String timestampMember,
+            String timestampValue
+    ) {
+        initializeLatestProtocol();
+        var untagged = CODEC.createDeserializer("""
+                {
+                    %s
+                    "radius": 7,
+                    "nestedShapes": [{"__type":"smithy.java.mcp.test#Square","side":4}],
+                    "timestampUnion": {"%s":%s}
+                }
+                """.formatted(discriminator, timestampMember, timestampValue).getBytes(StandardCharsets.UTF_8))
+                .readDocument();
+        echoOperation.responseEcho = Echo.builder()
+                .requiredField("default-output")
+                .shapeWithDefault(untagged)
+                .shapeWithDefaultList(List.of(untagged))
+                .shapeWithDefaultMap(Map.of("first", untagged))
+                .build();
+
+        // callTool validates output against the advertised schema.
+        var echo = getEchoFromResponse(callTool("McpEcho", createEchoInput(Map.of())));
+        var expected = Document.ofObject(Map.of("circleWithNested",
+                Map.of(
+                        "radius",
+                        7,
+                        "nestedShapes",
+                        List.of(Map.of("square", Map.of("side", 4))),
+                        "timestampUnion",
+                        Map.of(timestampMember, "2023-11-14T22:13:20Z"))));
+        assertTrue(Document.equals(expected, echo.getMember("shapeWithDefault")));
+        assertTrue(Document.equals(expected, echo.getMember("shapeWithDefaultList").asList().getFirst()));
+        assertTrue(Document.equals(expected, echo.getMember("shapeWithDefaultMap").getMember("first")));
+    }
+
+    @Test
+    void testOneOfExplicitSubtypeOverridesDefaultAndInputStillInjectsType() {
+        initializeLatestProtocol();
+        var square = Document.ofObject(Map.of("square", Map.of("side", 5)));
+        var echo = getEchoFromResponse(callTool("McpEcho", createEchoInput(Map.of("shapeWithDefault", square))));
+        assertTrue(Document.equals(square, echo.getMember("shapeWithDefault")));
+        assertEquals("smithy.java.mcp.test#Square",
+                echoOperation.getLastInput().getEcho().getShapeWithDefault().getMember("__type").asString());
+
+        var base = Document.ofObject(Map.of("circleWithNested", Map.of("radius", 3)));
+        echo = getEchoFromResponse(callTool("McpEcho", createEchoInput(Map.of("shapeWithDefault", base))));
+        assertTrue(Document.equals(base, echo.getMember("shapeWithDefault")));
+        assertEquals("smithy.java.mcp.test#CircleWithNested",
+                echoOperation.getLastInput().getEcho().getShapeWithDefault().getMember("__type").asString());
+    }
+
+    @ParameterizedTest
+    @MethodSource("defaultDiscriminators")
+    void testOneOfWithoutDefaultPreservesLegacyUntaggedOutput(String discriminator) {
+        initializeLatestProtocol();
+        var untagged = CODEC.createDeserializer(
+                "{%s\"radius\":7}".formatted(discriminator).getBytes(StandardCharsets.UTF_8)).readDocument();
+        echoOperation.responseEcho = Echo.builder()
+                .requiredField("legacy-output")
+                .shapeWithOneOfList(List.of(untagged))
+                .documentValue(untagged)
+                .build();
+        // Bypass schema validation: legacy untagged output retains its mismatch.
+        write("tools/call", Document.ofObject(Map.of("name", "McpEcho", "arguments", Map.of())));
+        var echo = getEchoFromResponse(read());
+        assertTrue(Document.equals(untagged, echo.getMember("shapeWithOneOfList").asList().getFirst()));
+        assertTrue(Document.equals(untagged, echo.getMember("documentValue")));
+    }
+
     @Test
     void testOneOfSchemaStructure() {
         initializeLatestProtocol();
@@ -2486,11 +2591,12 @@ class StdioMcpServerIntegrationTest {
 
     private static final class McpEchoOperationImpl implements McpEchoOperation {
         private volatile McpEchoInput lastInput;
+        private volatile Echo responseEcho;
 
         @Override
         public McpEchoOutput mcpEcho(McpEchoInput input, RequestContext context) {
             this.lastInput = input;
-            return McpEchoOutput.builder().echo(input.getEcho()).build();
+            return McpEchoOutput.builder().echo(responseEcho == null ? input.getEcho() : responseEcho).build();
         }
 
         public McpEchoInput getLastInput() {

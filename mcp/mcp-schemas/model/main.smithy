@@ -309,6 +309,10 @@ structure oneOf {
     /// List of possible variant types
     @required
     members: OneOfMemberList
+
+    /// Output variant for an absent or null discriminator; must target exactly one member.
+    /// If omitted, untagged documents pass through unchanged.
+    defaultTarget: OneOfTargetShape
 }
 
 list OneOfMemberList {
