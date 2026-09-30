@@ -23,6 +23,7 @@ dependencies {
     testRuntimeOnly(libs.smithy.aws.traits)
     testRuntimeOnly(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":server:server-proxy"))
+    testImplementation(project(":dynamic-schemas"))
 
     testImplementation(project(":codegen:codegen-plugin"))
     testImplementation(libs.json.schema.validator)
