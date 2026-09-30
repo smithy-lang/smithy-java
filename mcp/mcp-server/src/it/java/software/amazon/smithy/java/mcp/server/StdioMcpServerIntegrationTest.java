@@ -49,6 +49,7 @@ import software.amazon.smithy.java.mcp.test.model.Echo;
 import software.amazon.smithy.java.mcp.test.model.McpEchoInput;
 import software.amazon.smithy.java.mcp.test.model.McpEchoOutput;
 import software.amazon.smithy.java.mcp.test.model.Shape;
+import software.amazon.smithy.java.mcp.test.model.Square;
 import software.amazon.smithy.java.mcp.test.model.TestUnion;
 import software.amazon.smithy.java.mcp.test.service.CalculateAreaOperation;
 import software.amazon.smithy.java.mcp.test.service.McpEchoOperation;
@@ -2027,6 +2028,25 @@ class StdioMcpServerIntegrationTest {
                         List.of(Map.of("square", Map.of("side", 4))),
                         "timestampUnion",
                         Map.of(timestampMember, "2023-11-14T22:13:20Z"))));
+        assertTrue(Document.equals(expected, echo.getMember("shapeWithDefault")));
+        assertTrue(Document.equals(expected, echo.getMember("shapeWithDefaultList").asList().getFirst()));
+        assertTrue(Document.equals(expected, echo.getMember("shapeWithDefaultMap").getMember("first")));
+    }
+
+    @Test
+    void testOneOfTypedSubtypeOutputUsesItsShapeIdInsteadOfDefault() {
+        initializeLatestProtocol();
+        var square = Document.of(Square.builder().side(4).build());
+        echoOperation.responseEcho = Echo.builder()
+                .requiredField("typed-output")
+                .shapeWithDefault(square)
+                .shapeWithDefaultList(List.of(square))
+                .shapeWithDefaultMap(Map.of("first", square))
+                .build();
+
+        // callTool validates output against the advertised schema.
+        var echo = getEchoFromResponse(callTool("McpEcho", createEchoInput(Map.of())));
+        var expected = Document.ofObject(Map.of("square", Map.of("side", 4)));
         assertTrue(Document.equals(expected, echo.getMember("shapeWithDefault")));
         assertTrue(Document.equals(expected, echo.getMember("shapeWithDefaultList").asList().getFirst()));
         assertTrue(Document.equals(expected, echo.getMember("shapeWithDefaultMap").getMember("first")));
