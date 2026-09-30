@@ -6,11 +6,15 @@
 package software.amazon.smithy.java.mcp.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -20,14 +24,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.OneOfMember;
 import software.amazon.smithy.java.mcp.OneOfTrait;
+import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
@@ -36,18 +45,25 @@ class SmithyDocumentAdapterTest {
     private static final ShapeId CHILD_ID = ShapeId.from("test#Child");
     private static final Schema BASE = Schema.structureBuilder(BASE_ID)
             .putMember("name", PreludeSchemas.STRING)
+            .putMember("when", PreludeSchemas.TIMESTAMP)
             .build();
     private static final Schema CHILD = Schema.structureBuilder(CHILD_ID)
             .putMember("name", PreludeSchemas.STRING)
             .putMember("count", PreludeSchemas.BIG_INTEGER)
             .build();
+    private static final ShapeId CONTAINER_ID = ShapeId.from("test#Container");
+    private static final Schema CONTAINER = Schema.structureBuilder(CONTAINER_ID)
+            .putMember("child", CHILD)
+            .build();
     private static final JsonCodec CODEC = JsonCodec.builder().build();
-    private final SmithyDocumentAdapter adapter = new SmithyDocumentAdapter(new SchemaIndex() {
+    private final SchemaIndex index = new SchemaIndex() {
         private final Map<ShapeId, Schema> schemas = Map.of(
                 BASE_ID,
                 BASE,
                 CHILD_ID,
                 CHILD,
+                CONTAINER_ID,
+                CONTAINER,
                 PreludeSchemas.STRING.id(),
                 PreludeSchemas.STRING);
 
@@ -60,7 +76,8 @@ class SmithyDocumentAdapterTest {
         public void visit(Consumer<Schema> visitor) {
             schemas.values().forEach(visitor);
         }
-    });
+    };
+    private final SmithyDocumentAdapter adapter = new SmithyDocumentAdapter(index);
 
     private static OneOfMember member(String name, ShapeId target) {
         return OneOfMember.builder().name(name).target(target).build();
@@ -104,6 +121,117 @@ class SmithyDocumentAdapterTest {
         var result = adapter.fromSmithy(document, schema(BASE_ID));
         assertTrue(
                 Document.equals(Document.ofObject(Map.of("child", Map.of("name", "child", "count", "123"))), result));
+    }
+
+    private static SerializableStruct struct(Schema schema, Consumer<ShapeSerializer> members) {
+        return new SerializableStruct() {
+            @Override
+            public Schema schema() {
+                return schema;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                members.accept(serializer);
+            }
+
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    private static Document holding(Schema holder, Document value) {
+        return Document.of(struct(holder, s -> s.writeDocument(holder.member("shape"), value)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("typedDefaults")
+    void typedDocumentUsesItsShapeIdInsteadOfTheDefault(ShapeId defaultTarget) {
+        var holder = Schema.structureBuilder(ShapeId.from("test#Holder"))
+                .putMember("shape", schema(defaultTarget))
+                .build();
+        var child = Document.of(struct(CHILD, s -> {
+            s.writeString(CHILD.member("name"), "child");
+            s.writeBigInteger(CHILD.member("count"), BigInteger.TEN);
+        }));
+        var result = adapter.fromSmithy(holding(holder, child), holder);
+        assertTrue(Document.equals(
+                Document.ofObject(Map.of("shape", Map.of("child", Map.of("name", "child", "count", "10")))),
+                result), result.toString());
+    }
+
+    static Stream<Arguments> typedDefaults() {
+        return Stream.of(Arguments.of((ShapeId) null), Arguments.of(BASE_ID));
+    }
+
+    @Test
+    void typedDocumentOutsideTheMembersIsNotRelabeledAsTheDefault() {
+        var otherSchema = Schema.structureBuilder(ShapeId.from("test#Other"))
+                .putMember("name", PreludeSchemas.STRING)
+                .putMember("extra", PreludeSchemas.STRING)
+                .build();
+        var holder = Schema.structureBuilder(ShapeId.from("test#Holder"))
+                .putMember("shape", schema(BASE_ID))
+                .build();
+        var other = Document.of(struct(otherSchema, s -> {
+            s.writeString(otherSchema.member("name"), "other");
+            s.writeString(otherSchema.member("extra"), "kept");
+        }));
+        var shape = adapter.fromSmithy(holding(holder, other), holder).getMember("shape");
+        assertNull(shape.getMember("base"));
+        assertEquals("other", shape.getMember("name").asString());
+        assertEquals("kept", shape.getMember("extra").asString());
+    }
+
+    @Test
+    void untaggedStringMapStillUsesTheDefault() {
+        var result = adapter.fromSmithy(Document.ofObject(Map.of("name", "base", "when", 1700000000)),
+                schema(BASE_ID));
+        assertTrue(Document.equals(
+                Document.ofObject(Map.of("base", Map.of("name", "base", "when", "2023-11-14T22:13:20Z"))),
+                result), result.toString());
+    }
+
+    @ParameterizedTest
+    @MethodSource("typedDefaults")
+    void memberBackedTypedDocumentResolvesToTheMemberTarget(ShapeId defaultTarget) {
+        var holder = Schema.structureBuilder(ShapeId.from("test#Holder"))
+                .putMember("shape", schema(defaultTarget))
+                .build();
+        var child = Document.of(struct(CONTAINER.member("child"), s -> {
+            s.writeString(CHILD.member("name"), "child");
+            s.writeBigInteger(CHILD.member("count"), BigInteger.TEN);
+        }));
+        assertEquals(ShapeId.from("test#Container$child"), child.discriminator());
+        var result = adapter.fromSmithy(holding(holder, child), holder);
+        assertTrue(Document.equals(
+                Document.ofObject(Map.of("shape", Map.of("child", Map.of("name", "child", "count", "10")))),
+                result), result.toString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"simple", "composed", "model-backed"})
+    void unresolvableMemberBackedDocumentUsesTheDefault(String indexKind) {
+        // Simple indexes return null for unknown shapes; composed and model-backed indexes throw.
+        var adapter = switch (indexKind) {
+            case "composed" -> new SmithyDocumentAdapter(SchemaIndex.compose(index));
+            case "model-backed" -> new SmithyDocumentAdapter(
+                    SchemaIndex.compose(index, new SchemaConverter(Model.builder().build()).getSchemaIndex()));
+            default -> this.adapter;
+        };
+        var unindexed = Schema.structureBuilder(ShapeId.from("test#Unindexed"))
+                .putMember("base", BASE)
+                .build();
+        var holder = Schema.structureBuilder(ShapeId.from("test#Holder"))
+                .putMember("shape", schema(BASE_ID))
+                .build();
+        var base = Document.of(struct(unindexed.member("base"), s -> s.writeString(BASE.member("name"), "base")));
+        var result = adapter.fromSmithy(holding(holder, base), holder);
+        assertTrue(Document.equals(
+                Document.ofObject(Map.of("shape", Map.of("base", Map.of("name", "base")))),
+                result), result.toString());
     }
 
     @Test
@@ -198,5 +326,72 @@ class SmithyDocumentAdapterTest {
                 adapter.fromSmithy(Document.of(Instant.parse("2023-11-14T22:13:20Z")), schema).asString());
         assertEquals(Instant.parse("2023-11-14T22:13:20Z"),
                 adapter.toSmithy(parse(value), schema).asTimestamp());
+    }
+
+    static Stream<Arguments> invalidEpochSecondStrings() {
+        return Stream.of("NaN",
+                "Infinity",
+                "-Infinity",
+                "0x1p4",
+                " 1700000000 ",
+                "1e400",
+                "1e20",
+                "-1e20",
+                "1e308",
+                "1".repeat(65),
+                "1.2.3")
+                .map(Arguments::of);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidEpochSecondStrings")
+    void epochSecondsStringsMustBeFiniteDecimals(String value) {
+        var schema = Schema.structureBuilder(ShapeId.from("test#WithTimestamp"))
+                .putMember("timestamp",
+                        PreludeSchemas.TIMESTAMP,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS))
+                .build()
+                .member("timestamp");
+        var document = Document.of(value);
+        assertThrows(RuntimeException.class, () -> adapter.toSmithy(document, schema));
+        assertThrows(RuntimeException.class, () -> adapter.fromSmithy(document, schema));
+    }
+
+    @Test
+    void fractionalEpochSecondStringsKeepMilliseconds() {
+        var schema = Schema.structureBuilder(ShapeId.from("test#WithTimestamp"))
+                .putMember("timestamp",
+                        PreludeSchemas.TIMESTAMP,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS))
+                .build()
+                .member("timestamp");
+        assertEquals("2023-11-14T22:13:20.500Z",
+                adapter.fromSmithy(Document.of("1700000000.5"), schema).asString());
+    }
+
+    @Test
+    void oversizedEpochSecondStringsAreRejectedQuickly() {
+        var schema = Schema.structureBuilder(ShapeId.from("test#WithTimestamp"))
+                .putMember("timestamp",
+                        PreludeSchemas.TIMESTAMP,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS))
+                .build()
+                .member("timestamp");
+        var document = Document.of("1." + "1".repeat(300_000));
+        assertTimeoutPreemptively(Duration.ofSeconds(1), () -> {
+            assertThrows(RuntimeException.class, () -> adapter.toSmithy(document, schema));
+            assertThrows(RuntimeException.class, () -> adapter.fromSmithy(document, schema));
+        });
+    }
+
+    @Test
+    void unknownTimestampFormatUsesLegacyParsing() {
+        var schema = Schema.structureBuilder(ShapeId.from("test#WithTimestamp"))
+                .putMember("timestamp", PreludeSchemas.TIMESTAMP, new TimestampFormatTrait("unix-millis"))
+                .build()
+                .member("timestamp");
+        assertEquals("2023-11-14T22:13:20Z", adapter.fromSmithy(parse("1700000000"), schema).asString());
+        assertEquals(Instant.parse("2023-11-14T22:13:20Z"),
+                adapter.toSmithy(parse("1700000000"), schema).asTimestamp());
     }
 }
