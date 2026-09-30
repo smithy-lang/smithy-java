@@ -1,5 +1,62 @@
 # Change Log
 
+## 1.7.0 (9/30/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+* Added support for `oneOf` defaults when a discriminator is missing, along
+  with a validator for the default target.
+  ([#1376](https://github.com/smithy-lang/smithy-java/pull/1376))
+* Made the Smithy serde provider the default for the XML and JSON codecs,
+  removing the need for extra configuration to opt into it.
+  ([#1372](https://github.com/smithy-lang/smithy-java/pull/1372))
+* Added modern MCP protocol conformance to the MCP server, including
+  protocol version negotiation and conformance test coverage.
+  ([#1341](https://github.com/smithy-lang/smithy-java/pull/1341))
+
+### Bug Fixes
+
+* Fixed the MCP server returning stale tools and prompts after a
+  `list_changed` notification.
+  ([#1377](https://github.com/smithy-lang/smithy-java/pull/1377))
+* Fixed the member name cache producing incorrect results when serializing a
+  document wrapping a structure.
+  ([#1372](https://github.com/smithy-lang/smithy-java/pull/1372))
+* Fixed several identity and authentication resolution issues, skipping
+  endpoint auth schemes incompatible with the resolved auth scheme, removing
+  duplicate auth schemes, and checking the resolver before reading auth
+  properties.
+  ([#1370](https://github.com/smithy-lang/smithy-java/pull/1370))
+* Fixed the MCP server failing to list tools when a `oneOf` document appeared
+  as an operation input or output root, which previously threw a
+  `ClassCastException` or silently dropped the `oneOf` variants depending on
+  schema build order.
+  ([#1345](https://github.com/smithy-lang/smithy-java/pull/1345))
+* Fixed generated structure serializers emitting members in declaration order
+  instead of schema order.
+  ([#1344](https://github.com/smithy-lang/smithy-java/pull/1344))
+
+### Improvements
+
+* Improved base64 encoding performance by reusing a scratch buffer instead of
+  allocating per call.
+  ([#1363](https://github.com/smithy-lang/smithy-java/pull/1363))
+* Improved generated map serialization by using `Map.forEach` to avoid
+  per-entry view allocations.
+  ([#1362](https://github.com/smithy-lang/smithy-java/pull/1362))
+* Improved HTTP header value normalization performance.
+  ([#1351](https://github.com/smithy-lang/smithy-java/pull/1351))
+* Improved AWS Query string encoding performance.
+  ([#1350](https://github.com/smithy-lang/smithy-java/pull/1350))
+* Improved base64 encoding performance for exact-length arrays.
+  ([#1349](https://github.com/smithy-lang/smithy-java/pull/1349))
+
 ## 1.6.1 (9/2/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
