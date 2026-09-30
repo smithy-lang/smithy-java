@@ -192,24 +192,24 @@ final class SmithyDocumentAdapter {
             return document;
         }
 
-        var discriminator = document.getMember(oneOf.getDiscriminator());
-        var shapeId = discriminator == null
-                ? oneOf.getDefaultTarget().orElse(null)
-                : ShapeId.from(discriminator.asString());
-        if (shapeId == null) {
-            return document;
-        }
-
-        // Bundle loading may skip model validation.
-        if (discriminator == null
-                && oneOf.getMembers().stream().filter(member -> member.getTarget().equals(shapeId)).count() != 1) {
-            throw new SerializationException("The oneOf defaultTarget `" + shapeId
-                    + "` must identify exactly one member of " + targetSchema.id());
+        var shapeId = resolveVariant(document, oneOf);
+        var defaulted = shapeId == null;
+        if (defaulted) {
+            shapeId = oneOf.getDefaultTarget().orElse(null);
+            if (shapeId == null) {
+                return document;
+            }
+            // Bundle loading may skip model validation.
+            var target = shapeId;
+            if (oneOf.getMembers().stream().filter(member -> member.getTarget().equals(target)).count() != 1) {
+                throw new SerializationException("The oneOf defaultTarget `" + shapeId
+                        + "` must identify exactly one member of " + targetSchema.id());
+            }
         }
         for (var member : oneOf.getMembers()) {
             if (member.getTarget().equals(shapeId)) {
                 var variantSchema = schemaIndex.getSchema(shapeId);
-                if (discriminator == null && variantSchema.type() != ShapeType.STRUCTURE) {
+                if (defaulted && variantSchema.type() != ShapeType.STRUCTURE) {
                     throw new SerializationException("The oneOf defaultTarget `" + shapeId
                             + "` must target a structure");
                 }
@@ -220,6 +220,39 @@ final class SmithyDocumentAdapter {
             }
         }
         return document;
+    }
+
+    /**
+     * Resolves the variant named by the discriminator member, or by the shape ID of a typed document such as
+     * {@code Document.of(shape)}, which carries no discriminator member. Returns null for untagged documents.
+     */
+    private ShapeId resolveVariant(Document document, OneOfTrait oneOf) {
+        var discriminator = document.getMember(oneOf.getDiscriminator());
+        if (discriminator != null) {
+            return ShapeId.from(discriminator.asString());
+        }
+        // Only typed structures report their own shape ID; map documents stay untagged.
+        if (document.type() != ShapeType.STRUCTURE) {
+            return null;
+        }
+        var shapeId = document.discriminator();
+        // A document backed by a member schema reports the member ID; resolve it to the member's target.
+        if (shapeId != null && shapeId.hasMember()) {
+            var container = findSchema(shapeId.withoutMember());
+            var member = container == null ? null : container.member(shapeId.getMember().get());
+            shapeId = member == null ? null : member.memberTarget().id();
+        }
+        return shapeId;
+    }
+
+    private Schema findSchema(ShapeId id) {
+        // Some indexes throw for unknown shapes instead of returning null (e.g. composed or model-backed indexes);
+        // an unresolved lookup only means the variant is resolved through the defaultTarget instead.
+        try {
+            return schemaIndex.getSchema(id);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private boolean needsAdaptation(Schema schema) {
@@ -264,13 +297,17 @@ final class SmithyDocumentAdapter {
 
     private static Instant readTimestamp(Document document, TimestampFormatTrait trait) {
         if (trait != null) {
-            var formatter = TimestampFormatter.of(trait);
             try {
-                return document.isType(ShapeType.STRING)
-                        ? formatter.readFromString(document.asString(), false)
-                        : formatter.readFromNumber(document.asNumber());
+                var formatter = TimestampFormatter.of(trait);
+                if (!document.isType(ShapeType.STRING)) {
+                    return formatter.readFromNumber(document.asNumber());
+                }
+                // Epoch-seconds timestamps are numbers; strings only use the date-time and http-date parsing below.
+                if (formatter.format() != TimestampFormatTrait.Format.EPOCH_SECONDS) {
+                    return formatter.readFromString(document.asString(), false);
+                }
             } catch (RuntimeException e) {
-                // Fall back to legacy parsing for format mismatches.
+                // Fall back to legacy parsing for unknown formats and format mismatches.
             }
         }
         if (document.isType(ShapeType.STRING)) {
