@@ -53,7 +53,7 @@ dependencies {
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":logging"))
     runtimeOnly(project(":aws:aws-sigv4"))
-    stsModel("software.amazon.api.models:sts:1.0.7") { isTransitive = false }
+    stsModel("software.amazon.api.models:sts:1.0.8") { isTransitive = false }
     testImplementation(project(":client:client-mock-plugin"))
     testImplementation(project(":http:http-api"))
 }
