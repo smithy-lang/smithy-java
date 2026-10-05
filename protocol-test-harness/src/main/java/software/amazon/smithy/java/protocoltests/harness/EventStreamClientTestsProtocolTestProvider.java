@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
@@ -197,15 +198,49 @@ final class EventStreamClientTestsProtocolTestProvider extends
                 var placeholderTransport =
                         (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) mockClient.config().transport();
                 placeholderTransport.setTransport(testTransport);
+                // Serialization runs on the writer thread, so capture its failure to inspect on this one.
+                var writeError = new AtomicReference<Exception>();
+                Thread writerThread = null;
                 if (event != null) { // normal request event.
-                    Thread.ofVirtual().start(() -> {
+                    writerThread = Thread.ofVirtual().start(() -> {
                         try (var w = writer.asWriter()) {
                             w.write(expected);
+                        } catch (Exception e) {
+                            writeError.set(e);
                         }
                     });
                 }
                 try {
-                    mockClient.clientRequest(input, apiOperation, overrideConfig);
+                    Exception requestError = null;
+                    try {
+                        mockClient.clientRequest(input, apiOperation, overrideConfig);
+                    } catch (Exception e) {
+                        requestError = e;
+                    }
+
+                    if (writerThread != null) {
+                        try {
+                            writerThread.join();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException("Interrupted while waiting for event writer", e);
+                        }
+                    }
+
+                    var failure = writeError.get() != null ? writeError.get() : requestError;
+                    if (testCase.getExpectation().isFailure()) {
+                        if (failure == null) {
+                            fail("Expected failure but request succeeded: "
+                                    + testTransport.getCapturedRequest());
+                        }
+                        Assertions.assertExpectationEquals(testCase, failure);
+                        return;
+                    }
+
+                    if (failure != null) {
+                        throw asRuntimeException(failure);
+                    }
+
                     var request = testTransport.getCapturedRequest();
                     if (event != null) {
                         Assertions.assertEventStreamRequestEquals(request, event);
@@ -398,6 +433,13 @@ final class EventStreamClientTestsProtocolTestProvider extends
                 .filter(ProtocolTestProvider::isBinaryMediaType)
                 .map(type -> Base64.getDecoder().decode(body))
                 .orElseGet(() -> body.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static RuntimeException asRuntimeException(Exception e) {
+        if (e instanceof RuntimeException re) {
+            return re;
+        }
+        return new RuntimeException(e);
     }
 
     private static SerializableStruct buildInput(
