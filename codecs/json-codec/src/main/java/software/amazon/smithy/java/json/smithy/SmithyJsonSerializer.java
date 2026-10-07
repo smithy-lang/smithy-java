@@ -181,13 +181,13 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeFloat(Schema schema, float value) {
-        ensureCapacity(24);
+        ensureCapacity(NumberCodec.FLOAT_MAX_BYTES);
         pos = NumberCodec.writeFloatFullQuoted(buf, pos, value);
     }
 
     @Override
     public void writeDouble(Schema schema, double value) {
-        ensureCapacity(24);
+        ensureCapacity(NumberCodec.DOUBLE_MAX_BYTES);
         pos = NumberCodec.writeDoubleFullQuoted(buf, pos, value);
     }
 
@@ -488,7 +488,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         @Override
         public void writeFloat(Schema schema, float value) {
             byte[] nameBytes = resolveFieldNameBytes(schema);
-            ensureCapacity(nameBytes.length + 1 + 24);
+            ensureCapacity(nameBytes.length + 1 + NumberCodec.FLOAT_MAX_BYTES);
             writeFieldNameBytesUnchecked(nameBytes);
             pos = NumberCodec.writeFloatFullQuoted(buf, pos, value);
         }
@@ -496,7 +496,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         @Override
         public void writeDouble(Schema schema, double value) {
             byte[] nameBytes = resolveFieldNameBytes(schema);
-            ensureCapacity(nameBytes.length + 1 + 24);
+            ensureCapacity(nameBytes.length + 1 + NumberCodec.DOUBLE_MAX_BYTES);
             writeFieldNameBytesUnchecked(nameBytes);
             pos = NumberCodec.writeDoubleFullQuoted(buf, pos, value);
         }

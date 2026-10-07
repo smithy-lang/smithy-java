@@ -282,13 +282,21 @@ class NumberCodecTest {
             1.0E-7,
             1.7976931348623157E308,
             5.0E-324,
-            -0.1
+            -0.1,
+            -2.0528210082510967E-190
     })
     void writeDouble(double value) {
-        byte[] buf = new byte[32];
+        byte[] buf = new byte[NumberCodec.DOUBLE_MAX_BYTES];
         int end = NumberCodec.writeDouble(buf, 0, value);
         String actual = new String(buf, 0, end, StandardCharsets.US_ASCII);
         assertEquals(value, Double.parseDouble(actual));
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+    void writeDoubleRejectsNonFiniteWithAssertions(double value) {
+        byte[] buf = new byte[NumberCodec.DOUBLE_MAX_BYTES];
+        assertThrows(AssertionError.class, () -> NumberCodec.writeDouble(buf, 0, value));
     }
 
     // --- writeFloat ---
@@ -301,13 +309,21 @@ class NumberCodecTest {
             100.0f,
             3.14f,
             Float.MAX_VALUE,
-            Float.MIN_VALUE
+            Float.MIN_VALUE,
+            -1.35191895E-20f
     })
     void writeFloat(float value) {
-        byte[] buf = new byte[20];
+        byte[] buf = new byte[NumberCodec.FLOAT_MAX_BYTES];
         int end = NumberCodec.writeFloat(buf, 0, value);
         String actual = new String(buf, 0, end, StandardCharsets.US_ASCII);
         assertEquals(value, Float.parseFloat(actual));
+    }
+
+    @ParameterizedTest
+    @ValueSource(floats = {Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY})
+    void writeFloatRejectsNonFiniteWithAssertions(float value) {
+        byte[] buf = new byte[NumberCodec.FLOAT_MAX_BYTES];
+        assertThrows(AssertionError.class, () -> NumberCodec.writeFloat(buf, 0, value));
     }
 
     // --- writeNonFiniteFloat ---
@@ -363,9 +379,17 @@ class NumberCodecTest {
     // --- writeFloatFull / writeDoubleFull ---
 
     @ParameterizedTest
-    @ValueSource(floats = {0.0f, 1.5f, -3.14f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY})
+    @ValueSource(floats = {
+            0.0f,
+            1.5f,
+            -3.14f,
+            -1.35191895E-20f,
+            Float.NaN,
+            Float.POSITIVE_INFINITY,
+            Float.NEGATIVE_INFINITY
+    })
     void writeFloatFull(float value) {
-        byte[] buf = new byte[24];
+        byte[] buf = new byte[NumberCodec.FLOAT_MAX_BYTES];
         int end = NumberCodec.writeFloatFull(buf, 0, value);
         String actual = new String(buf, 0, end, StandardCharsets.US_ASCII);
         if (Float.isNaN(value)) {
@@ -380,9 +404,17 @@ class NumberCodecTest {
     }
 
     @ParameterizedTest
-    @ValueSource(doubles = {0.0, 1.5, -3.14, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+    @ValueSource(doubles = {
+            0.0,
+            1.5,
+            -3.14,
+            -2.0528210082510967E-190,
+            Double.NaN,
+            Double.POSITIVE_INFINITY,
+            Double.NEGATIVE_INFINITY
+    })
     void writeDoubleFull(double value) {
-        byte[] buf = new byte[24];
+        byte[] buf = new byte[NumberCodec.DOUBLE_MAX_BYTES];
         int end = NumberCodec.writeDoubleFull(buf, 0, value);
         String actual = new String(buf, 0, end, StandardCharsets.US_ASCII);
         if (Double.isNaN(value)) {
@@ -397,9 +429,16 @@ class NumberCodecTest {
     }
 
     @ParameterizedTest
-    @ValueSource(floats = {0.0f, 1.5f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY})
+    @ValueSource(floats = {
+            0.0f,
+            1.5f,
+            -1.35191895E-20f,
+            Float.NaN,
+            Float.POSITIVE_INFINITY,
+            Float.NEGATIVE_INFINITY
+    })
     void writeFloatFullQuoted(float value) {
-        byte[] buf = new byte[24];
+        byte[] buf = new byte[NumberCodec.FLOAT_MAX_BYTES];
         int end = NumberCodec.writeFloatFullQuoted(buf, 0, value);
         String actual = new String(buf, 0, end, StandardCharsets.US_ASCII);
         if (Float.isFinite(value)) {
@@ -414,9 +453,16 @@ class NumberCodecTest {
     }
 
     @ParameterizedTest
-    @ValueSource(doubles = {0.0, 1.5, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+    @ValueSource(doubles = {
+            0.0,
+            1.5,
+            -2.0528210082510967E-190,
+            Double.NaN,
+            Double.POSITIVE_INFINITY,
+            Double.NEGATIVE_INFINITY
+    })
     void writeDoubleFullQuoted(double value) {
-        byte[] buf = new byte[24];
+        byte[] buf = new byte[NumberCodec.DOUBLE_MAX_BYTES];
         int end = NumberCodec.writeDoubleFullQuoted(buf, 0, value);
         String actual = new String(buf, 0, end, StandardCharsets.US_ASCII);
         if (Double.isFinite(value)) {

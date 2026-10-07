@@ -150,14 +150,6 @@
         <Bug pattern="US_USELESS_SUPPRESSION_ON_FIELD"/>
     </Match>
 
-    <!-- Vendored Schubfach algorithm (from Jackson/OpenJDK) — not our code to fix. -->
-    <Match>
-        <Class name="software.amazon.smithy.java.codecs.commons.Schubfach$DoubleToDecimal" />
-    </Match>
-    <Match>
-        <Class name="software.amazon.smithy.java.codecs.commons.Schubfach$FloatToDecimal" />
-    </Match>
-
     <!--
     ~ Intentional String reference (==) fast path before the equals() comparison. Header names are
     ~ canonicalized to interned constants, so a reference hit is a cheap shortcut; every == check is
