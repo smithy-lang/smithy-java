@@ -411,7 +411,7 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
         public void writeFloat(Schema schema, float value) {
             if (Float.isFinite(value)) {
                 writeAttrPrefix();
-                ensureCapacity(24);
+                ensureCapacity(NumberCodec.FLOAT_MAX_BYTES);
                 pos = NumberCodec.writeFloat(buf, pos, value);
                 writeAttrSuffix();
             } else {
@@ -426,7 +426,7 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
         public void writeDouble(Schema schema, double value) {
             if (Double.isFinite(value)) {
                 writeAttrPrefix();
-                ensureCapacity(24);
+                ensureCapacity(NumberCodec.DOUBLE_MAX_BYTES);
                 pos = NumberCodec.writeDouble(buf, pos, value);
                 writeAttrSuffix();
             } else {
@@ -570,14 +570,14 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
         @Override
         public void writeFloat(Schema schema, float value) {
             closePendingTag();
-            ensureCapacity(24);
+            ensureCapacity(NumberCodec.FLOAT_MAX_BYTES);
             pos = NumberCodec.writeFloatFull(buf, pos, value);
         }
 
         @Override
         public void writeDouble(Schema schema, double value) {
             closePendingTag();
-            ensureCapacity(24);
+            ensureCapacity(NumberCodec.DOUBLE_MAX_BYTES);
             pos = NumberCodec.writeDoubleFull(buf, pos, value);
         }
 

@@ -21,6 +21,18 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 @SmithyInternalApi
 public final class NumberCodec {
 
+    /**
+     * Required capacity from the starting position for float formatting, including packed stores
+     * beyond the returned end. Also covers non-finite values, with or without quotes.
+     */
+    public static final int FLOAT_MAX_BYTES = 15;
+
+    /**
+     * Required capacity from the starting position for double formatting, including packed stores
+     * beyond the returned end. Also covers non-finite values, with or without quotes.
+     */
+    public static final int DOUBLE_MAX_BYTES = 24;
+
     private NumberCodec() {}
 
     private static final VarHandle INT_HANDLE =
@@ -345,20 +357,34 @@ public final class NumberCodec {
         return writeAsciiString(buf, pos, s);
     }
 
+    /**
+     * Writes a finite double and returns the end position.
+     * Reserve {@link #DOUBLE_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     *
+     * @throws AssertionError if {@code value} is non-finite and assertions are enabled
+     */
     public static int writeDouble(byte[] buf, int pos, double value) {
         long longValue = (long) value;
         if (value == (double) longValue) {
             return writeLong(buf, pos, longValue);
         }
-        return Schubfach.writeDouble(buf, pos, value);
+        return Zmij.writeDouble(buf, pos, value);
     }
 
+    /**
+     * Writes a finite float and returns the end position.
+     * Reserve {@link #FLOAT_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     *
+     * @throws AssertionError if {@code value} is non-finite and assertions are enabled
+     */
     public static int writeFloat(byte[] buf, int pos, float value) {
         int intValue = (int) value;
         if (value == (float) intValue) {
             return writeInt(buf, pos, intValue);
         }
-        return Schubfach.writeFloat(buf, pos, value);
+        return Zmij.writeFloat(buf, pos, value);
     }
 
     public static int writeNonFiniteFloat(byte[] buf, int pos, float value) {
@@ -405,6 +431,11 @@ public final class NumberCodec {
         return pos + bytes.length;
     }
 
+    /**
+     * Writes a float, including non-finite values, and returns the end position.
+     * Reserve {@link #FLOAT_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     */
     public static int writeFloatFull(byte[] buf, int pos, float value) {
         if (Float.isFinite(value)) {
             return writeFloat(buf, pos, value);
@@ -412,6 +443,11 @@ public final class NumberCodec {
         return writeNonFiniteFloat(buf, pos, value);
     }
 
+    /**
+     * Writes a double, including non-finite values, and returns the end position.
+     * Reserve {@link #DOUBLE_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     */
     public static int writeDoubleFull(byte[] buf, int pos, double value) {
         if (Double.isFinite(value)) {
             return writeDouble(buf, pos, value);
@@ -419,6 +455,11 @@ public final class NumberCodec {
         return writeNonFiniteDouble(buf, pos, value);
     }
 
+    /**
+     * Writes a float, quoting non-finite values, and returns the end position.
+     * Reserve {@link #FLOAT_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     */
     public static int writeFloatFullQuoted(byte[] buf, int pos, float value) {
         if (Float.isFinite(value)) {
             return writeFloat(buf, pos, value);
@@ -426,6 +467,11 @@ public final class NumberCodec {
         return writeNonFiniteFloatQuoted(buf, pos, value);
     }
 
+    /**
+     * Writes a double, quoting non-finite values, and returns the end position.
+     * Reserve {@link #DOUBLE_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     */
     public static int writeDoubleFullQuoted(byte[] buf, int pos, double value) {
         if (Double.isFinite(value)) {
             return writeDouble(buf, pos, value);

@@ -429,12 +429,12 @@ final class QueryFormSerializer implements ShapeSerializer {
     }
 
     private void writeParamDouble(byte[] key, double value) {
-        writeKeyPrefix(key, 25);
+        writeKeyPrefix(key, NumberCodec.DOUBLE_MAX_BYTES);
         pos = NumberCodec.writeDouble(buf, pos, value);
     }
 
     private void writeParamFloat(byte[] key, float value) {
-        writeKeyPrefix(key, 15);
+        writeKeyPrefix(key, NumberCodec.FLOAT_MAX_BYTES);
         pos = NumberCodec.writeFloat(buf, pos, value);
     }
 
@@ -668,7 +668,7 @@ final class QueryFormSerializer implements ShapeSerializer {
                 writeIndexedKeyPrefix(9);
                 pos = NumberCodec.writeNonFiniteFloat(buf, pos, value);
             } else {
-                writeIndexedKeyPrefix(15);
+                writeIndexedKeyPrefix(NumberCodec.FLOAT_MAX_BYTES);
                 pos = NumberCodec.writeFloat(buf, pos, value);
             }
             index++;
@@ -680,7 +680,7 @@ final class QueryFormSerializer implements ShapeSerializer {
                 writeIndexedKeyPrefix(9);
                 pos = NumberCodec.writeNonFiniteDouble(buf, pos, value);
             } else {
-                writeIndexedKeyPrefix(25);
+                writeIndexedKeyPrefix(NumberCodec.DOUBLE_MAX_BYTES);
                 pos = NumberCodec.writeDouble(buf, pos, value);
             }
             index++;
@@ -936,7 +936,7 @@ final class QueryFormSerializer implements ShapeSerializer {
                 writePrefixEquals(9);
                 pos = NumberCodec.writeNonFiniteFloat(buf, pos, value);
             } else {
-                writePrefixEquals(15);
+                writePrefixEquals(NumberCodec.FLOAT_MAX_BYTES);
                 pos = NumberCodec.writeFloat(buf, pos, value);
             }
         }
@@ -947,7 +947,7 @@ final class QueryFormSerializer implements ShapeSerializer {
                 writePrefixEquals(9);
                 pos = NumberCodec.writeNonFiniteDouble(buf, pos, value);
             } else {
-                writePrefixEquals(25);
+                writePrefixEquals(NumberCodec.DOUBLE_MAX_BYTES);
                 pos = NumberCodec.writeDouble(buf, pos, value);
             }
         }
