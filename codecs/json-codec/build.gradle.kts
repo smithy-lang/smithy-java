@@ -6,6 +6,10 @@ plugins {
     id("com.gradleup.shadow")
 }
 
+pitest {
+    excludedGroups.add("stress")
+}
+
 description = "This module provides json functionality"
 
 extra["displayName"] = "Smithy :: Java :: JSON"
