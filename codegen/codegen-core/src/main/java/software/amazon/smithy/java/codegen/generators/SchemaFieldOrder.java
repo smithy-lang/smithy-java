@@ -88,16 +88,27 @@ public final class SchemaFieldOrder {
         this.reverseMapping = map;
 
         // Phase 2: Partition
-        if (allFields.size() < FAST_PATH_THRESHOLD) {
-            // Fast path: keep all shapes in a single "Schemas" partition
-            this.partitions = allFields.isEmpty()
-                    ? Collections.emptyList()
-                    : List.of(List.copyOf(allFields));
+        if (allFields.isEmpty()) {
+            this.partitions = Collections.emptyList();
+        } else if (canUseFastPath(allFields, directive, context)) {
+            // Fast path: keep shapes in a single "Schemas" partition when the generated
+            // content is small enough.
+            this.partitions = List.of(List.copyOf(allFields));
         } else {
-            // Measure actual generated sizes and partition based on content size
+            // Measure actual per-shape generated sizes and partition based on content size.
             int[] sizes = SchemasGenerator.measureShapeSizes(allFields, directive.model(), context, this);
             this.partitions = computePartitions(allFields, sizes);
         }
+    }
+
+    private boolean canUseFastPath(
+            List<SchemaField> allFields,
+            Directive<?> directive,
+            CodeGenerationContext context
+    ) {
+        return allFields.size() < FAST_PATH_THRESHOLD
+                && SchemasGenerator.measureCombinedSize(allFields, directive.model(), context, this)
+                        <= SCHEMA_FILE_SIZE_THRESHOLD;
     }
 
     private static List<List<SchemaField>> computePartitions(
