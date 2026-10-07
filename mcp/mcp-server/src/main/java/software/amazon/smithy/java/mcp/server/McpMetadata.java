@@ -35,6 +35,28 @@ public record McpMetadata(
                 : EMPTY;
     }
 
+    /**
+     * Returns this metadata as it should be forwarded to a remote speaking {@code protocol}.
+     *
+     * <p>A session-based remote negotiated its version at initialization, so the stateless
+     * protocol keys are dropped; other {@code _meta} entries pass through. A stateless remote
+     * gets the version it was selected for.
+     */
+    McpMetadata forwardedTo(McpProtocol protocol) {
+        if (!protocol.usesStatelessMetadata()) {
+            return extensions.isEmpty() ? EMPTY : new McpMetadata(null, null, null, extensions);
+        }
+        var version = protocol.protocolVersion();
+        if (version.equals(protocolVersion)) {
+            return this;
+        }
+        return new McpMetadata(
+                version,
+                clientInfo,
+                clientCapabilities == null ? Document.of(Map.of()) : clientCapabilities,
+                extensions);
+    }
+
     Document applyTo(Document params) {
         if (this == EMPTY
                 || (protocolVersion == null

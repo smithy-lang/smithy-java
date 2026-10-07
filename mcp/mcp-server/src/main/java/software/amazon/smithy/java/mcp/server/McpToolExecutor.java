@@ -136,11 +136,20 @@ final class McpToolExecutor {
             McpCall.CallTool call,
             McpRequestContext requestContext
     ) {
-        var protocol = protocols.require(requestContext.protocolVersion());
+        // Forward in the protocol the remote was set up with, not the caller's: a caller on a
+        // newer or stateless revision must not push its version onto a remote that negotiated another.
+        var protocol = sources.remoteProtocol(
+                target.client(),
+                protocols.require(requestContext.protocolVersion()));
+        var forwarded = new McpCall.CallTool(
+                call.id(),
+                call.name(),
+                call.arguments(),
+                call.metadata().forwardedTo(protocol));
         return target.client()
-                .usingProtocol(
+                .forwarding(
                         protocol,
-                        () -> wireCodec.decode(target.client().exchangeForwarded(wireCodec.encode(call))));
+                        () -> wireCodec.decode(target.client().exchangeForwarded(wireCodec.encode(forwarded))));
     }
 
     private McpOutcome toolFailure(McpCall.CallTool call, RuntimeException exception) {

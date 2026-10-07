@@ -254,6 +254,19 @@ public abstract class McpRemoteClient implements AutoCloseable {
         return withRequestProtocol(requestedProtocol, operation);
     }
 
+    /**
+     * Runs a call forwarded to this remote in {@code selectedProtocol}, the protocol selected for it.
+     *
+     * <p>A stateless protocol is pinned for the exchange. A session protocol is not: the client keeps
+     * using the version it currently holds, so a version renegotiated when the session is restarted
+     * mid-exchange applies to the initialized notification and the retried request.
+     */
+    final <T> T forwarding(McpProtocol selectedProtocol, Supplier<T> operation) {
+        return selectedProtocol.usesStatelessMetadata()
+                ? withRequestProtocol(selectedProtocol, operation)
+                : operation.get();
+    }
+
     private <T> T withRequestProtocol(McpProtocol protocol, Supplier<T> operation) {
         var previous = requestProtocol.get();
         requestProtocol.set(protocol);
