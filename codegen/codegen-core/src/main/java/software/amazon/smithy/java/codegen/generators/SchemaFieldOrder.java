@@ -107,8 +107,8 @@ public final class SchemaFieldOrder {
             CodeGenerationContext context
     ) {
         return allFields.size() < FAST_PATH_THRESHOLD
-                && SchemasGenerator.measureCombinedSize(allFields, directive.model(), context, this)
-                        <= SCHEMA_FILE_SIZE_THRESHOLD;
+                && SchemasGenerator
+                        .measureCombinedSize(allFields, directive.model(), context, this) <= SCHEMA_FILE_SIZE_THRESHOLD;
     }
 
     private static List<List<SchemaField>> computePartitions(
