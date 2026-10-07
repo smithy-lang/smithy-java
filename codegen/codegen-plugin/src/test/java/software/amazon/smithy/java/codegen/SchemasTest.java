@@ -84,6 +84,74 @@ public class SchemasTest {
         verifySchemaReference("Op100Output");
     }
 
+    @Test
+    void partitionsWideSchemasBelowFastPathThreshold() {
+        int totalOperations = 100;
+        int membersPerStructure = 20;
+        var smithyDefinition = new StringBuilder("""
+                $version: "2"
+                namespace s.j
+                """);
+        var serviceDefinition = new StringBuilder("""
+                service TestService {
+                    operations: [
+                """);
+        var members = new StringBuilder();
+        for (int i = 1; i <= membersPerStructure; i++) {
+            members.append("value%02d: String\n".formatted(i));
+        }
+        for (int i = 1; i <= totalOperations; i++) {
+            String operationName = "Op%03d".formatted(i);
+            serviceDefinition.append(operationName).append(",");
+            smithyDefinition.append("""
+                    operation %s {
+                        input: %sInput,
+                        output: %sOutput,
+                    }
+                    structure %sInput {
+                        %s
+                    }
+                    structure %sOutput {
+                        %s
+                    }
+                    """.formatted(
+                    operationName,
+                    operationName,
+                    operationName,
+                    operationName,
+                    members,
+                    operationName,
+                    members));
+        }
+        smithyDefinition.append(serviceDefinition.append("]}"));
+        var model = Model.assembler()
+                .addUnparsedModel("test.smithy", smithyDefinition.toString())
+                .disableValidation()
+                .assemble()
+                .unwrap();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .settings(settings())
+                .model(model)
+                .build();
+
+        new TestJavaCodegenPlugin().execute(context);
+
+        var schemaFiles = manifest.getFiles()
+                .stream()
+                .map(Path::getFileName)
+                .map(Path::toString)
+                .filter(s -> s.startsWith("Schema"))
+                .toList();
+        long totalSchemaSourceSize = schemaFiles.stream().mapToLong(s -> getFileString(s).length()).sum();
+        assertThat(totalSchemaSourceSize).isGreaterThan(50_000);
+        assertThat(schemaFiles)
+                .as("schema files generated for %,d total characters of schema source", totalSchemaSourceSize)
+                .hasSizeGreaterThanOrEqualTo(2)
+                .contains("Schemas.java")
+                .allMatch(s -> s.matches("Schemas\\d*\\.java"));
+    }
+
     private void verifySchemaReference(String structureName) {
         assertThat(getFileString(structureName + ".java"))
                 .containsPattern("public static final Schema \\$SCHEMA = Schemas\\d*\\.[A-Z][A-Z0-9_]+");
