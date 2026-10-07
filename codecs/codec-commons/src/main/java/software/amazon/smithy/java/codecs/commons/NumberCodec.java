@@ -21,6 +21,9 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 @SmithyInternalApi
 public final class NumberCodec {
 
+    /** Maximum digit count for the decimal fast path. */
+    public static final int MAX_FAST_DECIMAL_DIGITS = DecimalToBinary.MAX_DIGITS;
+
     /**
      * Required capacity from the starting position for float formatting, including packed stores
      * beyond the returned end. Also covers non-finite values, with or without quotes.
@@ -246,7 +249,23 @@ public final class NumberCodec {
         if ((((sub + 0x7676767676767676L) | sub) & 0x8080808080808080L) != 0) {
             return -1;
         }
-        // SWAR: combine pairs -> quads -> final 8-digit value
+        return combineDigitLanes(sub);
+    }
+
+    /** Returns eight big-endian byte lanes XORed with '0', without inter-lane borrowing. */
+    public static long digitLanes(byte[] buf, int i) {
+        return (long) LONG_HANDLE.get(buf, i) ^ 0x3030303030303030L;
+    }
+
+    /** Counts the leading digit lanes (0..8). */
+    public static int leadingDigitLaneCount(long lanes) {
+        long bad = (lanes & 0xF0F0F0F0F0F0F0F0L)
+                | (((lanes & 0x0F0F0F0F0F0F0F0FL) + 0x0606060606060606L) & 0x1010101010101010L);
+        return bad == 0 ? 8 : Long.numberOfLeadingZeros(bad) >>> 3;
+    }
+
+    /** Combines up to eight big-endian lanes containing digits 0..9; unused leading lanes must be zero. */
+    public static long combineDigitLanes(long sub) {
         long lo = sub & 0x000F000F000F000FL;
         long hi = (sub >>> 8) & 0x000F000F000F000FL;
         long pairs = hi * 10 + lo;
@@ -258,18 +277,24 @@ public final class NumberCodec {
         return (long) upper * 10000 + lower;
     }
 
-    /**
-     * Parse a double from a byte array span using FastDoubleParser (no String allocation).
-     */
+    /** Parses a double directly from a byte span using FastDoubleParser. */
     public static double parseDouble(byte[] buf, int offset, int length) {
         return JavaDoubleParser.parseDouble(buf, offset, length);
     }
 
-    /**
-     * Parse a float from a byte array span using FastDoubleParser (no String allocation).
-     */
+    /** Parses a float directly from a byte span using FastDoubleParser. */
     public static float parseFloat(byte[] buf, int offset, int length) {
         return JavaFloatParser.parseFloat(buf, offset, length);
+    }
+
+    /** Converts a validated nonnegative significand and scale; NaN requests a general parse. */
+    public static double decimalToDouble(long unscaled, int scale) {
+        return DecimalToBinary.toDouble(unscaled, scale);
+    }
+
+    /** Returns 10^exponent for an exponent from 0 through 18. */
+    public static long powerOfTen(int exponent) {
+        return POWERS_OF_10[exponent];
     }
 
     public static int writeBoolean(byte[] buf, int pos, boolean value) {
