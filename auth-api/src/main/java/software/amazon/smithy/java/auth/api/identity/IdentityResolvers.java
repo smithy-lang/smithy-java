@@ -6,9 +6,7 @@
 package software.amazon.smithy.java.auth.api.identity;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * An interface to allow retrieving an {@link IdentityResolver} based on the identity class.
@@ -16,6 +14,9 @@ import java.util.Map;
 public interface IdentityResolvers {
     /**
      * Retrieve an identity resolver for the provided identity type.
+     *
+     * <p>A resolver matches if its identity type is the requested type or a subtype of it. An exact match has
+     * priority over a subtype match.
      *
      * @param identityClass Identity type to retrieve.
      * @return the identity resolver or null if not found.
@@ -33,21 +34,13 @@ public interface IdentityResolvers {
 
     /**
      * Create a new IdentityResolvers
+     *
+     * <p>If more than one resolver matches an identity type, the last resolver in the list wins.
+     *
      * @param identityResolvers The {@link IdentityResolver}s to use
      * @return the IdentityResolvers
      */
     static IdentityResolvers of(List<IdentityResolver<?>> identityResolvers) {
-        Map<Class<?>, IdentityResolver<?>> result = new HashMap<>();
-        for (IdentityResolver<?> identityResolver : identityResolvers) {
-            result.put(identityResolver.identityType(), identityResolver);
-        }
-
-        return new IdentityResolvers() {
-            @SuppressWarnings("unchecked")
-            @Override
-            public <T extends Identity> IdentityResolver<T> identityResolver(Class<T> identityClass) {
-                return (IdentityResolver<T>) result.get(identityClass);
-            }
-        };
+        return new DefaultIdentityResolvers(identityResolvers);
     }
 }

@@ -52,6 +52,6 @@ public final class EnvironmentCredentialProvider implements ChainIdentityProvide
         String sessionToken = setup.getenv(EnvironmentVariableIdentityResolver.SESSION_TOKEN_PROPERTY);
         String accountId = setup.getenv(EnvironmentVariableIdentityResolver.ACCOUNT_ID_PROPERTY);
         var identity = AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken, null, accountId);
-        setup.addTerminalResolver(IdentityResolver.of(identity));
+        setup.addTerminalResolver(IdentityResolver.of(AwsCredentialsIdentity.class, identity));
     }
 }

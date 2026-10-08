@@ -82,7 +82,7 @@ public final class AwsCredentialChainPlugin implements ClientPlugin {
 
     private static boolean hasAwsCredentialsResolver(ClientConfig.Builder config) {
         for (IdentityResolver<?> resolver : config.identityResolvers()) {
-            if (resolver.identityType() == AwsCredentialsIdentity.class) {
+            if (AwsCredentialsIdentity.class.isAssignableFrom(resolver.identityType())) {
                 return true;
             }
         }

@@ -56,8 +56,21 @@ public interface IdentityResolver<IdentityT extends Identity> {
     /**
      * Create an implementation of {@link IdentityResolver} that returns a specific, pre-defined instance of
      * {@link Identity}.
+     *
+     * <p>The resolver reports the runtime class of {@code identity} as its identity type. To report an identity
+     * interface instead, use {@link #of(Class, Identity)}.
      */
     static <I extends Identity> IdentityResolver<I> of(I identity) {
         return new StaticIdentityResolver<>(identity);
+    }
+
+    /**
+     * Create an implementation of {@link IdentityResolver} that returns a specific, pre-defined instance of
+     * {@link Identity} and reports {@code identityType} as its identity type.
+     *
+     * @throws IllegalArgumentException if {@code identity} is not an instance of {@code identityType}.
+     */
+    static <I extends Identity> IdentityResolver<I> of(Class<I> identityType, I identity) {
+        return new StaticIdentityResolver<>(identityType, identity);
     }
 }
