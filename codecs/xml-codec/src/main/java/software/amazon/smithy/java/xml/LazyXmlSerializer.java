@@ -27,12 +27,22 @@ final class LazyXmlSerializer implements ShapeSerializer {
     private final XmlNamespaceTrait defaultNamespace;
     private final XmlInfo xmlInfo;
     private final OutputStream sink;
+    private final SmithyGeneratedXmlSerde generated;
+    private final XmlSettings settings;
     private SmithyXmlSerializer delegate;
 
-    LazyXmlSerializer(XmlNamespaceTrait defaultNamespace, XmlInfo xmlInfo, OutputStream sink) {
+    LazyXmlSerializer(
+            XmlNamespaceTrait defaultNamespace,
+            XmlInfo xmlInfo,
+            OutputStream sink,
+            SmithyGeneratedXmlSerde generated,
+            XmlSettings settings
+    ) {
         this.defaultNamespace = defaultNamespace;
         this.xmlInfo = xmlInfo;
         this.sink = sink;
+        this.generated = generated;
+        this.settings = settings;
     }
 
     private SmithyXmlSerializer delegate() {
@@ -44,6 +54,12 @@ final class LazyXmlSerializer implements ShapeSerializer {
 
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
+        // A generated codec writes straight through to the sink, so it can only be used while nothing
+        // has been buffered ahead of it. Once the dispatch serializer exists it owns unflushed bytes
+        // that have to reach the sink first, and jumping the queue would reorder the document.
+        if (generated != null && delegate == null && generated.serializeTo(struct, schema, sink, settings)) {
+            return;
+        }
         delegate().writeStruct(schema, struct);
     }
 

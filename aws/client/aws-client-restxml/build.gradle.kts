@@ -22,6 +22,13 @@ dependencies {
 protocolTestRuns {
     run("native") { systemProperty("smithy-java.xml-provider", "smithy") }
     run("stax") { }
+    run("codegen") {
+        systemProperty("smithy-java.xml-provider", "smithy")
+        // Strict turns an emitter bug into a failure instead of a silent fall back to the
+        // dispatch path, which would leave this run indistinguishable from "native".
+        systemProperty("smithy-java.runtime-codegen.xml", "strict")
+        systemProperty("smithy-java.runtime-codegen.http-binding", "strict")
+    }
 }
 
 val generator = "software.amazon.smithy.java.protocoltests.generators.ProtocolTestGenerator"
