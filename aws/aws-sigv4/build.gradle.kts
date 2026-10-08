@@ -19,6 +19,10 @@ dependencies {
     implementation(project(":io"))
     implementation(project(":logging"))
     implementation(libs.smithy.aws.traits)
+
+    testImplementation(project(":client:dynamic-client"))
+    testImplementation(project(":client:client-mock-plugin"))
+    testImplementation(project(":aws:client:aws-client-awsjson"))
 }
 
 afterEvaluate {

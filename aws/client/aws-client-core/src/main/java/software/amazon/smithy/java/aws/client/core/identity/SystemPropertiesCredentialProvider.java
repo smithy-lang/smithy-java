@@ -52,6 +52,6 @@ public final class SystemPropertiesCredentialProvider implements ChainIdentityPr
         String sessionToken = System.getProperty(SystemPropertiesIdentityResolver.SESSION_TOKEN_PROPERTY);
         String accountId = System.getProperty(SystemPropertiesIdentityResolver.ACCOUNT_ID_PROPERTY);
         var identity = AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken, null, accountId);
-        setup.addTerminalResolver(IdentityResolver.of(identity));
+        setup.addTerminalResolver(IdentityResolver.of(AwsCredentialsIdentity.class, identity));
     }
 }
