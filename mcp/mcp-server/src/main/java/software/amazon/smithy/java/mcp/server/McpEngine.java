@@ -8,9 +8,11 @@ package software.amazon.smithy.java.mcp.server;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -44,7 +46,8 @@ public final class McpEngine implements AutoCloseable {
         protocols = McpProtocolRegistry.create(
                 builder.protocols.values(),
                 builder.protocolOverrides.values(),
-                builder.discoverProtocols);
+                builder.discoverProtocols,
+                builder.protocolVersions);
         wireCodec = new McpWireCodec(builder.extensions);
         interceptor = builder.interceptor;
         cachePolicy = builder.cachePolicy;
@@ -162,6 +165,13 @@ public final class McpEngine implements AutoCloseable {
         return protocols.find(version);
     }
 
+    /**
+     * The version used when a request does not identify one, honoring any {@link Builder#protocolVersions} restriction.
+     */
+    ProtocolVersion defaultProtocolVersion() {
+        return protocols.defaultProtocol().protocolVersion();
+    }
+
     void bindTransport(
             Consumer<JsonRpcRequest> notificationWriter,
             Consumer<JsonRpcResponse> responseWriter
@@ -210,6 +220,7 @@ public final class McpEngine implements AutoCloseable {
         private ToolFilter toolFilter = (serverId, toolName) -> true;
         private McpMetricsObserver metricsObserver;
         private boolean discoverProtocols = true;
+        private Set<McpProtocolId> protocolVersions;
         private McpCachePolicy cachePolicy = McpCachePolicy.DEFAULT;
 
         public Builder services(Map<String, Service> services) {
@@ -257,6 +268,40 @@ public final class McpEngine implements AutoCloseable {
 
         public Builder discoverProtocols(boolean discoverProtocols) {
             this.discoverProtocols = discoverProtocols;
+            return this;
+        }
+
+        /**
+         * Restricts the protocol versions the engine negotiates and advertises to the given registered versions.
+         *
+         * <p>By default every registered protocol is served. When restricted, requests that claim another
+         * version fail with {@code -32022} (whose {@code supported} list, like {@code server/discover}'s
+         * {@code supportedVersions}, names only the retained versions), and {@code initialize} falls back to
+         * the newest retained handshake version.
+         *
+         * <p>For example, a server that relays {@code notifications/tools/list_changed} from proxied servers
+         * can be restricted to handshake versions (2025-11-25 and earlier). 2026-07-28 only delivers
+         * list-change notifications through {@code subscriptions/listen}, which is not implemented yet, so
+         * restricting the versions lets clients that support both fall back to {@code initialize} and keep
+         * receiving those notifications.
+         *
+         * <p>{@link #build()} fails with {@link IllegalArgumentException} if a version is not registered, and
+         * with {@link IllegalStateException} if none of the versions supports {@code initialize}.
+         *
+         * @param versions protocol versions to serve
+         * @return the builder
+         */
+        public Builder protocolVersions(ProtocolVersion... versions) {
+            Objects.requireNonNull(versions, "versions");
+            if (versions.length == 0) {
+                throw new IllegalArgumentException("At least one MCP protocol version is required");
+            }
+            var ids = new LinkedHashSet<McpProtocolId>();
+            for (var protocolVersion : versions) {
+                Objects.requireNonNull(protocolVersion, "protocol version");
+                ids.add(McpProtocolId.of(protocolVersion.identifier()));
+            }
+            this.protocolVersions = Set.copyOf(ids);
             return this;
         }
 

@@ -33,6 +33,7 @@ public final class StdioMcpServerBuilder {
     private ToolFilter toolFilter = (server, tool) -> true;
     private McpMetricsObserver metricsObserver;
     private boolean discoverProtocols = true;
+    private ProtocolVersion[] protocolVersions;
     private McpCachePolicy cachePolicy = McpCachePolicy.DEFAULT;
 
     StdioMcpServerBuilder() {}
@@ -116,6 +117,16 @@ public final class StdioMcpServerBuilder {
         return this;
     }
 
+    /**
+     * Restricts the protocol versions the server negotiates and advertises.
+     *
+     * @see McpEngine.Builder#protocolVersions(ProtocolVersion...)
+     */
+    public StdioMcpServerBuilder protocolVersions(ProtocolVersion... versions) {
+        this.protocolVersions = Objects.requireNonNull(versions, "versions").clone();
+        return this;
+    }
+
     public StdioMcpServerBuilder cachePolicy(McpCachePolicy cachePolicy) {
         this.cachePolicy = Objects.requireNonNull(cachePolicy, "cachePolicy");
         return this;
@@ -141,11 +152,15 @@ public final class StdioMcpServerBuilder {
                     .discoverProtocols(discoverProtocols);
             protocols.values().forEach(engineBuilder::addProtocol);
             protocolOverrides.values().forEach(engineBuilder::overrideProtocol);
+            if (protocolVersions != null) {
+                engineBuilder.protocolVersions(protocolVersions);
+            }
             engine = engineBuilder.build();
         } else if (!services.isEmpty()
                 || !remoteClients.isEmpty()
                 || !protocols.isEmpty()
-                || !protocolOverrides.isEmpty()) {
+                || !protocolOverrides.isEmpty()
+                || protocolVersions != null) {
             throw new IllegalStateException("Cannot combine a prebuilt engine with builder-managed sources");
         }
         return new StdioMcpServer(this);

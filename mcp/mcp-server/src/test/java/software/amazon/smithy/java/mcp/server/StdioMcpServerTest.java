@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -233,6 +234,65 @@ public class StdioMcpServerTest {
         assertTrue(completion.getMember("values").asList().isEmpty());
         assertEquals(0, completion.getMember("total").asNumber().intValue());
         assertFalse(completion.getMember("hasMore").asBoolean());
+    }
+
+    @Test
+    public void handshakeOnlyServerSendsStatelessClientsBackToInitialize() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .protocolVersions(
+                        KnownProtocolVersion.V2025_11_25,
+                        KnownProtocolVersion.V2025_06_18,
+                        KnownProtocolVersion.V2025_03_26,
+                        KnownProtocolVersion.V2024_11_05)
+                .addService("test-mcp",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test#TestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(MODEL)
+                                .build())
+                .build();
+
+        server.start();
+
+        write("server/discover", modernParams(Map.of()));
+        var discover = read();
+        assertNull(discover.getResult());
+        assertEquals(-32022, discover.getError().getCode());
+        var supported = discover.getError()
+                .getData()
+                .getMember("supported")
+                .asList()
+                .stream()
+                .map(Document::asString)
+                .toList();
+        assertEquals(KnownProtocolVersion.V2025_11_25.identifier(), supported.getFirst());
+        assertFalse(supported.contains(KnownProtocolVersion.V2026_07_28.identifier()));
+
+        write("initialize",
+                Document.of(Map.of(
+                        "protocolVersion",
+                        Document.of(KnownProtocolVersion.V2026_07_28.identifier()))));
+        var initialize = read().getResult();
+        assertEquals(
+                KnownProtocolVersion.V2025_11_25.identifier(),
+                initialize.getMember("protocolVersion").asString());
+        assertTrue(initialize.getMember("capabilities").getMember("tools").getMember("listChanged").asBoolean());
+    }
+
+    @Test
+    public void prebuiltEngineCannotBeCombinedWithProtocolVersions() {
+        try (var engine = McpEngine.builder().build()) {
+            var builder = StdioMcpServer.builder()
+                    .input(input)
+                    .output(output)
+                    .engine(engine)
+                    .protocolVersions(KnownProtocolVersion.V2025_11_25);
+
+            assertThrows(IllegalStateException.class, builder::build);
+        }
     }
 
     @Test
