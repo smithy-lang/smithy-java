@@ -74,7 +74,7 @@ public final class MapGenerator
                                                 @Override
                                                 public void accept(${value:B} values, ${shapeSerializer:T} serializer) {
                                                     ${?sparse}if (values == null) {
-                                                        serializer.writeNull(${valueSchema:L});
+                                                        ${memberNullSerializer:C|};
                                                         return;
                                                     }
                                                     ${/sparse}${memberSerializer:C|};
@@ -106,7 +106,6 @@ public final class MapGenerator
                             writer.putContext("key", keySymbol);
                             writer.putContext("value", valueSymbol);
                             writer.putContext("keySchema", keySchema);
-                            writer.putContext("valueSchema", valueSchema);
                             var collectionImpl = (Class<?>) directive.symbol()
                                     .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS);
                             writer.putContext("collectionImpl", collectionImpl);
@@ -119,13 +118,13 @@ public final class MapGenerator
                             writer.putContext("shapeSerializer", ShapeSerializer.class);
                             writer.putContext("shapeDeserializer", ShapeDeserializer.class);
                             writer.putContext("string", String.class);
-                            writer.putContext(
-                                    "memberSerializer",
-                                    new SerializerMemberGenerator(
-                                            directive,
-                                            writer,
-                                            directive.shape().getValue(),
-                                            "values"));
+                            var memberSerializer = new SerializerMemberGenerator(
+                                    directive,
+                                    writer,
+                                    directive.shape().getValue(),
+                                    "values");
+                            writer.putContext("memberSerializer", memberSerializer);
+                            writer.putContext("memberNullSerializer", memberSerializer.writeNullGenerator());
                             writer.putContext(
                                     "memberDeserializer",
                                     new DeserializerGenerator(

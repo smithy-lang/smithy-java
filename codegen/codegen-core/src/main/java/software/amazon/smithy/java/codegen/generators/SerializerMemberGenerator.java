@@ -29,7 +29,6 @@ import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.LongShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
-import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.shapes.ShortShape;
@@ -47,7 +46,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     private final SymbolProvider provider;
     private final Model model;
     private final Map<ShapeId, String> renames;
-    private final Shape shape;
+    private final MemberShape shape;
     private final String state;
     private final ContextualDirective<CodeGenerationContext, ?> directive;
     private final String schemaNameOverride;
@@ -55,7 +54,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     SerializerMemberGenerator(
             ContextualDirective<CodeGenerationContext, ?> directive,
             JavaWriter writer,
-            Shape shape,
+            MemberShape shape,
             String state
     ) {
         this(directive, writer, shape, state, null);
@@ -64,7 +63,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     SerializerMemberGenerator(
             ContextualDirective<CodeGenerationContext, ?> directive,
             JavaWriter writer,
-            Shape shape,
+            MemberShape shape,
             String state,
             String schemaNameOverride
     ) {
@@ -224,23 +223,8 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
             writer.write("serializer.writeString(SCHEMA_MESSAGE, ${state:L}.getMessage())");
             return null;
         }
-        var container = model.expectShape(memberShape.getContainer());
-        if (schemaNameOverride != null && (container.isListShape() || container.isMapShape())) {
-            writer.putContext("schema", schemaNameOverride);
-        } else {
-            var schemaFieldOder = directive.context().schemaFieldOrder();
-            if (container.isListShape()) {
-                var memberSchema =
-                        schemaFieldOder.getSchemaFieldName(container, writer) + ".listMember()";
-                writer.putContext("schema", memberSchema);
-            } else if (container.isMapShape()) {
-                var memberSchema =
-                        schemaFieldOder.getSchemaFieldName(container, writer) + ".mapValueMember()";
-                writer.putContext("schema", memberSchema);
-            } else {
-                writer.putContext("schema", CodegenUtils.toMemberSchemaName(memberName));
-            }
-        }
+
+        writer.putContext("schema", getSchemaNameForMember(memberShape));
         return model.expectShape(memberShape.getTarget()).accept(this);
     }
 
@@ -248,5 +232,26 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     public Void timestampShape(TimestampShape timestampShape) {
         writer.write("serializer.writeTimestamp(${schema:L}, ${state:L})");
         return null;
+    }
+
+    public Runnable writeNullGenerator() {
+        return () -> writer.write("serializer.writeNull($L)", getSchemaNameForMember(shape));
+    }
+
+    private String getSchemaNameForMember(MemberShape memberShape) {
+        var container = model.expectShape(memberShape.getContainer());
+        if (schemaNameOverride != null && (container.isListShape() || container.isMapShape())) {
+            return schemaNameOverride;
+        } else {
+            var schemaFieldOder = directive.context().schemaFieldOrder();
+            if (container.isListShape()) {
+                return schemaFieldOder.getSchemaFieldName(container, writer) + ".listMember()";
+            } else if (container.isMapShape()) {
+                return schemaFieldOder.getSchemaFieldName(container, writer) + ".mapValueMember()";
+            }
+        }
+
+        var memberName = provider.toMemberName(memberShape);
+        return CodegenUtils.toMemberSchemaName(memberName);
     }
 }

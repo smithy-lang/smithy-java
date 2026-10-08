@@ -99,5 +99,18 @@ public final class SymbolProperties {
      */
     public static final Property<Boolean> IS_NULLABLE = Property.named("is-nullable");
 
+    /**
+     * Indicates that a nullable structure member must be serialized as an explicit null when it has no value.
+     *
+     * <p>By default, generated serializers skip nullable members whose value is {@code null}. When this
+     * property is set to {@code true} on a member symbol, the generated serializer instead calls
+     * {@code ShapeSerializer#writeNull} with the member's schema, so that the codec can emit an explicit null
+     * (for example, {@code "member": null} in JSON).
+     *
+     * <p>This property is optional and defaults to {@code false}. It is not set by the default symbol provider;
+     * custom symbol providers or decorators can set it on structure member symbols.
+     */
+    public static final Property<Boolean> REQUIRES_EXPLICIT_NULL = Property.named("requires-explicit-null");
+
     private SymbolProperties() {}
 }
