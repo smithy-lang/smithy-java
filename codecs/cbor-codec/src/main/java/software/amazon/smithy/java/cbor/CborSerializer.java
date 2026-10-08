@@ -58,7 +58,7 @@ final class CborSerializer implements ShapeSerializer {
     private static final int ARRAY_STREAM = TYPE_ARRAY | INDEFINITE;
 
     private static final int DEFAULT_BUF_SIZE = 4096;
-    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
+    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 32;
 
     private static final StripedPool<CborSerializer, Void> POOL = new CborStripedPool();
 
@@ -282,6 +282,40 @@ final class CborSerializer implements ShapeSerializer {
             ensureCapacity(1);
             buf[pos++] = (byte) TYPE_SIMPLE_BREAK_STREAM;
         }
+    }
+
+    void generatedBeginObject() {
+        startMap(-1);
+    }
+
+    void generatedWriteField(byte[] encodedName) {
+        ensureCapacity(encodedName.length);
+        System.arraycopy(encodedName, 0, buf, pos, encodedName.length);
+        pos += encodedName.length;
+    }
+
+    void generatedEndObject() {
+        endMap();
+    }
+
+    void generatedBeginArray(int size) {
+        startArray(size);
+    }
+
+    void generatedEndArray() {
+        endArray();
+    }
+
+    void generatedBeginMap(int size) {
+        startMap(size);
+    }
+
+    void generatedWriteMapKey(String key) {
+        writeStringValue(key);
+    }
+
+    void generatedEndMap() {
+        endMap();
     }
 
     @Override
