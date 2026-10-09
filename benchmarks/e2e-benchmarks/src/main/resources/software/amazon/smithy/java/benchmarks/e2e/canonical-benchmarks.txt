@@ -1,0 +1,89 @@
+# The 71 cross-SDK "Serde E2E" benchmarks, by protocol, in the order they are reported.
+#
+# Each id is the `id` of a `serde-benchmark`-tagged @httpRequestTests / @httpResponseTests
+# case in the shared benchmark model (AwsSdkPerformanceBenchmarkModels). The ids are shared
+# verbatim with every other SDK's suite so results line up in the cross-SDK aggregate.
+#
+# Cases that exist only in smithy-java's copy of the model (WideTypes, OutOfOrder) are not
+# listed here; run them with --all-model-cases.
+
+# AwsJson10 (22)
+awsJson1_0_HealthcheckRequest_Example
+awsJson1_0_HealthcheckResponse_Example
+awsJson1_0_GetItemInput_Baseline
+awsJson1_0_GetItemOutput_Baseline
+awsJson1_0_GetItemOutput_S
+awsJson1_0_GetItemOutput_M
+awsJson1_0_GetItemOutput_L
+awsJson1_0_GetItemOutputBinary_S
+awsJson1_0_GetItemOutputBinary_M
+awsJson1_0_GetItemOutputBinary_L
+awsJson1_0_PutItemRequest_Baseline
+awsJson1_0_PutItemRequest_ShallowMap_S
+awsJson1_0_PutItemRequest_ShallowMap_M
+awsJson1_0_PutItemRequest_ShallowMap_L
+awsJson1_0_PutItemRequest_Nested_M
+awsJson1_0_PutItemRequest_Nested_L
+awsJson1_0_PutItemRequest_MixedItem_S
+awsJson1_0_PutItemRequest_MixedItem_M
+awsJson1_0_PutItemRequest_MixedItem_L
+awsJson1_0_PutItemRequest_BinaryData_S
+awsJson1_0_PutItemRequest_BinaryData_M
+awsJson1_0_PutItemRequest_BinaryData_L
+
+# RpcV2Cbor (19)
+rpcv2Cbor_GetItemOutput_Baseline
+rpcv2Cbor_GetItemOutput_S
+rpcv2Cbor_GetItemOutput_M
+rpcv2Cbor_GetItemOutput_L
+rpcv2Cbor_GetItemOutputBinary_S
+rpcv2Cbor_GetItemOutputBinary_M
+rpcv2Cbor_GetItemOutputBinary_L
+rpcv2Cbor_PutItemRequest_Baseline
+rpcv2Cbor_PutItemRequest_ShallowMap_S
+rpcv2Cbor_PutItemRequest_ShallowMap_M
+rpcv2Cbor_PutItemRequest_ShallowMap_L
+rpcv2Cbor_PutItemRequest_Nested_M
+rpcv2Cbor_PutItemRequest_Nested_L
+rpcv2Cbor_PutItemRequest_MixedItem_S
+rpcv2Cbor_PutItemRequest_MixedItem_M
+rpcv2Cbor_PutItemRequest_MixedItem_L
+rpcv2Cbor_PutItemRequest_BinaryData_S
+rpcv2Cbor_PutItemRequest_BinaryData_M
+rpcv2Cbor_PutItemRequest_BinaryData_L
+
+# AwsQuery (10)
+awsQuery_GetMetricDataRequest_S
+awsQuery_GetMetricDataRequest_M
+awsQuery_GetMetricDataRequest_L
+awsQuery_GetMetricDataResponse_S
+awsQuery_GetMetricDataResponse_M
+awsQuery_GetMetricDataResponse_L
+awsQuery_PutMetricDataRequest_Baseline
+awsQuery_PutMetricDataRequest_S
+awsQuery_PutMetricDataRequest_M
+awsQuery_PutMetricDataRequest_L
+
+# RestJson1 (10)
+restJson1_CopyObjectRequest_Baseline
+restJson1_CopyObjectRequest_M
+restJson1_CopyObjectOutput_Baseline
+restJson1_CopyObjectOutput_M
+restJson1_PutObject_S
+restJson1_PutObject_M
+restJson1_PutObject_L
+restJson1_GetObject_S
+restJson1_GetObject_M
+restJson1_GetObject_L
+
+# RestXml (10)
+restXml_CopyObjectRequest_Baseline
+restXml_CopyObjectRequest_M
+restXml_CopyObjectOutput_Baseline
+restXml_CopyObjectOutput_M
+restXml_PutObject_S
+restXml_PutObject_M
+restXml_PutObject_L
+restXml_GetObject_S
+restXml_GetObject_M
+restXml_GetObject_L

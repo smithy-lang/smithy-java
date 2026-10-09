@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.benchmarks.e2e;
+package software.amazon.smithy.java.benchmarks.live;
 
 import com.sun.management.OperatingSystemMXBean;
 import java.lang.management.BufferPoolMXBean;
@@ -124,7 +124,7 @@ final class ResourceMonitor {
         // First call returns -1 as a baseline; ignore it.
         osMXBean.getProcessCpuLoad();
         scheduler = Executors.newScheduledThreadPool(1, r -> {
-            var t = new Thread(r, "e2e-resource-monitor");
+            var t = new Thread(r, "live-resource-monitor");
             t.setDaemon(true);
             return t;
         });
