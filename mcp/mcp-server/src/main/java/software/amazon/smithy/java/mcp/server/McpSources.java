@@ -42,6 +42,13 @@ interface McpSources extends AutoCloseable {
 
     void ensureRemoteCatalogLoaded(McpProtocol protocol);
 
+    /**
+     * Returns the protocol to use when forwarding a call from a caller speaking
+     * {@code callerProtocol} to {@code client}: the one selected when that remote's catalog
+     * was loaded for the caller's protocol.
+     */
+    McpProtocol remoteProtocol(McpRemoteClient client, McpProtocol callerProtocol);
+
     void addService(String id, Service service);
 
     void addRemoteClient(McpRemoteClient client);

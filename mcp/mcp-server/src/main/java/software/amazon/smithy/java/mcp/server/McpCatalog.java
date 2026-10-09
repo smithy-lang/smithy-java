@@ -336,6 +336,7 @@ final class McpCatalog implements McpSources {
         runOnce(load.operation(), () -> {
             try {
                 var protocol = prepareRemoteClient(client, requestedProtocol);
+                load.selectedProtocol().set(protocol);
                 client.usingProtocol(protocol, () -> {
                     refresh(client);
                     return null;
@@ -346,6 +347,22 @@ final class McpCatalog implements McpSources {
                 throw e;
             }
         });
+    }
+
+    @Override
+    public McpProtocol remoteProtocol(McpRemoteClient client, McpProtocol callerProtocol) {
+        var load = remoteCatalogLoads.get(new RemoteCatalogKey(client, catalogProtocol(callerProtocol).id()));
+        var selected = load == null ? null : load.selectedProtocol().get();
+        if (selected != null && selected.usesStatelessMetadata()) {
+            return selected;
+        }
+        // A session-based remote can renegotiate when its session is restarted, so prefer the
+        // version it currently holds over the one recorded at load time.
+        var negotiated = client.negotiatedProtocol();
+        if (negotiated != null) {
+            return negotiated;
+        }
+        return selected != null ? selected : callerProtocol;
     }
 
     private McpProtocol prepareRemoteClient(
@@ -851,9 +868,10 @@ final class McpCatalog implements McpSources {
 
     private record RemoteLoadState(
             AtomicReference<CompletableFuture<Void>> operation,
-            AtomicLong retryAfterNanos) {
+            AtomicLong retryAfterNanos,
+            AtomicReference<McpProtocol> selectedProtocol) {
         private RemoteLoadState() {
-            this(new AtomicReference<>(), new AtomicLong());
+            this(new AtomicReference<>(), new AtomicLong(), new AtomicReference<>());
         }
     }
 

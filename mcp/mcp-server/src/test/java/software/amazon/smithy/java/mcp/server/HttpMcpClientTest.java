@@ -15,8 +15,10 @@ import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -1034,6 +1036,256 @@ class HttpMcpClientTest {
         assertEquals(
                 Map.of(),
                 metadata.getMember(McpWireNames.CLIENT_CAPABILITIES).asStringMap());
+    }
+
+    @Test
+    void statelessCallerToolCallsUseTheRemotesNegotiatedProtocol() {
+        var forwarded = legacyRemote();
+
+        try (var engine = McpEngine.builder().addRemoteClient(proxy).build()) {
+            var listed = engine.execute(statelessRequest(1, "tools/list", Map.of()), KnownProtocolVersion.V2026_07_28);
+            assertNull(listed.getError(), () -> "tools/list failed: " + listed.getError().getMessage());
+
+            var called = engine.execute(
+                    statelessRequest(2, "tools/call", Map.of("name", Document.of("Echo"))),
+                    KnownProtocolVersion.V2026_07_28);
+
+            assertNull(called.getError(), () -> "tools/call failed: " + called.getError().getMessage());
+            assertEquals("echoed",
+                    called.getResult().getMember("content").asList().getFirst().getMember("text").asString());
+            var toolCall = forwardedRequest(forwarded, "tools/call");
+            assertEquals(LEGACY_REMOTE_VERSION, toolCall.protocolHeader());
+            assertNull(toolCall.metaProtocolVersion(), "stateless _meta leaked to the legacy remote");
+        }
+    }
+
+    @Test
+    void statelessCallerPromptGetsUseTheRemotesNegotiatedProtocol() {
+        var forwarded = legacyRemote();
+
+        try (var engine = McpEngine.builder().addRemoteClient(proxy).build()) {
+            var prompt = engine.execute(
+                    statelessRequest(1, "prompts/get", Map.of("name", Document.of("Greet"))),
+                    KnownProtocolVersion.V2026_07_28);
+
+            assertNull(prompt.getError(), () -> "prompts/get failed: " + prompt.getError().getMessage());
+            var promptGet = forwardedRequest(forwarded, "prompts/get");
+            assertEquals(LEGACY_REMOTE_VERSION, promptGet.protocolHeader());
+            assertNull(promptGet.metaProtocolVersion(), "stateless _meta leaked to the legacy remote");
+        }
+    }
+
+    @Test
+    void sessionCallerToolCallsUseTheRemotesNegotiatedVersionNotTheCallers() {
+        var forwarded = legacyRemote();
+
+        try (var engine = McpEngine.builder().addRemoteClient(proxy).build()) {
+            var initialized = engine.execute(
+                    JsonRpcRequest.builder()
+                            .jsonrpc("2.0")
+                            .id(Document.of(1))
+                            .method("initialize")
+                            .params(Document.of(Map.of(
+                                    "protocolVersion",
+                                    Document.of(KnownProtocolVersion.V2025_11_25.identifier()),
+                                    "capabilities",
+                                    Document.of(Map.of()),
+                                    "clientInfo",
+                                    Document.of(Map.of("name", Document.of("test"), "version", Document.of("1"))))))
+                            .build(),
+                    KnownProtocolVersion.V2025_11_25);
+            assertNull(initialized.getError(), () -> "initialize failed: " + initialized.getError().getMessage());
+
+            var called = engine.execute(
+                    JsonRpcRequest.builder()
+                            .jsonrpc("2.0")
+                            .id(Document.of(2))
+                            .method("tools/call")
+                            .params(Document.of(Map.of("name", Document.of("Echo"))))
+                            .build(),
+                    KnownProtocolVersion.V2025_11_25);
+
+            assertNull(called.getError(), () -> "tools/call failed: " + called.getError().getMessage());
+            assertEquals(LEGACY_REMOTE_VERSION, forwardedRequest(forwarded, "tools/call").protocolHeader());
+        }
+    }
+
+    @Test
+    void forwardedCallsFollowAVersionRenegotiatedWhenTheSessionRestarts() {
+        // The remote first negotiates 2025-06-18 in session "first". Once that session expires it answers
+        // 404, and the re-initialization negotiates 2025-11-25 in session "second", after which only
+        // 2025-11-25 is accepted. The initialized notification and the retried call must follow it.
+        var upgraded = new AtomicBoolean();
+        var forwarded = new CopyOnWriteArrayList<Forwarded>();
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            try {
+                var header = exchange.getRequestHeaders().getFirst("MCP-Protocol-Version");
+                var session = exchange.getRequestHeaders().getFirst("Mcp-Session-Id");
+                var request = JsonRpcRequest.builder()
+                        .deserialize(JSON_CODEC.createDeserializer(exchange.getRequestBody().readAllBytes()))
+                        .build();
+                forwarded.add(new Forwarded(request.getMethod(), header, metaProtocolVersion(request)));
+                var initialize = request.getMethod().equals("initialize");
+                if (!initialize && upgraded.get() && "first".equals(session)) {
+                    exchange.sendResponseHeaders(404, -1);
+                    return;
+                }
+                var accepted = upgraded.get() ? KnownProtocolVersion.V2025_11_25 : KnownProtocolVersion.V2025_06_18;
+                if (!initialize && header != null && !header.equals(accepted.identifier())) {
+                    writeJson(exchange,
+                            400,
+                            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,"
+                                    + "\"message\":\"Unsupported protocol version: " + header + "\"}}");
+                    return;
+                }
+                if (request.getId() == null) {
+                    exchange.sendResponseHeaders(202, -1);
+                    return;
+                }
+                var id = JSON_CODEC.serializeToString(request.getId());
+                var result = switch (request.getMethod()) {
+                    case "initialize" -> {
+                        exchange.getResponseHeaders().set("Mcp-Session-Id", upgraded.get() ? "second" : "first");
+                        yield "{\"protocolVersion\":\"" + accepted.identifier()
+                                + "\",\"capabilities\":{\"tools\":{}},"
+                                + "\"serverInfo\":{\"name\":\"legacy\",\"version\":\"1\"}}";
+                    }
+                    case "tools/list" -> "{\"tools\":[{\"name\":\"Echo\",\"inputSchema\":{\"type\":\"object\"}}]}";
+                    case "prompts/list" -> "{\"prompts\":[]}";
+                    case "tools/call" -> "{\"content\":[{\"type\":\"text\",\"text\":\"echoed\"}]}";
+                    default -> null;
+                };
+                writeJson(exchange,
+                        200,
+                        result == null
+                                ? "{\"jsonrpc\":\"2.0\",\"id\":" + id
+                                        + ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}"
+                                : "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + result + "}");
+            } finally {
+                exchange.close();
+            }
+        });
+
+        try (var engine = McpEngine.builder().addRemoteClient(proxy).build()) {
+            var first = engine.execute(
+                    statelessRequest(1, "tools/call", Map.of("name", Document.of("Echo"))),
+                    KnownProtocolVersion.V2026_07_28);
+            assertNull(first.getError(), () -> "first tools/call failed: " + first.getError().getMessage());
+
+            upgraded.set(true);
+            forwarded.clear();
+            var second = engine.execute(
+                    statelessRequest(2, "tools/call", Map.of("name", Document.of("Echo"))),
+                    KnownProtocolVersion.V2026_07_28);
+
+            assertNull(second.getError(), () -> "tools/call after restart failed: " + second.getError().getMessage());
+            var upgradedVersion = KnownProtocolVersion.V2025_11_25.identifier();
+            assertEquals(upgradedVersion, forwardedRequest(forwarded, "notifications/initialized").protocolHeader());
+            assertEquals(upgradedVersion, forwarded.getLast().protocolHeader(), () -> "retried call: " + forwarded);
+            assertEquals("tools/call", forwarded.getLast().method());
+        }
+    }
+
+    private static final String LEGACY_REMOTE_VERSION = KnownProtocolVersion.V2025_06_18.identifier();
+
+    private record Forwarded(String method, String protocolHeader, String metaProtocolVersion) {}
+
+    /**
+     * Serves a remote that only speaks 2025-06-18: it negotiates that version whatever the client asks for,
+     * and, as that revision requires, rejects any other MCP-Protocol-Version with 400.
+     */
+    private List<Forwarded> legacyRemote() {
+        var forwarded = new CopyOnWriteArrayList<Forwarded>();
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            try {
+                var header = exchange.getRequestHeaders().getFirst("MCP-Protocol-Version");
+                var request = JsonRpcRequest.builder()
+                        .deserialize(JSON_CODEC.createDeserializer(exchange.getRequestBody().readAllBytes()))
+                        .build();
+                forwarded.add(new Forwarded(request.getMethod(), header, metaProtocolVersion(request)));
+                if (request.getId() == null) {
+                    exchange.sendResponseHeaders(202, -1);
+                    return;
+                }
+                var id = JSON_CODEC.serializeToString(request.getId());
+                if (!request.getMethod().equals("initialize") && header != null
+                        && !header.equals(LEGACY_REMOTE_VERSION)) {
+                    writeJson(exchange,
+                            400,
+                            "{\"jsonrpc\":\"2.0\",\"id\":" + id
+                                    + ",\"error\":{\"code\":-32600,\"message\":\"Unsupported protocol version: "
+                                    + header + "\"}}");
+                    return;
+                }
+                var result = switch (request.getMethod()) {
+                    case "initialize" -> "{\"protocolVersion\":\"" + LEGACY_REMOTE_VERSION
+                            + "\",\"capabilities\":{\"tools\":{},\"prompts\":{}},"
+                            + "\"serverInfo\":{\"name\":\"legacy\",\"version\":\"1\"}}";
+                    case "tools/list" -> "{\"tools\":[{\"name\":\"Echo\",\"inputSchema\":{\"type\":\"object\"}}]}";
+                    case "prompts/list" -> "{\"prompts\":[{\"name\":\"Greet\",\"description\":\"Greets\"}]}";
+                    case "prompts/get" -> "{\"messages\":[{\"role\":\"user\","
+                            + "\"content\":{\"type\":\"text\",\"text\":\"hello\"}}]}";
+                    case "tools/call" -> "{\"content\":[{\"type\":\"text\",\"text\":\"echoed\"}]}";
+                    default -> null;
+                };
+                writeJson(exchange,
+                        200,
+                        result == null
+                                ? "{\"jsonrpc\":\"2.0\",\"id\":" + id
+                                        + ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}"
+                                : "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + result + "}");
+            } finally {
+                exchange.close();
+            }
+        });
+        return forwarded;
+    }
+
+    private static Forwarded forwardedRequest(List<Forwarded> forwarded, String method) {
+        return forwarded.stream()
+                .filter(request -> request.method().equals(method))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(method + " was never forwarded: " + forwarded));
+    }
+
+    private static JsonRpcRequest statelessRequest(int id, String method, Map<String, Document> params) {
+        var values = new HashMap<>(params);
+        values.put("_meta",
+                Document.of(Map.of(
+                        McpWireNames.PROTOCOL_VERSION,
+                        Document.of(KnownProtocolVersion.V2026_07_28.identifier()),
+                        McpWireNames.CLIENT_CAPABILITIES,
+                        Document.of(Map.of()))));
+        return JsonRpcRequest.builder()
+                .jsonrpc("2.0")
+                .id(Document.of(id))
+                .method(method)
+                .params(Document.of(values))
+                .build();
+    }
+
+    private static String metaProtocolVersion(JsonRpcRequest request) {
+        var params = request.getParams();
+        if (params == null || !(params.isType(ShapeType.MAP) || params.isType(ShapeType.STRUCTURE))) {
+            return null;
+        }
+        var meta = params.getMember("_meta");
+        if (meta == null || !(meta.isType(ShapeType.MAP) || meta.isType(ShapeType.STRUCTURE))) {
+            return null;
+        }
+        var version = meta.getMember(McpWireNames.PROTOCOL_VERSION);
+        return version == null ? null : version.asString();
+    }
+
+    private static void writeJson(HttpExchange exchange, int status, String json) throws IOException {
+        var body = json.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.sendResponseHeaders(status, body.length);
+        try (var output = exchange.getResponseBody()) {
+            output.write(body);
+        }
     }
 
     private static ToolInfo tool(String name) {
