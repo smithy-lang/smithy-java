@@ -345,7 +345,9 @@ final class CborDeserializer implements ShapeDeserializer {
         byte token = parser.currentToken();
         byte actual = (byte) (token ^ Token.TAG_FLAG);
         if (actual <= Token.NEG_INT) {
-            return Instant.ofEpochMilli(readLong("timestamp", token) * 1000);
+            // Fix (matches later SDKs): read the integer epoch with the untagged token; passing the tagged
+            // token (e.g. EPOCH_IPOS) made readLong reject it with "Can't read EPOCH_IPOS as a timestamp".
+            return Instant.ofEpochMilli(readLong("timestamp", actual) * 1000);
         } else if (actual == Token.FLOAT) {
             double d = readDouble("timestamp", actual);
             return Instant.ofEpochMilli(Math.round(d * 1000d));

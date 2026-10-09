@@ -112,3 +112,10 @@ include(":mcp:mcp-server")
 
 include(":model-bundle")
 include(":model-bundle:model-bundle-api")
+
+// Benchmarks (not published). Added for the 2026-02-11 baseline: the current e2e ops/CPU-sec harness
+// built against this SDK (the first commit with awsQuery client support). The smithy-java HTTP client /
+// BoringSSL / fixture server do not exist yet, so only the in-process stub path is built.
+include(":benchmarks")
+include(":benchmarks:benchmark-commons")
+include(":benchmarks:e2e-benchmarks")
