@@ -3,18 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.benchmarks.e2e;
+package software.amazon.smithy.java.benchmarks.live;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Map;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeValue;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.GetItemInput;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.PutItemInput;
-import software.amazon.smithy.java.benchmarks.e2e.s3.client.S3Client;
-import software.amazon.smithy.java.benchmarks.e2e.s3.model.GetObjectInput;
-import software.amazon.smithy.java.benchmarks.e2e.s3.model.PutObjectInput;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.client.DynamoDBClient;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.AttributeValue;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.GetItemInput;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.PutItemInput;
+import software.amazon.smithy.java.benchmarks.live.s3.client.S3Client;
+import software.amazon.smithy.java.benchmarks.live.s3.model.GetObjectInput;
+import software.amazon.smithy.java.benchmarks.live.s3.model.PutObjectInput;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**

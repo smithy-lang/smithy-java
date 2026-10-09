@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.benchmarks.e2e;
+package software.amazon.smithy.java.benchmarks.live;
 
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
@@ -91,7 +91,7 @@ abstract class BenchmarkSupport {
         }
 
         int concurrency = Runtime.getRuntime().availableProcessors()
-                * Integer.getInteger("e2e.concurrency.multiplier", 4);
+                * Integer.getInteger("live.concurrency.multiplier", 4);
         var permits = new Semaphore(concurrency);
         var done = new CountDownLatch(config.batchActions());
         var error = new AtomicReference<Throwable>();
@@ -130,7 +130,7 @@ abstract class BenchmarkSupport {
     }
 
     private void printInit() {
-        System.out.println("Initialized smithy-java e2e benchmark:");
+        System.out.println("Initialized smithy-java live benchmark:");
         System.out.println("  Operation: " + config.operation().id);
         System.out.println("  Region:    " + config.region());
         if (config.operation().isS3()) {

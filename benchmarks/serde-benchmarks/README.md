@@ -64,6 +64,16 @@ The JMH JSON output is written to:
 benchmarks/serde-benchmarks/build/results/jmh/results.json
 ```
 
+## Running on a metal host
+
+`scripts/run-metal-benchmarks.py --suite serde` runs this suite on a bare-metal EC2 instance
+driven over SSM (no SSH), with the CPU governor pinned, and copies the JMH JSON plus the converted
+`output.json` and `output.md` to S3 and to `build/metal-runs/<run-id>/results/serde/`. The
+converter runs on the host so EC2 instance type detection works. `--serde-args` passes extra JMH
+arguments, for example `-p testCaseId=rpcv2Cbor_PutItemRequest_BinaryData_S`, and `--serde-fast`
+shortens the iterations. See [`../e2e-benchmarks/README.md`](../e2e-benchmarks/README.md#running-on-metal)
+for the account setup.
+
 ## Producing the cross-language schema
 
 After running the benchmarks, convert the JMH JSON into the shared output
