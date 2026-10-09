@@ -3,23 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.benchmarks.e2e;
+package software.amazon.smithy.java.benchmarks.live;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.function.IntConsumer;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeDefinition;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.AttributeValue;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.BillingMode;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.CreateTableInput;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.DeleteTableInput;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.DescribeTableInput;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.KeySchemaElement;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.KeyType;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.ProvisionedThroughput;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.model.ScalarAttributeType;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.client.DynamoDBClient;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.AttributeDefinition;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.AttributeValue;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.BillingMode;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.CreateTableInput;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.DeleteTableInput;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.DescribeTableInput;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.KeySchemaElement;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.KeyType;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.ProvisionedThroughput;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.model.ScalarAttributeType;
 
 final class DdbBenchmarks extends BenchmarkSupport {
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.benchmarks.e2e;
+package software.amazon.smithy.java.benchmarks.live;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -16,9 +16,9 @@ import software.amazon.smithy.java.aws.client.auth.scheme.s3express.S3ExpressCon
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.aws.credentials.chain.ChainSetup;
 import software.amazon.smithy.java.aws.credentials.imds.ImdsCredentialProvider;
-import software.amazon.smithy.java.benchmarks.e2e.dynamodb.client.DynamoDBClient;
-import software.amazon.smithy.java.benchmarks.e2e.s3.client.S3Client;
-import software.amazon.smithy.java.benchmarks.e2e.s3.model.CreateSessionInput;
+import software.amazon.smithy.java.benchmarks.live.dynamodb.client.DynamoDBClient;
+import software.amazon.smithy.java.benchmarks.live.s3.client.S3Client;
+import software.amazon.smithy.java.benchmarks.live.s3.model.CreateSessionInput;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.http.boringssl.BoringSslTlsProvider;
 import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
@@ -76,15 +76,15 @@ final class Clients {
     }
 
     private static int maxConnections() {
-        return Integer.getInteger("e2e.maxconns", 1024);
+        return Integer.getInteger("live.maxconns", 1024);
     }
 
     /**
-     * Returns the alternate transport selected via {@code -De2e.transport=...}, or null for the
+     * Returns the alternate transport selected via {@code -Dlive.transport=...}, or null for the
      * default JDK HttpClient. Recognized values: {@code smithy}, {@code smithy-boringssl}.
      */
     private static ClientTransport<?, ?> selectTransport() {
-        var name = System.getProperty("e2e.transport", "").trim().toLowerCase();
+        var name = System.getProperty("live.transport", "").trim().toLowerCase();
         return switch (name) {
             case "", "jdk" -> null;
             case "smithy" -> new SmithyHttpClientTransport(smithyPool(false));
@@ -93,7 +93,7 @@ final class Clients {
             // pipeline. Falls back to the JDK provider if tcnative is unavailable on the host.
             case "smithy-boringssl" -> new SmithyHttpClientTransport(smithyPool(true));
             default -> throw new IllegalArgumentException(
-                    "Unknown e2e.transport: '" + name
+                    "Unknown live.transport: '" + name
                             + "' (expected one of: jdk, smithy, smithy-boringssl)");
         };
     }
@@ -106,7 +106,7 @@ final class Clients {
      * fails (the pool routes HTTPS to the H2 manager, which refuses an ALPN result of "http/1.1").
      * Force ENFORCE_HTTP_1_1 so the pool routes to the H1 manager from the start. The pool's default
      * maxConnectionsPerRoute=20 throttles a single-bucket benchmark hard, so use the shared
-     * -De2e.maxconns cap (default unbounded) for equal footing with netty.
+     * -Dlive.maxconns cap (default unbounded) for equal footing with netty.
      */
     private static HttpClient smithyPool(boolean boringSsl) {
         int maxConns = maxConnections();
@@ -114,10 +114,10 @@ final class Clients {
                 .httpVersionPolicy(HttpVersionPolicy.ENFORCE_HTTP_1_1)
                 .maxTotalConnections(maxConns)
                 .maxConnectionsPerRoute(maxConns);
-        applyBufferProp("e2e.smithy.recvbuf", 1024 * 1024, builder::socketReceiveBufferSize);
-        applyBufferProp("e2e.smithy.sendbuf", 1024 * 1024, builder::socketSendBufferSize);
-        applyTlsBufferProp("e2e.smithy.tls.readbuf", 256 * 1024, builder::tlsReadBufferSize);
-        applyTlsBufferProp("e2e.smithy.tls.writebuf", 256 * 1024, builder::tlsWriteBufferSize);
+        applyBufferProp("live.smithy.recvbuf", 1024 * 1024, builder::socketReceiveBufferSize);
+        applyBufferProp("live.smithy.sendbuf", 1024 * 1024, builder::socketSendBufferSize);
+        applyTlsBufferProp("live.smithy.tls.readbuf", 256 * 1024, builder::tlsReadBufferSize);
+        applyTlsBufferProp("live.smithy.tls.writebuf", 256 * 1024, builder::tlsWriteBufferSize);
         // The epoll transport is selected automatically when the native library is available.
         if (boringSsl) {
             if (BoringSslTlsProvider.available()) {
@@ -178,7 +178,7 @@ final class Clients {
     @SuppressWarnings("unchecked")
     private static IdentityResolver<AwsCredentialsIdentity> buildImds() {
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "e2e-imds-refresh");
+            Thread t = new Thread(r, "live-imds-refresh");
             t.setDaemon(true);
             return t;
         });

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.benchmarks.e2e;
+package software.amazon.smithy.java.benchmarks.live;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,7 +11,7 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 /**
- * Front door for the fixed live AWS e2e benchmarks.
+ * Front door for the fixed live AWS benchmarks.
  */
 public final class WorkloadRunner {
 
@@ -167,7 +167,7 @@ record BenchmarkConfig(
         }
         if (operation == null) {
             throw new IllegalArgumentException(
-                    "Usage: java -jar smithy-java-e2e-benchmark-runner.jar "
+                    "Usage: java -jar smithy-java-live-benchmark-runner.jar "
                             + "--operation s3-put|s3-get|ddb-put|ddb-get [--bucket <name>] "
                             + "[--table <name>] [--region <region>]");
         }
@@ -176,22 +176,22 @@ record BenchmarkConfig(
         int defaultActions = op.isS3() ? DEFAULT_S3_ACTIONS : DEFAULT_DDB_ACTIONS;
         return new BenchmarkConfig(
                 op,
-                flags.getOrDefault("region", System.getProperty("e2e.region", DEFAULT_REGION)),
-                flags.getOrDefault("bucket", System.getProperty("e2e.bucket", DEFAULT_BUCKET)),
-                flags.getOrDefault("table", System.getProperty("e2e.table", DEFAULT_TABLE)),
-                flags.getOrDefault("keyPrefix", System.getProperty("e2e.keyPrefix", DEFAULT_KEY_PREFIX)),
-                flags.getOrDefault("s3KeyPrefix", System.getProperty("e2e.s3KeyPrefix", DEFAULT_S3_KEY_PREFIX)),
-                Integer.getInteger("e2e.object.size", DEFAULT_OBJECT_SIZE),
-                Integer.getInteger("e2e.data.length", DEFAULT_DATA_LENGTH),
-                Integer.getInteger("e2e.batch.actions", defaultActions),
-                Integer.getInteger("e2e.warmup.batches", DEFAULT_WARMUP_BATCHES),
-                Integer.getInteger("e2e.measurement.batches", DEFAULT_MEASUREMENT_BATCHES),
-                Boolean.parseBoolean(System.getProperty("e2e.collectMetrics", "true")),
-                Integer.getInteger("e2e.metrics.interval.ms", 100),
-                Boolean.parseBoolean(System.getProperty("e2e.ddb.createTable", "true")),
-                Boolean.parseBoolean(System.getProperty("e2e.ddb.deleteTable", "true")),
-                Long.getLong("e2e.ddb.readCapacityUnits", DEFAULT_DDB_CAPACITY_UNITS),
-                Long.getLong("e2e.ddb.writeCapacityUnits", DEFAULT_DDB_CAPACITY_UNITS));
+                flags.getOrDefault("region", System.getProperty("live.region", DEFAULT_REGION)),
+                flags.getOrDefault("bucket", System.getProperty("live.bucket", DEFAULT_BUCKET)),
+                flags.getOrDefault("table", System.getProperty("live.table", DEFAULT_TABLE)),
+                flags.getOrDefault("keyPrefix", System.getProperty("live.keyPrefix", DEFAULT_KEY_PREFIX)),
+                flags.getOrDefault("s3KeyPrefix", System.getProperty("live.s3KeyPrefix", DEFAULT_S3_KEY_PREFIX)),
+                Integer.getInteger("live.object.size", DEFAULT_OBJECT_SIZE),
+                Integer.getInteger("live.data.length", DEFAULT_DATA_LENGTH),
+                Integer.getInteger("live.batch.actions", defaultActions),
+                Integer.getInteger("live.warmup.batches", DEFAULT_WARMUP_BATCHES),
+                Integer.getInteger("live.measurement.batches", DEFAULT_MEASUREMENT_BATCHES),
+                Boolean.parseBoolean(System.getProperty("live.collectMetrics", "true")),
+                Integer.getInteger("live.metrics.interval.ms", 100),
+                Boolean.parseBoolean(System.getProperty("live.ddb.createTable", "true")),
+                Boolean.parseBoolean(System.getProperty("live.ddb.deleteTable", "true")),
+                Long.getLong("live.ddb.readCapacityUnits", DEFAULT_DDB_CAPACITY_UNITS),
+                Long.getLong("live.ddb.writeCapacityUnits", DEFAULT_DDB_CAPACITY_UNITS));
     }
 
     private static void validateClientMode(String mode) {

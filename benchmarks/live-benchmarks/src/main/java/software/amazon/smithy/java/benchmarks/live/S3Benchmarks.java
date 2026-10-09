@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.benchmarks.e2e;
+package software.amazon.smithy.java.benchmarks.live;
 
 import java.util.Random;
 
