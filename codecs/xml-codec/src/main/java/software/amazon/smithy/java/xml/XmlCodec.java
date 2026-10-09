@@ -60,6 +60,13 @@ public final class XmlCodec implements Codec {
 
     @Override
     public ShapeDeserializer createDeserializer(ByteBuffer source) {
+        // Cherry-picked correctness fix (from 59b59a744, "Optimize HTTP binding and XML overhead", minus the
+        // perf changes): an empty response body is a valid empty payload, not a parse error. Without this the
+        // stax reader throws "Premature end of file" when a 200 carries no body (e.g. the harness's minimal
+        // restXml CopyObject responses).
+        if (source == null || !source.hasRemaining()) {
+            return EmptyXmlDeserializer.INSTANCE;
+        }
         try {
             var reader = xmlInputFactory.createXMLStreamReader(ByteBufferUtils.byteBufferInputStream(source));
             return XmlDeserializer.topLevel(

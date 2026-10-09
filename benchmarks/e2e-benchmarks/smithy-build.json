@@ -1,0 +1,108 @@
+{
+  "version": "1.0",
+  "imports": [
+    "../serde-benchmarks/model"
+  ],
+  "projections": {
+    "aws-json-rpc-1-0-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": [
+              "com.amazonaws.sdk.benchmark#AwsJsonRpc10DataPlane"
+            ]
+          }
+        }
+      ],
+      "plugins": {
+        "java-client-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#AwsJsonRpc10DataPlane",
+          "name": "AwsJson10",
+          "namespace": "software.amazon.smithy.java.benchmarks.e2e.generated.awsjson10",
+          "protocol": "aws.protocols#awsJson1_0"
+        }
+      }
+    },
+    "aws-query-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": [
+              "com.amazonaws.sdk.benchmark#AwsQueryDataPlane"
+            ]
+          }
+        }
+      ],
+      "plugins": {
+        "java-client-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#AwsQueryDataPlane",
+          "name": "AwsQuery",
+          "namespace": "software.amazon.smithy.java.benchmarks.e2e.generated.awsquery",
+          "protocol": "aws.protocols#awsQuery"
+        }
+      }
+    },
+    "rest-json-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": [
+              "com.amazonaws.sdk.benchmark#AwsRestJsonDataPlane"
+            ]
+          }
+        }
+      ],
+      "plugins": {
+        "java-client-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#AwsRestJsonDataPlane",
+          "name": "RestJson1",
+          "namespace": "software.amazon.smithy.java.benchmarks.e2e.generated.restjson",
+          "protocol": "aws.protocols#restJson1"
+        }
+      }
+    },
+    "rest-xml-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": [
+              "com.amazonaws.sdk.benchmark#AwsRestXmlDataPlane"
+            ]
+          }
+        }
+      ],
+      "plugins": {
+        "java-client-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#AwsRestXmlDataPlane",
+          "name": "RestXml",
+          "namespace": "software.amazon.smithy.java.benchmarks.e2e.generated.restxml",
+          "protocol": "aws.protocols#restXml"
+        }
+      }
+    },
+    "rpc-v2-cbor-client": {
+      "transforms": [
+        {
+          "name": "includeServices",
+          "args": {
+            "services": [
+              "com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane"
+            ]
+          }
+        }
+      ],
+      "plugins": {
+        "java-client-codegen": {
+          "service": "com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane",
+          "name": "RpcV2Cbor",
+          "namespace": "software.amazon.smithy.java.benchmarks.e2e.generated.rpcv2cbor",
+          "protocol": "smithy.protocols#rpcv2Cbor"
+        }
+      }
+    }
+  }
+}
