@@ -11,8 +11,7 @@ import java.util.List;
 import javax.net.ssl.SSLEngine;
 
 /**
- * Gives the fixture server access to package-private transports.
- * This class belongs to the fixture server jar.
+ * Exposes the HTTP client's package-private socket and TLS transports to the fixture server.
  */
 public final class FixtureServerTransports {
 

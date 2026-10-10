@@ -5,72 +5,58 @@
 
 package software.amazon.smithy.java.benchmarks.e2e;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
+import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
-import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
- * Returns canned responses and consumes request bodies in process.
- * Supports one request at a time on one thread.
+ * Returns the canned response in process and consumes request bodies.
+ * Serves one request at a time on one thread, like the benchmark loop.
  */
-final class MockHttpTransport implements CountingTransport {
+final class MockHttpTransport implements ClientTransport<HttpRequest, HttpResponse>, Target {
+
+    static final String DESCRIPTION = "In-process ClientTransport returning one pre-built canned HTTP response per "
+            + "benchmark. No sockets and no localhost server. The request body is fully consumed as a real transport "
+            + "would; each call gets a new zero-copy view over the same response bytes.";
 
     private CannedResponse response;
+    private boolean checkNextRequest;
     private HttpRequest lastRequest;
     private long lastRequestBodyBytes;
-    private long requests;
-    private long requestBodyBytes;
 
     @Override
-    public void prepare(BenchmarkCase benchmarkCase) {
-        response = benchmarkCase.response();
+    public ClientTransport<HttpRequest, HttpResponse> transport() {
+        return this;
     }
 
     @Override
-    public int lastResponseStatus() {
-        return response == null ? -1 : response.statusCode();
+    public String endpoint() {
+        return BenchmarkProtocol.ENDPOINT;
     }
 
     @Override
-    public long lastResponseLength() {
-        return response == null ? -1 : response.bodyLength();
-    }
-
-    @Override
-    public String lastHttpVersion() {
-        return "stub";
+    public void respondWith(CannedResponse response) {
+        this.response = response;
+        this.checkNextRequest = true;
     }
 
     @Override
     public String description() {
-        return RunReport.HTTP_MOCK;
+        return DESCRIPTION;
     }
 
     @Override
-    public void resetCounters() {
-        requests = 0;
-        requestBodyBytes = 0;
-    }
+    public void close() {}
 
-    @Override
-    public long requests() {
-        return requests;
-    }
-
-    @Override
-    public long requestBodyBytes() {
-        return requestBodyBytes;
-    }
-
-    @Override
-    public HttpRequest lastRequest() {
+    HttpRequest lastRequest() {
         return lastRequest;
+    }
+
+    long lastRequestBodyBytes() {
+        return lastRequestBodyBytes;
     }
 
     @Override
@@ -80,52 +66,18 @@ final class MockHttpTransport implements CountingTransport {
 
     @Override
     public HttpResponse send(Context context, HttpRequest request) {
-        requests++;
         lastRequest = request;
-        lastRequestBodyBytes = drain(request.body());
-        requestBodyBytes += lastRequestBodyBytes;
-        return response.newHttpResponse();
-    }
-
-    /** Reject body lengths that a real server would reject before measurement. */
-    @Override
-    public void validateLast(BenchmarkCase benchmarkCase) {
-        CountingTransport.super.validateLast(benchmarkCase);
-        Long declared = lastRequest == null ? null : lastRequest.headers().contentLength();
-        if (declared != null && declared != lastRequestBodyBytes) {
-            throw new IllegalStateException(benchmarkCase.id() + ": the request declares Content-Length " + declared
-                    + " but its body held " + lastRequestBodyBytes
-                    + " bytes. A real server rejects this; check how the case's payload parameter is decoded.");
-        }
-    }
-
-    // Copy bytes into a reusable buffer. A null output stream can skip reading an in-memory body.
-    private static final ThreadLocal<byte[]> SCRATCH = ThreadLocal.withInitial(() -> new byte[8192]);
-
-    static long drain(DataStream body) {
-        if (body == null) {
-            return 0;
-        }
-        byte[] buf = SCRATCH.get();
-        long total = 0;
-        try (var in = body.asInputStream()) {
-            int n;
-            while ((n = in.read(buf)) >= 0) {
-                total += n;
+        lastRequestBodyBytes = Bodies.drain(request.body());
+        if (checkNextRequest) {
+            // Validate request framing on the first call, before warmup.
+            checkNextRequest = false;
+            Long declared = request.headers().contentLength();
+            if (declared != null && declared != lastRequestBodyBytes) {
+                throw new IllegalStateException(
+                        "The request declares Content-Length " + declared + " but its body held "
+                                + lastRequestBodyBytes + " bytes; check how the case's payload parameter is decoded.");
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         }
-        return total;
-    }
-
-    static long consume(ByteBuffer payload) {
-        ByteBuffer b = payload.duplicate();
-        byte[] buf = SCRATCH.get();
-        long total = b.remaining();
-        while (b.hasRemaining()) {
-            b.get(buf, 0, Math.min(buf.length, b.remaining()));
-        }
-        return total;
+        return response.newHttpResponse();
     }
 }

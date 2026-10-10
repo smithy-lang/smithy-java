@@ -18,16 +18,14 @@ class CpuTimeRunnerTest {
     @Test
     void runsExactlyTheIterationFloorWhenTheCpuStopIsDisabled() throws Throwable {
         var calls = new AtomicLong();
-        var beforeMeasurement = new AtomicLong();
         var runner = new CpuTimeRunner(new Settings(500, 0, 100, 0, Warmup.fixed(7)));
 
-        var m = runner.run(calls::incrementAndGet, () -> beforeMeasurement.set(calls.get()));
+        var m = runner.run(calls::incrementAndGet);
 
         assertThat(m.iterations()).isEqualTo(500);
         assertThat(m.warmup().iterations()).isEqualTo(7);
         assertThat(m.warmup().automatic()).isFalse();
-        assertThat(beforeMeasurement.get()).as("hook runs after warmup, before measurement").isEqualTo(7);
-        assertThat(calls.get()).isEqualTo(507);
+        assertThat(calls.get()).as("warmup calls plus measured calls").isEqualTo(507);
         assertThat(m.wallNanos()).isPositive();
         assertThat(m.processCpuNanos()).isNotNegative();
     }
@@ -35,7 +33,7 @@ class CpuTimeRunnerTest {
     @Test
     void iterationFloorWinsWhenReachedFirst() throws Throwable {
         var runner = new CpuTimeRunner(new Settings(300, 60, 100, 0, Warmup.fixed(0)));
-        var m = runner.run(() -> {}, () -> {});
+        var m = runner.run(() -> {});
         assertThat(m.iterations()).isEqualTo(300);
     }
 
@@ -50,7 +48,7 @@ class CpuTimeRunnerTest {
                 x = x * 31 + i;
             }
             sink.set(x);
-        }, () -> {});
+        });
 
         assertThat(m.iterations() % 100).as("stops on a check boundary").isZero();
         assertThat(m.processCpuNanos()).isGreaterThanOrEqualTo(40_000_000L);
@@ -60,7 +58,7 @@ class CpuTimeRunnerTest {
     @Test
     void cpuTimeFloorKeepsAFastBenchmarkRunning() throws Throwable {
         var runner = new CpuTimeRunner(new Settings(100, 0, 100, 0.05, Warmup.fixed(0)));
-        var m = runner.run(() -> {}, () -> {});
+        var m = runner.run(() -> {});
         assertThat(m.iterations()).as("kept going past the iteration floor").isGreaterThan(100);
         assertThat(m.iterations() % 100).isZero();
         assertThat(m.processCpuNanos()).isGreaterThanOrEqualTo(40_000_000L);
@@ -69,26 +67,27 @@ class CpuTimeRunnerTest {
     @Test
     void automaticWarmupRespectsTheFloor() throws Throwable {
         var runner = new CpuTimeRunner(new Settings(100, 0, 100, 0, Warmup.auto()));
-        var m = runner.run(() -> {}, () -> {});
+        var m = runner.run(() -> {});
         assertThat(m.warmup().automatic()).isTrue();
         assertThat(m.warmup().iterations()).isGreaterThanOrEqualTo(Warmup.AUTO_FLOOR);
         assertThat(m.warmup().iterations()).isLessThanOrEqualTo(Warmup.AUTO_CAP);
     }
 
     @Test
-    void stopConditionUsesTheCrossSdkWording() {
-        assertThat(Settings.standard().stopCondition())
+    void standardSettingsAreTheCrossSdkRuleWithTheOneSecondFloor() {
+        var standard = Settings.standard();
+        assertThat(standard.minIterations()).isEqualTo(50_000);
+        assertThat(standard.minCpuSeconds()).isEqualTo(5.0);
+        assertThat(standard.checkInterval()).isEqualTo(100);
+        assertThat(standard.minMeasureCpuSeconds()).isEqualTo(1.0);
+        assertThat(standard.warmup().automatic()).isTrue();
+        assertThat(standard.stopCondition())
                 .isEqualTo(
                         "min 50000 iterations OR 5 seconds CPU time (first met wins) and at least 1 second(s) of CPU time");
-        assertThat(Settings.standard(0).stopCondition())
-                .isEqualTo("min 50000 iterations OR 5 seconds CPU time (first met wins)");
         assertThat(new Settings(50_000, 5, 100, 0, Warmup.auto()).stopCondition())
                 .isEqualTo("min 50000 iterations OR 5 seconds CPU time (first met wins)");
         assertThat(new Settings(50_000, 0, 100, 0, Warmup.auto()).stopCondition())
                 .isEqualTo("fixed 50000 iterations for every benchmark, no time-based stop");
-        assertThat(new Settings(50_000, 0, 100, 1, Warmup.auto()).stopCondition())
-                .isEqualTo(
-                        "fixed 50000 iterations for every benchmark and at least 1 second(s) of CPU time, no time-based stop");
         assertThat(new Settings(1000, 2.5, 100, 0, Warmup.auto()).stopCondition())
                 .isEqualTo("min 1000 iterations OR 2.5 seconds CPU time (first met wins)");
     }

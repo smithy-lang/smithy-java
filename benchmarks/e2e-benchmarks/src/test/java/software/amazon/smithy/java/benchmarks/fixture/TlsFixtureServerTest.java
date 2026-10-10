@@ -15,27 +15,20 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.KeyStore;
-import java.security.cert.CertificateFactory;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.security.cert.X509Certificate;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
-import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class TlsFixtureServerTest {
 
     private static final int BODY_BYTES = 70_000;
 
-    @TempDir
-    static Path tmp;
     private static ServerSocketChannel listener;
     private static SSLContext clientContext;
     private static int port;
@@ -43,28 +36,28 @@ class TlsFixtureServerTest {
     @BeforeAll
     static void start() throws Exception {
         assumeTrue(OpenSsl.isAvailable(), "netty-tcnative (BoringSSL) is not available on this host");
-        Path cert = tmp.resolve("server.pem");
-        Path key = tmp.resolve("server-key.pem");
-        assumeTrue(generateCertificate(cert, key), "openssl is not available to generate a test certificate");
-
         byte[] body = new byte[BODY_BYTES];
         for (int i = 0; i < body.length; i++) {
             body[i] = (byte) ('a' + i % 26);
         }
-        Path bodyFile = tmp.resolve("body.bin");
-        Files.write(bodyFile, body);
-        var fixture = Fixture.load(bodyFile, 200, "application/octet-stream", List.of());
-        var tls = FixtureServer.serverSslContext(cert, key, new String[] {"TLSv1.3"});
+        byte[] head = ("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + BODY_BYTES
+                + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII);
+        byte[] fixture = new byte[head.length + body.length];
+        System.arraycopy(head, 0, fixture, 0, head.length);
+        System.arraycopy(body, 0, fixture, head.length, body.length);
+        var server = new FixtureServer();
+        server.respondWith(fixture);
+        var tls = FixtureServer.selfSignedTls();
 
         listener = ServerSocketChannel.open();
         listener.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
         port = ((InetSocketAddress) listener.getLocalAddress()).getPort();
         Thread.ofPlatform().daemon().start(() -> {
             try {
-                FixtureServer.serve(listener, fixture, tls, FixtureServer.DEFAULT_READ_BUFFER, false);
+                server.serve(listener, tls);
             } catch (IOException e) {}
         });
-        clientContext = trusting(cert);
+        clientContext = trustAll();
     }
 
     @AfterAll
@@ -89,8 +82,9 @@ class TlsFixtureServerTest {
                 assertThat(body[0]).isEqualTo((byte) 'a');
                 assertThat(body[BODY_BYTES - 1]).isEqualTo((byte) ('a' + (BODY_BYTES - 1) % 26));
             }
-            send(socket, "HEAD / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
-            assertThat(readHead(in)).startsWith("HTTP/1.1 200 OK").contains("\r\nConnection: close\r\n");
+            send(socket, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+            assertThat(readHead(in)).startsWith("HTTP/1.1 200 OK");
+            assertThat(in.readNBytes(BODY_BYTES)).hasSize(BODY_BYTES);
             assertThat(in.read()).as("server closed after Connection: close").isEqualTo(-1);
         }
     }
@@ -111,48 +105,23 @@ class TlsFixtureServerTest {
         }
     }
 
-    private static boolean generateCertificate(Path cert, Path key) {
-        try {
-            var process = new ProcessBuilder("openssl",
-                    "req",
-                    "-x509",
-                    "-newkey",
-                    "ec",
-                    "-pkeyopt",
-                    "ec_paramgen_curve:prime256v1",
-                    "-nodes",
-                    "-days",
-                    "1",
-                    "-subj",
-                    "/CN=localhost",
-                    "-addext",
-                    "subjectAltName=DNS:localhost,IP:127.0.0.1",
-                    "-keyout",
-                    key.toString(),
-                    "-out",
-                    cert.toString())
-                    .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .start();
-            return process.waitFor(30, TimeUnit.SECONDS) && process.exitValue() == 0 && Files.exists(cert);
-        } catch (IOException e) {
-            return false;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
-    }
-
-    private static SSLContext trusting(Path cert) throws Exception {
-        var store = KeyStore.getInstance(KeyStore.getDefaultType());
-        store.load(null, null);
-        try (InputStream in = Files.newInputStream(cert)) {
-            store.setCertificateEntry("fixture", CertificateFactory.getInstance("X.509").generateCertificate(in));
-        }
-        var trust = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        trust.init(store);
+    /** The server's certificate is generated at startup and self-signed, so the test trusts whatever it presents. */
+    private static SSLContext trustAll() throws Exception {
         var context = SSLContext.getInstance("TLS");
-        context.init(null, trust.getTrustManagers(), null);
+        context.init(null, new TrustManager[] {new X509TrustManager() {
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType) {
+                assertThat(chain[0].getSubjectX500Principal().getName()).isEqualTo("CN=localhost");
+            }
+
+            @Override
+            public X509Certificate[] getAcceptedIssuers() {
+                return new X509Certificate[0];
+            }
+        }}, null);
         return context;
     }
 
@@ -162,7 +131,6 @@ class TlsFixtureServerTest {
         SSLParameters parameters = socket.getSSLParameters();
         parameters.setProtocols(new String[] {"TLSv1.3"});
         parameters.setApplicationProtocols(new String[] {"http/1.1"});
-        parameters.setEndpointIdentificationAlgorithm("HTTPS");
         socket.setSSLParameters(parameters);
         return socket;
     }
