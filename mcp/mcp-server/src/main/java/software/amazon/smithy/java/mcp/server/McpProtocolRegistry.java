@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
+import java.util.Set;
 import software.amazon.smithy.java.core.serde.document.Document;
 
 /**
@@ -58,12 +59,19 @@ final class McpProtocolRegistry {
             Collection<? extends ExtensionMcpProtocol> overrides,
             boolean discover
     ) {
-        return discover
-                ? create(
-                        additions,
-                        overrides,
-                        McpProtocolProvider.class.getClassLoader())
-                : create(additions, overrides, List.of());
+        return create(additions, overrides, discover, null);
+    }
+
+    static McpProtocolRegistry create(
+            Collection<? extends ExtensionMcpProtocol> additions,
+            Collection<? extends ExtensionMcpProtocol> overrides,
+            boolean discover,
+            Set<McpProtocolId> allowed
+    ) {
+        Iterable<McpProtocolProvider> providers = discover
+                ? ServiceLoader.load(McpProtocolProvider.class, McpProtocolProvider.class.getClassLoader())
+                : List.of();
+        return create(additions, overrides, providers, allowed);
     }
 
     static McpProtocolRegistry create(
@@ -81,6 +89,21 @@ final class McpProtocolRegistry {
             Collection<? extends ExtensionMcpProtocol> additions,
             Collection<? extends ExtensionMcpProtocol> overrides,
             Iterable<McpProtocolProvider> providers
+    ) {
+        return create(additions, overrides, providers, null);
+    }
+
+    /**
+     * Creates a registry, optionally restricted to the given protocol ids.
+     *
+     * @param allowed protocol ids to retain, in addition to validating that each one is registered;
+     *                {@code null} retains every registered protocol
+     */
+    static McpProtocolRegistry create(
+            Collection<? extends ExtensionMcpProtocol> additions,
+            Collection<? extends ExtensionMcpProtocol> overrides,
+            Iterable<McpProtocolProvider> providers,
+            Set<McpProtocolId> allowed
     ) {
         var candidates = new LinkedHashMap<McpProtocolId, List<Candidate>>();
         for (var protocol : BuiltInProtocols.all()) {
@@ -131,6 +154,15 @@ final class McpProtocolRegistry {
             throw new IllegalArgumentException(
                     "Cannot override unregistered MCP protocol: " + id.identifier());
         }
+        if (allowed != null) {
+            for (var id : allowed) {
+                if (!resolved.containsKey(id)) {
+                    throw new IllegalArgumentException(
+                            "Cannot restrict to unregistered MCP protocol: " + id.identifier());
+                }
+            }
+            resolved.keySet().retainAll(allowed);
+        }
         return new McpProtocolRegistry(resolved);
     }
 
@@ -156,7 +188,9 @@ final class McpProtocolRegistry {
     }
 
     McpProtocol defaultProtocol() {
-        return protocols.get(ProtocolVersion.defaultVersion().id());
+        var protocol = protocols.get(ProtocolVersion.defaultVersion().id());
+        // A registry restricted to a subset of versions may exclude the default version.
+        return protocol != null ? protocol : initializationFallbackProtocol;
     }
 
     McpProtocol initializationFallbackProtocol() {

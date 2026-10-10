@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -188,6 +189,143 @@ class RemoteCatalogNotificationIntegrationTest {
             }
         } finally {
             releaseRefresh.countDown();
+            http.stop(0);
+        }
+    }
+
+    @Test
+    void handshakeOnlyStdioServerKeepsDeliveringListChangedToStatelessCapableClients() throws Exception {
+        var discovered = new AtomicBoolean();
+        var http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            http.setExecutor(executor);
+            http.createContext("/mcp", exchange -> {
+                try (exchange) {
+                    var request = McpJson.CODEC.deserializeShape(
+                            exchange.getRequestBody().readAllBytes(),
+                            JsonRpcRequest.builder());
+                    if (request.getId() == null) {
+                        exchange.sendResponseHeaders(202, -1);
+                        return;
+                    }
+                    Map<String, ?> result;
+                    boolean sendNotification = false;
+                    switch (request.getMethod()) {
+                        case "initialize" -> result = Map.of(
+                                "protocolVersion",
+                                "2025-06-18",
+                                "capabilities",
+                                Map.of("tools", Map.of("listChanged", true)),
+                                "serverInfo",
+                                Map.of("name", "discovery-server", "version", "1"));
+                        case "tools/list" -> result = Map.of("tools",
+                                discovered.get()
+                                        ? List.of(tool("discover"), tool("new_tool"))
+                                        : List.of(tool("discover")));
+                        case "prompts/list" -> result = Map.of("prompts", List.of());
+                        case "tools/call" -> {
+                            sendNotification = request.getParams().getMember("name").asString().equals("discover");
+                            if (sendNotification) {
+                                discovered.set(true);
+                            }
+                            result = Map.of("content", List.of(Map.of("type", "text", "text", "success")));
+                        }
+                        default -> throw new IOException("Unexpected method: " + request.getMethod());
+                    }
+                    var response = McpJson.CODEC.serializeToString(JsonRpcResponse.builder()
+                            .jsonrpc("2.0")
+                            .id(request.getId())
+                            .result(Document.ofObject(result))
+                            .build());
+                    if (sendNotification) {
+                        respond(exchange,
+                                "text/event-stream",
+                                "data: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}\n\n"
+                                        + "data: " + response + "\n\n");
+                    } else {
+                        respond(exchange, "application/json", response);
+                    }
+                }
+            });
+            http.start();
+
+            var input = new TestInputStream();
+            var output = new TestOutputStream();
+            var remote = HttpMcpClient.builder()
+                    .endpoint("http://127.0.0.1:" + http.getAddress().getPort() + "/mcp")
+                    .build();
+            var server = StdioMcpServer.builder()
+                    .addRemoteClient(remote)
+                    .protocolVersions(
+                            KnownProtocolVersion.V2025_11_25,
+                            KnownProtocolVersion.V2025_06_18,
+                            KnownProtocolVersion.V2025_03_26,
+                            KnownProtocolVersion.V2024_11_05)
+                    .input(input)
+                    .output(output)
+                    .build();
+            server.start();
+            try {
+                // A client that prefers 2026-07-28 probes first, learns the server only speaks the handshake
+                // versions, and initializes instead.
+                send(input,
+                        1,
+                        "server/discover",
+                        Map.of("_meta",
+                                Map.of(
+                                        "io.modelcontextprotocol/protocolVersion",
+                                        "2026-07-28",
+                                        "io.modelcontextprotocol/clientCapabilities",
+                                        Map.of(),
+                                        "io.modelcontextprotocol/clientInfo",
+                                        Map.of("name", "test", "version", "1"))));
+                var probe = read(output);
+                assertEquals(1, probe.getMember("id").asInteger());
+                assertEquals(-32022, probe.getMember("error").getMember("code").asInteger());
+
+                send(input,
+                        2,
+                        "initialize",
+                        Map.of(
+                                "protocolVersion",
+                                "2026-07-28",
+                                "capabilities",
+                                Map.of(),
+                                "clientInfo",
+                                Map.of("name", "test", "version", "1")));
+                var initialize = assertResponse(read(output), 2);
+                assertEquals("2025-11-25", initialize.getMember("protocolVersion").asString());
+                assertTrue(initialize.getMember("capabilities")
+                        .getMember("tools")
+                        .getMember("listChanged")
+                        .asBoolean());
+                send(input, null, "notifications/initialized", Map.of());
+
+                send(input, 3, "tools/list", Map.of());
+                assertEquals(List.of("discover"), toolNames(assertResponse(read(output), 3)));
+
+                send(input, 4, "tools/call", Map.of("name", "discover", "arguments", Map.of()));
+                var notification = read(output);
+                assertEquals("notifications/tools/list_changed", notification.getMember("method").asString());
+                assertNull(notification.getMember("id"));
+                assertResponse(read(output), 4);
+
+                send(input, 5, "tools/list", Map.of());
+                assertEquals(List.of("discover", "new_tool"), toolNames(assertResponse(read(output), 5)));
+                send(input, 6, "tools/call", Map.of("name", "new_tool", "arguments", Map.of()));
+                assertEquals("success",
+                        assertResponse(read(output), 6)
+                                .getMember("content")
+                                .asList()
+                                .getFirst()
+                                .getMember("text")
+                                .asString());
+                output.assertNoOutput(100);
+            } finally {
+                server.shutdown().join();
+            }
+        } finally {
             http.stop(0);
         }
     }

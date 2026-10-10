@@ -548,6 +548,106 @@ class McpArchitectureTest {
                         Document.of(Map.of())))));
     }
 
+    @Test
+    void restrictedProtocolVersionsLimitNegotiationAndAdvertisement() {
+        try (var engine = McpEngine.builder()
+                .protocolVersions(KnownProtocolVersion.V2025_11_25, KnownProtocolVersion.V2025_06_18)
+                .build()) {
+            var discover = JsonRpcRequest.builder()
+                    .jsonrpc("2.0")
+                    .id(Document.of(1))
+                    .method(McpMethod.Standard.SERVER_DISCOVER.wireName())
+                    .build();
+
+            var response = engine.execute(discover, KnownProtocolVersion.V2026_07_28);
+
+            assertEquals(-32022, response.getError().getCode());
+            assertEquals(
+                    List.of(
+                            KnownProtocolVersion.V2025_11_25.identifier(),
+                            KnownProtocolVersion.V2025_06_18.identifier()),
+                    response.getError()
+                            .getData()
+                            .getMember("supported")
+                            .asList()
+                            .stream()
+                            .map(Document::asString)
+                            .toList());
+
+            for (var requested : List.of(KnownProtocolVersion.V2026_07_28, KnownProtocolVersion.V2025_03_26)) {
+                var initialize = engine.execute(initializeRequest(requested), null);
+
+                assertNull(initialize.getError());
+                assertEquals(
+                        KnownProtocolVersion.V2025_11_25.identifier(),
+                        initialize.getResult().getMember("protocolVersion").asString());
+            }
+            assertEquals(
+                    KnownProtocolVersion.V2025_06_18.identifier(),
+                    engine.execute(initializeRequest(KnownProtocolVersion.V2025_06_18), null)
+                            .getResult()
+                            .getMember("protocolVersion")
+                            .asString());
+        }
+    }
+
+    @Test
+    void restrictedProtocolVersionsWithoutTheDefaultServeUnversionedRequests() {
+        try (var engine = McpEngine.builder().protocolVersions(KnownProtocolVersion.V2025_11_25).build()) {
+            var listTools = JsonRpcRequest.builder()
+                    .jsonrpc("2.0")
+                    .id(Document.of(1))
+                    .method(McpMethod.Standard.TOOLS_LIST.wireName())
+                    .build();
+
+            var response = engine.execute(listTools, null);
+
+            assertNull(response.getError());
+            assertSame(KnownProtocolVersion.V2025_11_25, engine.defaultProtocolVersion());
+        }
+    }
+
+    @Test
+    void restrictedProtocolVersionsCanRetainAnExtensionProtocol() {
+        var protocol = protocol(
+                "2099-01-01",
+                Set.of(McpMethod.Standard.INITIALIZE),
+                100);
+        try (var engine = McpEngine.builder()
+                .discoverProtocols(false)
+                .addProtocol(protocol)
+                .protocolVersions(ProtocolVersion.parse(protocol.id().identifier()))
+                .build()) {
+            var response = engine.execute(initializeRequest(KnownProtocolVersion.V2025_11_25), null);
+
+            assertNull(response.getError());
+            assertEquals(
+                    protocol.id().identifier(),
+                    response.getResult().getMember("protocolVersion").asString());
+        }
+    }
+
+    @Test
+    void restrictingToAnUnregisteredProtocolVersionFailsConstruction() {
+        var builder = McpEngine.builder().protocolVersions(ProtocolVersion.parse("2099-01-01"));
+
+        var error = assertThrows(IllegalArgumentException.class, builder::build);
+
+        assertTrue(error.getMessage().contains("2099-01-01"), error.getMessage());
+    }
+
+    @Test
+    void restrictedProtocolVersionsMustRetainAnInitializationCapableVersion() {
+        var builder = McpEngine.builder().protocolVersions(KnownProtocolVersion.V2026_07_28);
+
+        assertThrows(IllegalStateException.class, builder::build);
+    }
+
+    @Test
+    void protocolVersionsRequiresAtLeastOneVersion() {
+        assertThrows(IllegalArgumentException.class, () -> McpEngine.builder().protocolVersions());
+    }
+
     private JsonRpcRequest initializeRequest(ProtocolVersion requestedVersion) {
         return JsonRpcRequest.builder()
                 .jsonrpc("2.0")
