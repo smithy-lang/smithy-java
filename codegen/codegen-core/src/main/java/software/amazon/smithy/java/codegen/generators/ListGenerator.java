@@ -55,7 +55,7 @@ public final class ListGenerator
                                                         for (int i = 0, size = values.size(); i < size; i++) {
                                                             var value = values.get(i);
                                                             ${?sparse}if (value == null) {
-                                                                serializer.writeNull($$m);
+                                                                ${memberNullSerializer:C|};
                                                                 continue;
                                                             }
                                                             ${/sparse}${memberSerializer:C|};
@@ -63,7 +63,7 @@ public final class ListGenerator
                                                     } else {
                                                         for (var value : values) {
                                                             ${?sparse}if (value == null) {
-                                                                serializer.writeNull($$m);
+                                                                ${memberNullSerializer:C|};
                                                                 continue;
                                                             }
                                                             ${/sparse}${memberSerializer:C|};
@@ -106,14 +106,14 @@ public final class ListGenerator
                             writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
                             writer.putContext("valueSchema", valueSchema);
                             writer.putContext("randomAccess", RandomAccess.class);
-                            writer.putContext(
-                                    "memberSerializer",
-                                    new SerializerMemberGenerator(
-                                            directive,
-                                            writer,
-                                            directive.shape().getMember(),
-                                            "value",
-                                            "$m"));
+                            var memberSerializer = new SerializerMemberGenerator(
+                                    directive,
+                                    writer,
+                                    directive.shape().getMember(),
+                                    "value",
+                                    "$m");
+                            writer.putContext("memberNullSerializer", memberSerializer.writeNullGenerator());
+                            writer.putContext("memberSerializer", memberSerializer);
                             writer.putContext(
                                     "memberDeserializer",
                                     new DeserializerGenerator(
