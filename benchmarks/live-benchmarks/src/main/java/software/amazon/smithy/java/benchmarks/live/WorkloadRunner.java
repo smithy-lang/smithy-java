@@ -10,9 +10,6 @@ import java.util.Map;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-/**
- * Front door for the fixed live AWS benchmarks.
- */
 public final class WorkloadRunner {
 
     private WorkloadRunner() {}

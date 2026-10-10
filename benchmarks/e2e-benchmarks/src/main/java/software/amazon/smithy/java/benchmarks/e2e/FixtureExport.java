@@ -20,10 +20,6 @@ import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 
-/**
- * Writes a benchmark's canned response as files a fixture server can serve: the exact body bytes plus a JSON
- * description with the status, headers, length, SHA-256 and the server arguments that reproduce the response.
- */
 final class FixtureExport {
 
     private FixtureExport() {}
@@ -52,7 +48,6 @@ final class FixtureExport {
         return 0;
     }
 
-    /** Writes {@code <id>.body} and {@code <id>.fixture.json}; returns both paths. */
     static List<Path> write(BenchmarkCase benchmarkCase, Path directory) {
         var response = benchmarkCase.response();
         byte[] body = new byte[response.bodyLength()];
@@ -104,7 +99,6 @@ final class FixtureExport {
         return List.of(bodyFile, jsonFile);
     }
 
-    /** Serializes the input once through the stub to report the request body size the fixture server will see. */
     private static long requestBodyEstimate(BenchmarkCase benchmarkCase) {
         try (var client =
                 new BenchmarkClient(benchmarkCase.protocol(), new MockHttpTransport(), BenchmarkProtocol.ENDPOINT)) {

@@ -27,18 +27,9 @@ import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 
 /**
- * Turns a baseline run and a current run into the cross-SDK comparison files
- * ({@code <prefix>.json} and {@code <prefix>.md}) whose schema and layout match
- * {@code results/<sdk>/<instancetype>_ocs_results.*} in AwsSdkPerformanceBenchmarkModels.
- *
- * <p>Either side may be a single results file or a directory of them. A directory is merged: runs covering
- * different protocols are concatenated, and when the same benchmark appears in several runs (the SOP asks for
- * three interleaved samples per side) the median ops/CPU-sec is used.
- *
- * <p>Comparability is checked, not assumed. Different stop conditions, CPU measurements or iteration floors are
- * errors. A different benchmark set is an error unless {@code --allow-partial} is given, in which case the
- * intersection is compared and the difference is recorded as a warning. Differences in instance, CPU, JVM or JIT
- * settings are warnings carried into the output.
+ * Creates cross-SDK comparison files from run reports.
+ * Uses median operations per CPU-second when a benchmark has multiple samples.
+ * Rejects incompatible measurements and records environment differences as warnings.
  */
 final class CompareRuns {
 
@@ -123,7 +114,6 @@ final class CompareRuns {
     ) {
         List<String> warnings = new ArrayList<>();
 
-        // Hard requirements: the two sides must have measured the same thing the same way.
         requireEqual(baseline, current, "stop_condition", "stop conditions");
         requireEqual(baseline, current, "measurement", "CPU time measurements");
         requireEqual(baseline, current, "min_iterations", "iteration floors");
@@ -136,7 +126,6 @@ final class CompareRuns {
         }
         warnIfDifferent(baseline, current, warnings, "transport_impl", "transport implementations");
 
-        // Soft requirements: carried as warnings.
         warnIfDifferent(baseline, current, warnings, "instance", "instance types");
         warnIfDifferent(baseline, current, warnings, "warmup_policy", "warmup policies");
         warnIfDifferent(baseline, current, warnings, "background_jit_compilation_disabled", "-Xbatch settings");
@@ -159,8 +148,6 @@ final class CompareRuns {
             warnings.add("Current was measured without -Xbatch");
         }
 
-        // Measurement-relevant configuration must match: JVM flags (heap, GC, -Xbatch, forwarded -D props) and
-        // smithy-java system properties. A heap/GC/property change between sides invalidates the comparison.
         if (!baseline.sortedJvmArguments().equals(current.sortedJvmArguments())) {
             configMismatch(allowConfigDiff,
                     warnings,
@@ -174,7 +161,6 @@ final class CompareRuns {
                             + baseline.smithyProperties() + ", current " + current.smithyProperties());
         }
 
-        // Sample quality: submission numbers must come from warmed, retry-free, complete samples.
         if (!allowLowQuality) {
             List<String> q = new ArrayList<>();
             if (!baseline.samplesConsistent()) {
@@ -201,7 +187,6 @@ final class CompareRuns {
             }
         }
 
-        // The benchmark set.
         Set<String> common = new LinkedHashSet<>();
         for (String id : orderedIds(baseline.samples.keySet(), current.samples.keySet())) {
             if (baseline.samples.containsKey(id) && current.samples.containsKey(id)) {
@@ -222,7 +207,6 @@ final class CompareRuns {
             throw new IllegalStateException("The two sides have no benchmarks in common");
         }
 
-        // Per-benchmark entries and per-protocol / overall geometric means.
         List<ObjectNode> entries = new ArrayList<>();
         Map<String, List<Double>> baselineByProtocol = new LinkedHashMap<>();
         Map<String, List<Double>> currentByProtocol = new LinkedHashMap<>();
@@ -350,7 +334,6 @@ final class CompareRuns {
         }
     }
 
-    /** Canonical ids in reporting order first, then anything else alphabetically. */
     private static List<String> orderedIds(Set<String> a, Set<String> b) {
         Set<String> all = new LinkedHashSet<>(a);
         all.addAll(b);
@@ -401,8 +384,7 @@ final class CompareRuns {
         return RunReport.round((current / baseline - 1) * 100, 2);
     }
 
-    // Two-sided 95% t critical values by degrees of freedom; 1.96 beyond the table. Kept here so this one
-    // comparison implementation owns the uncertainty reporting that used to be duplicated in the scheduler.
+    // Use two-sided 95% t critical values, or 1.96 beyond the table.
     private static final TreeMap<Integer, Double> T95 = new TreeMap<>(Map.ofEntries(
             Map.entry(1, 12.706),
             Map.entry(2, 4.303),
@@ -439,7 +421,6 @@ final class CompareRuns {
         return ceiling != null ? ceiling.getValue() : 1.96;
     }
 
-    /** Per-side sample statistics over a benchmark's ops/CPU-sec values (sample stddev with n-1). */
     record Stat(int n, double mean, double sd) {
         static Stat of(List<Double> values) {
             int n = values.size();
@@ -476,7 +457,7 @@ final class CompareRuns {
         }
     }
 
-    /** Delta-method 95% interval for current/baseline; null when either side lacks two samples. */
+    /** Returns a delta-method 95% interval for current/baseline, or null if either side has fewer than two samples. */
     static ObjectNode ratioNode(Stat baseline, Stat current) {
         if (baseline.n() < 2 || current.n() < 2 || baseline.mean() == 0 || current.mean() == 0) {
             return null;
@@ -500,7 +481,6 @@ final class CompareRuns {
         return args[index];
     }
 
-    /** Formats a percentage the way the shared markdown generator does: explicit sign, U+2212 for negatives. */
     static String formatPct(double pct) {
         String magnitude = BigDecimal.valueOf(Math.abs(pct)).stripTrailingZeros().toPlainString();
         return (pct < 0 ? "−" : "+") + magnitude + "%";
@@ -533,7 +513,7 @@ final class CompareRuns {
             Side baseline,
             Side current) {
 
-        /** Markdown in the exact layout of AwsSdkPerformanceBenchmarkModels' {@code scripts/markdown-ocs.js}. */
+        /** Matches the shared cross-SDK Markdown layout. */
         String markdown() {
             var metadata = json.expectObjectMember("metadata");
             var sb = new StringBuilder();
@@ -610,7 +590,6 @@ final class CompareRuns {
             return sb.toString();
         }
 
-        /** The report block the SOP asks each SDK to submit. */
         String textReport() {
             var metadata = json.expectObjectMember("metadata");
             var sb = new StringBuilder();
@@ -661,7 +640,6 @@ final class CompareRuns {
         }
     }
 
-    /** One side of a comparison: every single-run file for it, merged. */
     static final class Side {
         final List<Path> files = new ArrayList<>();
         final Map<String, List<Double>> samples = new LinkedHashMap<>();

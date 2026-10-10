@@ -16,9 +16,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Benchmark selection, transport and output options; only the CPU-time floor is configurable in the measurement.
- */
 final class BenchmarkOptions {
 
     private static final DateTimeFormatter OUTPUT_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
@@ -97,7 +94,6 @@ final class BenchmarkOptions {
                         + " URL with a host");
             }
         }
-        // Validate the loop parameters eagerly so bad values fail before any JVM is launched.
         options.settings();
         return options;
     }
@@ -118,7 +114,6 @@ final class BenchmarkOptions {
         return output;
     }
 
-    /** The instance type to record, or null to look it up. */
     String instanceType() {
         return instanceType;
     }
@@ -135,12 +130,10 @@ final class BenchmarkOptions {
         return endpoint;
     }
 
-    /** Run in this JVM rather than forking one child JVM per protocol. */
     boolean inProcess() {
         return inProcess;
     }
 
-    /** This JVM is a child of the per-protocol fork: write the results file, let the parent print the summary. */
     boolean child() {
         return child;
     }
@@ -157,7 +150,6 @@ final class BenchmarkOptions {
         return CpuTimeRunner.Settings.standard(minMeasureCpuSeconds);
     }
 
-    /** The benchmark ids selected by {@code --protocol}, {@code --filter} and {@code --all-model-cases}, in order. */
     List<String> selectIds() {
         List<String> candidates = allModelCases ? BenchmarkCases.allIds() : BenchmarkCases.canonicalIds();
         List<String> selected = new ArrayList<>();
@@ -183,10 +175,6 @@ final class BenchmarkOptions {
         return false;
     }
 
-    /**
-     * Arguments for a child JVM that runs one protocol in-process and writes to {@code childOutput}. The parent
-     * has already resolved the instance type, so children never query IMDS themselves.
-     */
     List<String> childArgs(BenchmarkProtocol protocol, Path childOutput, String instanceType) {
         List<String> args = new ArrayList<>();
         args.add("--child");

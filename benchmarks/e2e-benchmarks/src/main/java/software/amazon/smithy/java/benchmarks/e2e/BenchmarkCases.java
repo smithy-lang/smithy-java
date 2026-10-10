@@ -37,9 +37,6 @@ import software.amazon.smithy.protocoltests.traits.HttpRequestTestsTrait;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestsTrait;
 
-/**
- * Builds independent request and response benchmarks from the model's {@code serde-benchmark} test cases.
- */
 final class BenchmarkCases {
 
     static final String TAG = "serde-benchmark";
@@ -61,12 +58,11 @@ final class BenchmarkCases {
         return MODEL;
     }
 
-    /** The 71 cross-SDK benchmark ids, in reporting order. */
     static List<String> canonicalIds() {
         return CANONICAL;
     }
 
-    /** Every tagged case in the model: the canonical ids first, then smithy-java-only cases alphabetically. */
+    /** Returns canonical cases first, then additional cases in alphabetical order. */
     static List<String> allIds() {
         var extras = new TreeSet<String>();
         extras.addAll(REQUESTS.keySet());
@@ -81,7 +77,6 @@ final class BenchmarkCases {
         return REQUESTS.containsKey(id) || RESPONSES.containsKey(id);
     }
 
-    /** Builds the case for a benchmark id: generated operation, typed input, and canned response. */
     static BenchmarkCase build(String id) {
         var protocol = BenchmarkProtocol.forBenchmarkId(id);
         var request = REQUESTS.get(id);
@@ -111,7 +106,7 @@ final class BenchmarkCases {
         if (response != null) {
             var operation = resolveOperation(protocol, response.operation());
             var input = buildInput(operation, MinimalInput.forOperation(MODEL, response.operation()));
-            // CBOR and blob payload fixtures are base64; their Content-Length describes the decoded bytes.
+            // Content-Length describes decoded bytes for base64 fixtures.
             boolean blobPayload = blobPayloadMember(operation.outputSchema()) != null;
             byte[] body = response.testCase()
                     .getBody()
@@ -144,11 +139,7 @@ final class BenchmarkCases {
                 "No @httpRequestTests or @httpResponseTests case with id '" + id + "' is tagged " + TAG);
     }
 
-    /**
-     * A stable hash of the workload behind a benchmark id: operation, source, response status, the test case's
-     * params, and the response body bytes. Recorded in the results so {@code compare} can refuse two runs whose
-     * inputs differ under the same id. Computed once at setup, never in the measured loop.
-     */
+    /** Hashes the workload once during setup so comparisons can reject changed inputs under the same benchmark ID. */
     private static String fingerprint(
             String operationId,
             BenchmarkCase.Source source,
@@ -191,8 +182,7 @@ final class BenchmarkCases {
         var builder = op.inputBuilder();
         Node effective = params == null ? Node.objectNode() : params;
         new ProtocolTestDocument(effective, null).deserializeInto(builder);
-        // Structured blobs retain protocol-test UTF-8 semantics. Only @httpPayload blobs are base64 in this
-        // model: ContentLength and CRC64NVME describe the decoded bytes, as in the Java v2 harness.
+        // Decode only @httpPayload blobs from base64. Structured blobs retain protocol-test UTF-8 encoding.
         Schema payload = blobPayloadMember(op.inputSchema());
         if (payload != null && effective.isObjectNode()) {
             effective.expectObjectNode().getStringMember(payload.memberName()).ifPresent(value -> {
@@ -204,12 +194,10 @@ final class BenchmarkCases {
         return builder.build();
     }
 
-    /** The output's blob {@code @httpPayload} member, streaming or not, which the benchmark consumes fully. */
     private static Schema outputPayloadMember(ApiOperation<?, ?> operation) {
         return blobPayloadMember(operation.outputSchema());
     }
 
-    /** The {@code @httpPayload} member of a structure when it is a blob, streaming or not; null otherwise. */
     private static Schema blobPayloadMember(Schema struct) {
         for (Schema member : struct.members()) {
             if (member.hasTrait(TraitKey.HTTP_PAYLOAD_TRAIT) && member.type() == ShapeType.BLOB) {

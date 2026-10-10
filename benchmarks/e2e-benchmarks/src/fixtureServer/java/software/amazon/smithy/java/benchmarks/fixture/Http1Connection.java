@@ -13,15 +13,8 @@ import java.util.Locale;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
 
 /**
- * One HTTP/1.1 connection, served on the thread that runs it with blocking I/O over a {@link ConnectionTransport}:
- * the socket itself, or the http-client's {@code SSLEngineTransport} on top of it.
- *
- * <p>The per-request path allocates nothing once the connection is set up: requests are framed in place inside one
- * reusable byte array (incremental header scan that never rescans bytes it has seen, {@code Content-Length} or
- * {@code chunked} body draining with trailers, {@code Expect: 100-continue}, {@code HEAD}, {@code Connection:
- * close}), and the response is a single {@code write} of bytes prepared at startup. Ambiguous framing (both
- * {@code Content-Length} and {@code Transfer-Encoding}, or an encoding other than {@code chunked}) gets a 400 and
- * the connection is closed, as does a request head that does not fit the buffer.
+ * Frames requests in a reusable buffer and writes prepared response bytes.
+ * Rejects ambiguous framing, unsupported transfer encodings, and headers that exceed the buffer.
  */
 final class Http1Connection implements Runnable {
 
@@ -40,11 +33,9 @@ final class Http1Connection implements Runnable {
     private final Timing timing;
     private int pos;
     private int limit;
-    /** Bytes before this index have been scanned for the end of the current request head. */
     private int scanned;
     private InputStream in;
 
-    // The request currently being framed; reset per request, never reallocated.
     private boolean head;
     private boolean close;
     private boolean chunked;
@@ -67,7 +58,7 @@ final class Http1Connection implements Runnable {
             while (true) {
                 int headEnd = fillUntilHeadEnd();
                 if (headEnd < 0) {
-                    return; // EOF between requests, or the client went away mid-request
+                    return;
                 }
                 long served = timing != null ? System.nanoTime() : 0;
                 if (headEnd == Integer.MAX_VALUE) {
@@ -92,7 +83,7 @@ final class Http1Connection implements Runnable {
                 } else if (contentLength > 0) {
                     drain(contentLength);
                 }
-                // One write of the prepared bytes; flush pushes any TLS records the transport is still holding.
+                // Flush any TLS records that the transport still buffers.
                 out.write(fixture.response(head, close));
                 out.flush();
                 if (timing != null) {
@@ -106,7 +97,7 @@ final class Http1Connection implements Runnable {
                 }
             }
         } catch (IOException e) {
-            // The client closed or reset the connection; nothing to report for a fixture server.
+            // Ignore client disconnects.
         } finally {
             if (timing != null) {
                 timing.report(System.err);
@@ -114,10 +105,7 @@ final class Http1Connection implements Runnable {
         }
     }
 
-    /**
-     * Reads until the buffer holds a complete request head starting at {@code pos}. Returns the index just past the
-     * blank line, {@code -1} on EOF, or {@code Integer.MAX_VALUE} if the head cannot fit in the buffer.
-     */
+    /** Returns the index after the headers, -1 on EOF, or Integer.MAX_VALUE if the headers exceed the buffer. */
     private int fillUntilHeadEnd() throws IOException {
         while (true) {
             int end = findHeadEnd();
@@ -138,7 +126,7 @@ final class Http1Connection implements Runnable {
         }
     }
 
-    /** Scans [max(pos, scanned - 3), limit) for CRLFCRLF; remembers how far it got so bytes are scanned once. */
+    /** Rescan three bytes to detect a header terminator split across reads. */
     private int findHeadEnd() {
         int i = Math.max(pos, scanned - 3);
         int stop = limit - 3;
@@ -162,7 +150,6 @@ final class Http1Connection implements Runnable {
         bad = false;
         boolean sawContentLength = false;
 
-        // Request line: METHOD SP target SP version CRLF
         int lineEnd = indexOfCrlf(pos, headEnd);
         int space = indexOf((byte) ' ', pos, lineEnd);
         if (space < 0) {
@@ -171,7 +158,7 @@ final class Http1Connection implements Runnable {
         }
         head = space - pos == 4 && buf[pos] == 'H' && buf[pos + 1] == 'E' && buf[pos + 2] == 'A' && buf[pos + 3] == 'D';
         if (lineEnd - pos < 8 || !regionEquals(lineEnd - 8, HTTP_1_1)) {
-            // HTTP/1.0 (or anything else) gets one response and a close.
+            // Close the connection after one response unless the request uses HTTP/1.1.
             close = true;
         }
 
@@ -201,7 +188,7 @@ final class Http1Connection implements Runnable {
                 contentLength = length;
             } else if (nameIs(lineStart, colon, TRANSFER_ENCODING)) {
                 if (!valueIsIgnoreCase(valueStart, valueEnd, CHUNKED)) {
-                    bad = true; // only "chunked" is acceptable, and only as the sole coding
+                    bad = true;
                     return;
                 }
                 chunked = true;
@@ -219,7 +206,6 @@ final class Http1Connection implements Runnable {
         }
     }
 
-    /** Discards exactly {@code length} body bytes: first what is buffered, then straight from the socket. */
     private void drain(long length) throws IOException {
         long remaining = length;
         int buffered = limit - pos;
@@ -231,7 +217,6 @@ final class Http1Connection implements Runnable {
         if (remaining == 0) {
             return;
         }
-        // Everything buffered was body, so the buffer is free for discarding the rest.
         pos = limit = scanned = 0;
         while (remaining > 0) {
             int n = read(0, (int) Math.min(buf.length, remaining));
@@ -242,7 +227,6 @@ final class Http1Connection implements Runnable {
         }
     }
 
-    /** Discards a chunked body: size lines, chunk data, and trailers up to the terminating blank line. */
     private void drainChunked() throws IOException {
         while (true) {
             int lineEnd = fillLine();
@@ -260,7 +244,6 @@ final class Http1Connection implements Runnable {
             }
             pos += 2;
         }
-        // Trailers: lines until an empty one.
         while (true) {
             int lineEnd = fillLine();
             boolean empty = lineEnd == pos;
@@ -272,7 +255,6 @@ final class Http1Connection implements Runnable {
         scanned = pos;
     }
 
-    /** Ensures a full CRLF-terminated line starts at {@code pos}; returns the index of its CR. */
     private int fillLine() throws IOException {
         while (true) {
             int end = indexOfCrlf(pos, limit);
@@ -311,7 +293,6 @@ final class Http1Connection implements Runnable {
         limit = live;
     }
 
-    /** Index of the first CRLF in [from, to), or -1. */
     private int indexOfCrlf(int from, int to) {
         for (int i = from; i < to - 1; i++) {
             if (buf[i] == '\r' && buf[i + 1] == '\n') {
@@ -339,7 +320,6 @@ final class Http1Connection implements Runnable {
         return true;
     }
 
-    /** Case-insensitive ASCII comparison of the header name in [from, to) with a lower-case name. */
     private boolean nameIs(int from, int to, byte[] lowerName) {
         int end = to;
         while (end > from && (buf[end - 1] == ' ' || buf[end - 1] == '\t')) {
@@ -368,7 +348,6 @@ final class Http1Connection implements Runnable {
         return true;
     }
 
-    /** Whether a comma-separated token list in [from, to) contains the lower-case token. */
     private boolean containsTokenIgnoreCase(int from, int to, byte[] lowerToken) {
         int start = from;
         while (start < to) {
@@ -407,7 +386,6 @@ final class Http1Connection implements Runnable {
         return value;
     }
 
-    /** Parses a chunk-size line: hex digits, optionally followed by {@code ;extensions}. */
     private long parseHex(int from, int to) {
         long value = 0;
         int i = from;
@@ -438,9 +416,8 @@ final class Http1Connection implements Runnable {
     }
 
     /**
-     * Diagnostic per-connection timing ({@code --timing}): service time from the read that completes a request head
-     * to the response write returning, and the time spent blocked in {@code read} (the client's think time plus
-     * loopback transit). Two clock reads per request; off by default.
+     * Optional timing measures header completion to response write, plus time blocked in read.
+     * Adds two clock reads per request.
      */
     static final class Timing {
         private long requests;

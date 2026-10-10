@@ -16,9 +16,6 @@ import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
-/**
- * Fixed response bytes, exposed through a fresh zero-copy view on each call.
- */
 record CannedResponse(
         int statusCode,
         HttpHeaders headers,

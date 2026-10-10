@@ -24,9 +24,6 @@ import software.amazon.smithy.java.core.Version;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 
-/**
- * Captures what the benchmark ran on: JVM, OS, CPU, instance type, and the smithy-java build under test.
- */
 final class Environment {
 
     private static final String BUILD_INFO = "/META-INF/smithy-java-e2e-benchmarks/build-info.properties";
@@ -34,9 +31,6 @@ final class Environment {
 
     private Environment() {}
 
-    /**
-     * @param instanceType the instance type to record; see {@link #instanceType(String)}
-     */
     static ObjectNode capture(String instanceType) {
         var runtime = ManagementFactory.getRuntimeMXBean();
         var buildInfo = buildInfo();
@@ -84,7 +78,7 @@ final class Environment {
                 properties.load(in);
             }
         } catch (IOException e) {
-            // Leave the defaults in place; build info is informational.
+            // Keep default build details if the metadata cannot be read.
         }
         return properties;
     }
@@ -123,9 +117,7 @@ final class Environment {
                             return line.substring("PRETTY_NAME=".length()).replace("\"", "").strip();
                         }
                     }
-                } catch (IOException e) {
-                    // Fall through to the generic label.
-                }
+                } catch (IOException e) {}
             }
         }
         return osName + " " + osVersion;
@@ -154,9 +146,7 @@ final class Environment {
                     if (implementer != null) {
                         return "ARM (implementer " + implementer + ")";
                     }
-                } catch (IOException e) {
-                    // Fall through.
-                }
+                } catch (IOException e) {}
             }
         } else if (lower.contains("mac")) {
             String brand = command("sysctl", "-n", "machdep.cpu.brand_string");
@@ -167,10 +157,7 @@ final class Environment {
         return "unknown";
     }
 
-    /**
-     * The instance type to record: the override when given, otherwise the answer from IMDSv2, otherwise
-     * {@code unknown}. The IMDS lookup is a network call with short timeouts, so callers resolve it once per run.
-     */
+    /** Uses the override, then IMDSv2, then "unknown". Resolve once per run to avoid repeated network calls. */
     static String instanceType(String override) {
         if (override != null && !override.isBlank()) {
             return override;
@@ -198,7 +185,7 @@ final class Environment {
                 return response.body().strip();
             }
         } catch (Exception e) {
-            // Not on EC2 or IMDS unavailable.
+            // IMDS may be unavailable outside EC2.
         }
         return null;
     }
@@ -211,7 +198,7 @@ final class Environment {
                 return output;
             }
         } catch (IOException e) {
-            // Command unavailable.
+            // Ignore unavailable commands.
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

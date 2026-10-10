@@ -19,9 +19,6 @@ import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.context.Context;
 
-/**
- * Generated clients for the five protocols, with a fixed region, endpoint and credentials.
- */
 enum BenchmarkProtocol {
     AWS_JSON_1_0(
             "awsJson1_0",
@@ -59,7 +56,6 @@ enum BenchmarkProtocol {
             new byte[0],
             false);
 
-    /** Stub endpoint: resolution stays in the measured path but costs the same for every protocol. */
     static final String ENDPOINT = "https://example.com";
     static final String REGION = "us-east-1";
 
@@ -69,11 +65,8 @@ enum BenchmarkProtocol {
             "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY");
 
     /**
-     * Static credentials, registered under {@code AwsCredentialsIdentity.class} so the SigV4 lookup finds them.
-     *
-     * <p>{@code IdentityResolver.of(identity)} reports the identity's concrete class as its type, which never matches
-     * the interface the auth scheme asks for; the client would then fall through to the default credential chain
-     * and sign with whatever the host happens to have (IMDS, env, profile), making runs depend on the host.
+     * Register credentials under AwsCredentialsIdentity so SigV4 finds them.
+     * Concrete resolver types do not match the auth interface, so the client would use host credentials.
      */
     private static final IdentityResolver<AwsCredentialsIdentity> STATIC_CREDENTIALS = new IdentityResolver<>() {
         private final IdentityResult<AwsCredentialsIdentity> result = IdentityResult.of(CREDENTIALS);
@@ -140,7 +133,6 @@ enum BenchmarkProtocol {
         return emptyResponseBody.clone();
     }
 
-    /** Whether response bodies in the model's test cases are base64-encoded (the CBOR convention). */
     boolean base64Bodies() {
         return base64Bodies;
     }
@@ -174,7 +166,6 @@ enum BenchmarkProtocol {
         throw new IllegalArgumentException("No protocol matches benchmark id '" + id + "'");
     }
 
-    /** Accepts the id prefix ({@code awsJson1_0}), the summary name ({@code AwsJson10}), or the enum name. */
     static BenchmarkProtocol parse(String name) {
         for (var protocol : values()) {
             if (protocol.idPrefix.equalsIgnoreCase(name)

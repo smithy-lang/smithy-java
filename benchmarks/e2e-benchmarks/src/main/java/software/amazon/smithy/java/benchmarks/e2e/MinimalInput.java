@@ -17,14 +17,7 @@ import software.amazon.smithy.model.traits.EnumTrait;
 import software.amazon.smithy.model.traits.HttpLabelTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 
-/**
- * Synthesizes the smallest input a response-side benchmark can send.
- *
- * <p>Only members the client refuses to send without are populated: URI labels and other {@code @required}
- * members. Everything else is legitimately optional and left unset, so the request side of a response benchmark
- * stays as small as the protocol allows. Values follow the protocol-test {@code params} conventions so they can be
- * fed through the same {@code ProtocolTestDocument} path as request cases.
- */
+/** Sets URI labels and required members so response benchmarks send the smallest valid request. */
 final class MinimalInput {
 
     private static final int MAX_DEPTH = 8;
@@ -47,7 +40,7 @@ final class MinimalInput {
         return builder.build();
     }
 
-    @SuppressWarnings("deprecation") // EnumTrait is the fallback for legacy @enum strings.
+    @SuppressWarnings("deprecation")
     private static Node placeholder(Model model, MemberShape member, int depth) {
         if (depth > MAX_DEPTH) {
             return Node.objectNode();

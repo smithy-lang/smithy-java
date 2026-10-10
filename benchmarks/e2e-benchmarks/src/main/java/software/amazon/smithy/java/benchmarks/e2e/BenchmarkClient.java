@@ -14,9 +14,6 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
-/**
- * Reuses one generated client per protocol and binds each operation through a {@link MethodHandle} at setup.
- */
 final class BenchmarkClient implements AutoCloseable {
 
     private static final MethodType GENERIC_CALL = MethodType.methodType(
@@ -37,7 +34,6 @@ final class BenchmarkClient implements AutoCloseable {
         return transport;
     }
 
-    /** Points the transport at the case and binds the case's operation method. */
     Call prepare(BenchmarkCase benchmarkCase) {
         if (benchmarkCase.protocol() != protocol) {
             throw new IllegalArgumentException(
@@ -83,10 +79,6 @@ final class BenchmarkClient implements AutoCloseable {
         }
     }
 
-    /**
-     * A bound operation call: the same input on every invocation, with the output's streaming payload (if the
-     * operation has one) drained so the response body is actually read.
-     */
     static final class Call {
         private final MethodHandle handle;
         private final SerializableStruct input;
@@ -105,9 +97,7 @@ final class BenchmarkClient implements AutoCloseable {
                 if (payload instanceof DataStream stream) {
                     MockHttpTransport.drain(stream);
                 } else if (payload instanceof ByteBuffer buffer) {
-                    // Non-streaming blob payload (e.g. GetObject Body): read every byte, as a client
-                    // consuming the response does and as ocs requires. The SDK may deserialize it zero-copy,
-                    // so without this the payload is never touched and the number is meaningless.
+                    // Read every byte because deserialization may leave the payload in a buffer without copying it.
                     MockHttpTransport.consume(buffer);
                 }
             }

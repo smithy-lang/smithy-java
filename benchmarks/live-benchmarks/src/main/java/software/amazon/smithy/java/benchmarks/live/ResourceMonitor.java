@@ -15,10 +15,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Samples CPU and memory usage at a fixed interval. Mirrors the metrics shape
- * of the reference runner so the result tables line up across SDKs.
- */
 final class ResourceMonitor {
 
     private final OperatingSystemMXBean osMXBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
@@ -121,7 +117,7 @@ final class ResourceMonitor {
 
     void start(long intervalMs) {
         samples.clear();
-        // First call returns -1 as a baseline; ignore it.
+        // Ignore the first sample because it establishes the baseline.
         osMXBean.getProcessCpuLoad();
         scheduler = Executors.newScheduledThreadPool(1, r -> {
             var t = new Thread(r, "live-resource-monitor");

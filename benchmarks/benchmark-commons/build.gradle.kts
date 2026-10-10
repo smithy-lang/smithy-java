@@ -9,7 +9,4 @@ dependencies {
     testImplementation(libs.jmh.core)
 }
 
-// Shared with the e2e and live runners, so this intentionally keeps the repository's
-// Java 21 release target even though serde benchmarks execute on JDK 25.
-
-// Not published. No `smithy-java.module-conventions`, no publishing, no BOM entry.
+// Keep Java 21 compatibility for the e2e and live runners.

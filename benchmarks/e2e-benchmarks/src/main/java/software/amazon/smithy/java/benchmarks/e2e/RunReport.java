@@ -23,11 +23,6 @@ import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 
-/**
- * The single-run results file: one run of this harness, describing only itself. Comparing a baseline against a
- * current build is a separate step over two such files ({@link CompareRuns}), so each file stays a faithful record
- * of what was measured.
- */
 final class RunReport {
 
     static final String SCHEMA = "smithy-java/e2e-ops-cpusec/1";
