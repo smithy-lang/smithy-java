@@ -102,6 +102,10 @@ public final class McpEngine implements AutoCloseable {
      *
      * <p>This is primarily useful for transport adapters. Application code should
      * prefer the typed-call overload.
+     *
+     * <p>An accepted {@code subscriptions/listen} returns {@code null}, like a notification: the
+     * request stays open, and delivering its acknowledgment and notifications is up to the transport
+     * (see {@link McpOutcome.Subscribed}).
      */
     public JsonRpcResponse execute(JsonRpcRequest request, ProtocolVersion protocolVersion) {
         var session = newSession();
@@ -131,7 +135,11 @@ public final class McpEngine implements AutoCloseable {
         } catch (RuntimeException e) {
             return errorOutcome(call, e);
         }
-        return execute(call, new McpRequestContext(version, transportContext, Context.create()));
+        var outcome = execute(call, new McpRequestContext(version, transportContext, Context.create()));
+        if (call instanceof McpCall.Initialize && outcome instanceof McpOutcome.Success) {
+            session.markHandshake();
+        }
+        return outcome;
     }
 
     JsonRpcRequest encode(McpCall call) {
@@ -167,6 +175,10 @@ public final class McpEngine implements AutoCloseable {
             Consumer<JsonRpcResponse> responseWriter
     ) {
         sources.bindTransport(notificationWriter, responseWriter);
+    }
+
+    void bindTransport(McpSources.CatalogListener listener, Consumer<JsonRpcResponse> responseWriter) {
+        sources.bindTransport(listener, responseWriter);
     }
 
     void addService(String id, Service service) {

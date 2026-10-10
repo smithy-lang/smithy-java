@@ -176,6 +176,28 @@ support stateless discovery, the engine initializes that remote independently
 using the proxy server's identity and the highest-priority compatible stateful
 protocol.
 
+## List-change notifications
+
+When the tools or prompts of a proxied server change, or a service or remote
+client is added to a running stdio server, the server tells its client:
+
+- A connection that completed `initialize` receives the untagged
+  `notifications/tools/list_changed` and `notifications/prompts/list_changed`
+  notifications of the handshake protocol versions.
+- On `2026-07-28`, a client opts in with `subscriptions/listen`. The stdio server
+  advertises `listChanged` for tools and prompts from `server/discover`,
+  acknowledges a listen request with `notifications/subscriptions/acknowledged`,
+  and then delivers only the requested types, each tagged with
+  `_meta["io.modelcontextprotocol/subscriptionId"]`. Resource notifications are
+  not accepted on subscriptions. The client ends a subscription with
+  `notifications/cancelled`; a graceful server shutdown answers each open listen
+  request with a `complete` result.
+- A connection that has neither initialized nor subscribed receives no
+  unsolicited notifications.
+
+The HTTP handler does not support `subscriptions/listen` yet: it answers with
+`-32601` and does not advertise `listChanged`.
+
 ## HTTP parameter headers
 
 Annotate a Smithy input member with `smithy.ai#mcpHeader` to mirror that value in

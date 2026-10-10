@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -37,6 +38,9 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 @SmithyUnstableApi
 public final class StdioMcpServer implements Server {
     private static final InternalLogger LOG = InternalLogger.getLogger(StdioMcpServer.class);
+    private static final Set<String> SUBSCRIPTION_ONLY_NOTIFICATIONS = Set.of(
+            "notifications/resources/list_changed",
+            "notifications/resources/updated");
     private static final byte[] TOOLS_CHANGED = """
             {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}
             """.getBytes(StandardCharsets.UTF_8);
@@ -49,12 +53,14 @@ public final class StdioMcpServer implements Server {
     private final ExecutorService requests = Executors.newVirtualThreadPerTaskExecutor();
     private final CountDownLatch done = new CountDownLatch(1);
     private final AtomicBoolean shuttingDown = new AtomicBoolean();
+    private final McpSubscriptionRegistry subscriptions;
 
     StdioMcpServer(StdioMcpServerBuilder builder) {
         engine = builder.engine;
         session = engine.newSession();
         input = builder.input;
         output = builder.output;
+        subscriptions = new McpSubscriptionRegistry(output, this::write, engine.identity());
         listener = Thread.ofPlatform()
                 .name("stdio-dispatcher")
                 .daemon()
@@ -82,8 +88,15 @@ public final class StdioMcpServer implements Server {
                     continue;
                 }
 
+                var method = McpMethod.parse(request.getMethod());
+                if (method == McpMethod.Standard.NOTIFICATIONS_CANCELLED && request.getId() == null) {
+                    // Handled in arrival order on the reader thread, after any listen it references.
+                    var params = request.getParams();
+                    subscriptions.cancel(McpHttpBinding.isObject(params) ? params.getMember("requestId") : null);
+                    continue;
+                }
                 var task = requests.submit(() -> handleRequest(request));
-                if (McpMethod.Standard.INITIALIZE.wireName().equals(request.getMethod())) {
+                if (method == McpMethod.Standard.INITIALIZE || method == McpMethod.Standard.SUBSCRIPTIONS_LISTEN) {
                     try {
                         task.get();
                     } catch (InterruptedException e) {
@@ -99,19 +112,68 @@ public final class StdioMcpServer implements Server {
                 LOG.error("Error reading MCP input", e);
             }
         } finally {
+            // EOF or read failure: the transport is gone, so subscriptions end without a response.
+            subscriptions.clear();
             requests.shutdown();
         }
     }
 
     private void handleRequest(JsonRpcRequest request) {
         var outcome = engine.execute(request, session, null, McpTransportContext.STDIO);
+        if (outcome instanceof McpOutcome.Subscribed subscribed) {
+            subscriptions.open(subscribed);
+            return;
+        }
         var response = engine.encode(outcome);
         if (response != null) {
             write(response);
         }
     }
 
+    /**
+     * Tells the client that the tool list changed.
+     *
+     * <p>A connection that completed {@code initialize} receives an untagged
+     * {@code notifications/tools/list_changed}; {@code subscriptions/listen} streams that requested tool
+     * changes receive a copy tagged with their subscription id. Nothing is sent to a connection that
+     * has neither.
+     */
     public void refreshTools() {
+        publish(McpMethod.Standard.NOTIFICATIONS_TOOLS_LIST_CHANGED, null);
+    }
+
+    /**
+     * Writes the untagged copy for a handshake connection and tagged copies for matching subscriptions,
+     * under the output monitor so they cannot interleave with an acknowledgment.
+     *
+     * @param original the remote notification that reported the change, written unchanged to a
+     *                 handshake connection; {@code null} for a local change
+     */
+    private void publish(McpMethod.Standard method, JsonRpcRequest original) {
+        synchronized (output) {
+            if (session.handshake()) {
+                if (original != null) {
+                    write(original);
+                } else if (method == McpMethod.Standard.NOTIFICATIONS_TOOLS_LIST_CHANGED) {
+                    writeToolsChanged();
+                }
+            }
+            subscriptions.deliver(method);
+        }
+    }
+
+    /**
+     * A local change can affect both tools and prompts. Handshake connections keep receiving the
+     * single untagged tools notification they always have.
+     */
+    private void publishLocalChange() {
+        synchronized (output) {
+            publish(McpMethod.Standard.NOTIFICATIONS_TOOLS_LIST_CHANGED, null);
+            subscriptions.deliver(McpMethod.Standard.NOTIFICATIONS_PROMPTS_LIST_CHANGED);
+        }
+    }
+
+    private void writeToolsChanged() {
         try {
             synchronized (output) {
                 output.write(TOOLS_CHANGED);
@@ -122,14 +184,34 @@ public final class StdioMcpServer implements Server {
         }
     }
 
+    /**
+     * Applies this connection's delivery policy to catalog events.
+     */
+    private final class CatalogEvents implements McpSources.CatalogListener {
+        @Override
+        public void onListChanged(McpMethod.Standard method, JsonRpcRequest original) {
+            publish(method, original);
+        }
+
+        @Override
+        public void onNotification(JsonRpcRequest notification) {
+            // 2026-07-28 delivers resource change notifications only on subscriptions, and resource
+            // subscriptions are not accepted, so only handshake connections receive them.
+            if (SUBSCRIPTION_ONLY_NOTIFICATIONS.contains(notification.getMethod()) && !session.handshake()) {
+                return;
+            }
+            write(notification);
+        }
+    }
+
     public void addService(String id, Service service) {
         engine.addService(id, service);
-        refreshTools();
+        publishLocalChange();
     }
 
     public void addRemoteClient(McpRemoteClient client) {
         engine.addRemoteClient(client);
-        refreshTools();
+        publishLocalChange();
     }
 
     public boolean containsServer(String id) {
@@ -165,13 +247,14 @@ public final class StdioMcpServer implements Server {
 
     @Override
     public void start() {
-        engine.bindTransport(this::write, this::write);
+        engine.bindTransport(new CatalogEvents(), this::write);
         listener.start();
     }
 
     @Override
     public CompletableFuture<Void> shutdown() {
         if (shuttingDown.compareAndSet(false, true)) {
+            subscriptions.completeAll();
             requests.shutdownNow();
             engine.close();
             try {
