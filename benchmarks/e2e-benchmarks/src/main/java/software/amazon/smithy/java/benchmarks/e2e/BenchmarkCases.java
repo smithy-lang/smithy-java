@@ -141,7 +141,7 @@ final class BenchmarkCases {
                 "No @httpRequestTests or @httpResponseTests case with id '" + id + "' is tagged " + TAG);
     }
 
-    /** Hashes the workload once during setup so comparisons can reject changed inputs under the same benchmark ID. */
+    /** Hashes the workload during setup to identify changes in inputs and responses. */
     private static String fingerprint(
             String operationId,
             BenchmarkCase.Source source,

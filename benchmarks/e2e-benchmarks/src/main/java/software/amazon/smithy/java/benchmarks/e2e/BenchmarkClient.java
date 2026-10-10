@@ -10,10 +10,12 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
+/** One generated client per protocol, built once and reused by every case of that protocol. */
 final class BenchmarkClient implements AutoCloseable {
 
     private static final MethodType GENERIC_CALL = MethodType.methodType(
@@ -21,17 +23,11 @@ final class BenchmarkClient implements AutoCloseable {
             SerializableStruct.class);
 
     private final BenchmarkProtocol protocol;
-    private final CountingTransport transport;
     private final Object client;
 
-    BenchmarkClient(BenchmarkProtocol protocol, CountingTransport transport, String endpoint) {
+    BenchmarkClient(BenchmarkProtocol protocol, ClientTransport<?, ?> transport, String endpoint) {
         this.protocol = protocol;
-        this.transport = transport;
         this.client = protocol.newClient(transport, endpoint);
-    }
-
-    CountingTransport transport() {
-        return transport;
     }
 
     Call prepare(BenchmarkCase benchmarkCase) {
@@ -39,7 +35,6 @@ final class BenchmarkClient implements AutoCloseable {
             throw new IllegalArgumentException(
                     benchmarkCase.id() + " belongs to " + benchmarkCase.protocol() + ", not " + protocol);
         }
-        transport.prepare(benchmarkCase);
         return new Call(
                 operationHandle(benchmarkCase.operationName()),
                 benchmarkCase.input(),
@@ -80,6 +75,7 @@ final class BenchmarkClient implements AutoCloseable {
         }
     }
 
+    /** One benchmark case bound to its client: the operation method handle and the prepared input. */
     static final class Call {
         private final MethodHandle handle;
         private final SerializableStruct input;
@@ -99,8 +95,7 @@ final class BenchmarkClient implements AutoCloseable {
         }
 
         SerializableStruct invoke() throws Throwable {
-            // The input is reused across calls; serializing a blob payload advances its buffer, so rewind it
-            // first or every call after the first serializes an empty body.
+            // This SDK advances a blob payload's buffer while serializing; rewind it or later calls send an empty body.
             if (requestPayload != null) {
                 requestPayload.rewind();
             }
@@ -108,10 +103,9 @@ final class BenchmarkClient implements AutoCloseable {
             if (outputPayloadMember != null) {
                 Object payload = output.getMemberValue(outputPayloadMember);
                 if (payload instanceof DataStream stream) {
-                    MockHttpTransport.drain(stream);
+                    Bodies.drain(stream);
                 } else if (payload instanceof ByteBuffer buffer) {
-                    // Read every byte because deserialization may leave the payload in a buffer without copying it.
-                    MockHttpTransport.consume(buffer);
+                    Bodies.consume(buffer);
                 }
             }
             return output;

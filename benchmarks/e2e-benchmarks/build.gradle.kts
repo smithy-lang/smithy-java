@@ -1,11 +1,10 @@
 // Note: Not published.
 //
-// Feb-2026 baseline build of the cross-SDK serde E2E ops/CPU-sec harness. This is the CURRENT harness
-// (copied verbatim) built against the SDK as of the baseline commit, per the ocs SOP: measure old SDK
-// behavior with the current test infrastructure. Differences from the current harness, all forced by the
-// older SDK, are:
-//   - the smithy-java HTTP client / BoringSSL / fixture server did not exist, so the real-transport modes
-//     and that whole source set are dropped; only the in-process stub (the cross-SDK configuration) runs.
+// Feb-2026 baseline build of the cross-SDK serde E2E ops/CPU-sec harness: the current harness built against
+// the SDK as of the baseline commit, so old SDK behaviour is measured with the current test infrastructure.
+// Differences from the current module, all forced by the older SDK:
+//   - the smithy-java HTTP client and BoringSSL do not exist yet, so the https mode drives the JDK HTTP client
+//     (JavaHttpClientTransport) and the fixture server's TLS comes from SSLServerSocket;
 //   - the codegen plugin is `java-client-codegen` from `:codegen:plugins`, and there is no JMH convention.
 plugins {
     id("smithy-java.java-conventions")
@@ -15,10 +14,12 @@ plugins {
 }
 
 description =
-    "Cross-SDK serde E2E ops/CPU-sec benchmark (Feb-2026 baseline): generated-client calls with the HTTP transport mocked in-process."
+    "Cross-SDK serde E2E ops/CPU-sec benchmark (Feb-2026 baseline): generated-client calls against an in-process stub or a fixture server over HTTPS."
 
 application {
     mainClass.set("software.amazon.smithy.java.benchmarks.e2e.E2eBenchmark")
+    // Disable background JIT compilation for Gradle runs.
+    applicationDefaultJvmArgs = listOf("-Xbatch")
 }
 
 val sharedModelDir = layout.projectDirectory.dir("../serde-benchmarks/model")

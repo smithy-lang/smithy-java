@@ -1,17 +1,16 @@
-# smithy-java serde E2E benchmarks
+# smithy-java serde E2E benchmarks (Feb-2026 baseline build)
+
+This is the current e2e harness built against the SDK as of the baseline commit, so old SDK behaviour
+is measured with the current test infrastructure. Keep it in step with `benchmarks/e2e-benchmarks` on
+`main`; the only differences are the ones the older SDK forces (see the build file header).
 
 Measures operations per process CPU-second for complete generated-client calls: serialization,
-endpoint resolution, SigV4 signing, retries and interceptors, and deserialization. The default
-transport is an in-process stub; socket setup, TLS, network and service time are excluded.
-Inputs and clients are constructed before measurement and reused. Streaming responses are drained.
-Live AWS workloads are in [`../live-benchmarks`](../live-benchmarks/README.md).
+endpoint resolution, SigV4 signing, retries and interceptors, and deserialization. Inputs and clients
+are built before measurement and reused. Streaming responses are drained.
 
-The cross-SDK model and methodology are in
-[AwsSdkPerformanceBenchmarkModels](https://code.amazon.com/packages/AwsSdkPerformanceBenchmarkModels/trees/mainline/--/results):
-[`ocs.md`](https://code.amazon.com/packages/AwsSdkPerformanceBenchmarkModels/blobs/mainline/--/results/ocs.md)
-defines the measurement, and
-[`ocs-sop.md`](https://code.amazon.com/packages/AwsSdkPerformanceBenchmarkModels/blobs/mainline/--/results/ocs-sop.md)
-describes metal runs and submission.
+The measurement follows the procedure shared by the AWS SDK teams: one loop per benchmark, process
+CPU time, geometric means per protocol and overall, at least three interleaved baseline and current
+samples on bare metal, medians per benchmark.
 
 ## Cases
 
@@ -27,56 +26,66 @@ and reads its `serde-benchmark`-tagged request and response tests at runtime.
 | `restXml` | AwsRestXmlDataPlane | 10 |
 | Total | | 71 |
 
-Ids retain the model's names, such as `awsJson1_0_PutItemRequest_ShallowMap_M`. The canonical set
-is checked in as `src/main/resources/.../canonical-benchmarks.txt` and validated at startup.
-`--all-model-cases` adds smithy-java's `WideTypes` and `OutOfOrder` cases.
+Ids are the model's test-case ids, such as `awsJson1_0_PutItemRequest_ShallowMap_M`. The canonical
+set is checked in as `src/main/resources/.../canonical-benchmarks.txt` and validated at startup.
+`--all-model-cases` adds `WideTypes` and `OutOfOrder` cases outside the canonical set.
 
 Each request case uses its `params` and receives a minimal valid response: `{}` for JSON, an empty
 map for CBOR, no body for REST-XML, or an `<OpResponse><OpResult/></OpResponse>` wrapper for Query.
 Each response case uses its fixture and sends an input containing only required members and URI
-labels. Cases are measured independently.
+labels. CBOR bodies and `@httpPayload` blob fixtures are base64 in this model; the harness decodes
+them so `Content-Length` describes the bytes sent. The first call of every case checks that the
+request body length matches `Content-Length` and that the response deserialized into the expected
+output members.
 
-CBOR bodies and `@httpPayload` blob fixtures are base64 in this model. The harness decodes them
-so `ContentLength`, `Content-Length` and CRC64NVME describe the bytes sent. Structured blobs,
-including DynamoDB `B` attributes, retain protocol-test UTF-8 semantics. The stub checks request
-body length against `Content-Length` before measurement.
-
-## Build and run
+## Run
 
 ```bash
 ./gradlew :benchmarks:e2e-benchmarks:shadowJar
-java -jar benchmarks/e2e-benchmarks/build/libs/smithy-java-e2e-benchmark.jar \
+java -Xbatch -jar benchmarks/e2e-benchmarks/build/libs/smithy-java-e2e-benchmark.jar \
     --instance-type m7i.metal-24xl --output run1.json
+
+# Gradle adds -Xbatch.
+./gradlew :benchmarks:e2e-benchmarks:run --args="--mode https --protocol rpcv2Cbor"
 ```
 
-The jar targets Java 21 and records its build commit. Metal runs default to Corretto 25.
-The runner starts one child JVM per protocol with `-Xbatch`, forwards the launcher's JVM flags,
-and merges the results. Progress goes to stderr; the summary goes to stdout. Any operation
-failure fails the run. Tests invoke every model case once.
+One JVM runs the selected cases. For each case, the harness sets the response, checks one call,
+warms up, calls `System.gc()`, and measures. Pass `-Xbatch` to disable background JIT compilation.
+Progress goes to stderr, the summary to stdout, and any failure fails the run.
 
 | Option | Default | Purpose |
 |---|---|---|
+| `--mode stub\|https` | `stub` | See below |
 | `--protocol NAMES` | all | Comma-separated protocol names from the table |
 | `--filter SUBSTRINGS` | none | Case-insensitive substrings of benchmark ids |
 | `--all-model-cases` | off | Include smithy-java-only cases |
 | `--list` | off | List selected ids and exit |
-| `--transport MODE` | `stub` | `http` or `https` uses a fixture server |
-| `--endpoint URL` | mode default | `http://127.0.0.1:8080` or `https://127.0.0.1:8443`; scheme must match mode |
-| `--min-measure-cpu-seconds S` | `1` | CPU-time floor; `0` restores the literal cross-SDK stop rule |
-| `--in-process` | off | Run in this JVM for profiling; supply `-Xbatch` yourself |
 | `--output PATH` | timestamped JSON | Results file |
 | `--instance-type TYPE` | IMDSv2 lookup | Instance label in metadata |
 | `--notes TEXT` | none | Run annotation |
 
-```bash
-java -jar smithy-java-e2e-benchmark.jar --protocol restXml --filter GetObject --output restxml.json
-java -jar smithy-java-e2e-benchmark.jar --list
-```
+### Modes
+
+**`stub`** is the cross-SDK configuration: an in-process `ClientTransport` returns each case's
+canned response without opening sockets.
+
+**`https`** measures the same client calls through the one real transport this SDK has, the JDK
+`java.net.http.HttpClient` behind `JavaHttpClientTransport` (HTTP/1.1, TLS 1.3), to a fixture
+server. The harness starts the server in a child JVM from the same jar, so the server's CPU time
+stays out of the measurement, and tells it which response to serve before each case. Certificate
+verification is disabled: the server makes a self-signed certificate with `keytool` at startup.
+
+The fixture server (`...benchmarks.fixture.FixtureServer`) frames request headers in a reusable buffer,
+drains the body, and writes the current response bytes. It has two ports. The HTTPS data port serves
+the current fixture. The plaintext control port takes `POST /fixture` with the complete HTTP/1.1
+response as the body, validates it, and swaps it in for every connection. Until the first fixture
+arrives it answers 503.
 
 ## Measurement
 
 ```text
-warm up
+warm up: 2,000-call chunks until JIT compilation stays below 2% of chunk wall time
+         for five consecutive chunks and at least one second (floor 20,000 calls, cap 2,000,000)
 System.gc()
 cpuBefore = process CPU time
 repeat:
@@ -87,113 +96,10 @@ repeat:
 ops/CPU-sec = iterations / CPU elapsed
 ```
 
-Process CPU time includes user and system time for all threads, including JIT and GC. The
-one-second floor limits quantization from Linux's 10 ms process CPU clock. Increase it for
-longer profiling windows. A nanosecond-resolution benchmark-thread CPU metric is also recorded,
-but excludes work on other threads.
+Process CPU time includes user and system time for all threads, including JIT and GC. Linux reads
+it in 10 ms ticks, hence the one-second floor. A measured window that spends more than 5% of its
+wall time compiling is flagged `under_warmed`.
 
-Automatic warmup uses 2,000-call chunks. It stops after compilation stays below 2% of chunk
-wall time for five consecutive chunks and at least one second, with a 20,000-call floor and
-2,000,000-call cap. `-Xbatch` keeps compilation synchronous. A measured window spending more
-than 5% of wall time compiling is flagged `under_warmed`.
-
-The results schema is `smithy-java/e2e-ops-cpusec/1`. Metadata records the measurement settings,
-transport, commit, instance, JVM, OS and CPU. Each case records iterations, CPU and wall time,
-warmup, JIT and GC activity, and request/response verification. Summary values are geometric
-means, with CPU/wall and warmup diagnostics.
-
-## Real transport and fixture server
-
-`http` and `https` measure smithy-java's HTTP client against the same response fixtures.
-These runs include transport cost and cannot be compared with stub runs. HTTP/1.1 is enforced;
-HTTPS uses BoringSSL. Certificate verification is disabled for the self-signed fixture
-certificate, and this is recorded in metadata.
-
-The fixture server has its own source set (`src/fixtureServer`) and jar. It uses one platform
-thread per connection, blocking I/O, and the client's `SSLEngineTransport` for BoringSSL TLS.
-Request framing reuses a buffer; response bytes are prepared at startup. Bodies, including
-chunked uploads and trailers, are drained. HEAD, keep-alive and `Expect: 100-continue` are supported.
-
-```bash
-# Build both jars, generate a certificate, and run the pilot cases three times per mode.
-./gradlew :benchmarks:e2e-benchmarks:transportBenchmark
-
-./gradlew :benchmarks:e2e-benchmarks:transportBenchmark \
-    -Ptransport=http -Pbenchmarks=rpcv2Cbor_PutItemRequest_Baseline -Pruns=5
-```
-
-`fixture/run-transport.py` starts servers on free loopback ports and runs independent client
-JVMs with `-Xbatch` in randomized mode order. Results go to `build/transport-benchmark/`.
-HTTPS certificates are generated with `fixture/make-cert.sh` using OpenSSL.
-Server CPU per operation includes startup and warmup; it is omitted when failed runs or retries
-make the request count incomplete.
-
-For manual runs, export one case and use its `.fixture.json` `server_args` to configure the server:
-
-```bash
-java -jar smithy-java-e2e-benchmark.jar export-fixture restXml_GetObject_L --out fixtures
-java -jar smithy-java-fixture-server.jar --help
-java -jar smithy-java-e2e-benchmark.jar --protocol restXml --filter restXml_GetObject_L \
-    --transport https --endpoint https://127.0.0.1:8443
-```
-
-The server serves one fixture per process. Each client run first checks the response status and
-declared body length outside the measured window.
-
-## Baseline comparison
-
-Build the same harness and model against the baseline and current SDK. The cross-SDK baseline
-is the last commit on or before 2026-02-01; copy the current benchmark modules and their
-`settings.gradle.kts` includes onto that checkout, adapting APIs if needed and recording those
-changes in `--notes`. Interleave three samples per side on the same host.
-
-```bash
-java -jar smithy-java-e2e-benchmark.jar compare \
-    --baseline runs/baseline --current runs/current \
-    --out results/smithy-java/m7imetal24xl_ocs_results
-```
-
-Each side accepts a file or directory. Directories concatenate protocol runs and use medians
-for repeated cases; all samples within a side must use the same SDK, environment and measurement
-configuration. Between sides, different measurement rules, client modes or transports are errors.
-Different case sets require `--allow-partial`. CPU, instance, JVM and warmup differences produce
-warnings. Output is `<out>.json` and `<out>.md`; `--lang` changes the SDK label.
-
-Submit these files to `results/smithy-java/` in AwsSdkPerformanceBenchmarkModels and regenerate
-the aggregate with `node scripts/markdown-ocs.js`.
-
-## Metal runner
-
-`scripts/run-metal-benchmarks.py` builds and stages artifacts through S3, launches a metal EC2
-instance, and drives it through SSM without SSH or a key pair. `scripts/metal-host.sh` installs
-Corretto, sets the performance governor where available, disables Intel turbo, smoke-tests the
-host, runs the matrix, and uploads results and logs.
-
-```bash
-python3 scripts/run-metal-benchmarks.py setup-infra
-python3 scripts/run-metal-benchmarks.py --dry-run
-python3 scripts/run-metal-benchmarks.py --baseline-jar /path/to/baseline.jar
-python3 scripts/run-metal-benchmarks.py --instance-type m7g.metal --suite e2e,serde
-python3 scripts/run-metal-benchmarks.py --suite fixture --samples 5
-python3 scripts/run-metal-benchmarks.py --suite h1scaling --h1-baseline-jmh-jar /path/to/baseline-jmh.jar
-```
-
-Local results go to `build/metal-runs/<run-id>/`; S3 retains results and a log bundle.
-The runner terminates the instance on completion or interruption. A host shutdown terminates
-it after `--max-hours`. `--keep-instance` retains it; `resume` continues polling a detached run,
-and `cleanup` terminates an instance recorded in `metal-run-state.json`. Failed or unconfirmed
-termination retains that file for cleanup. Networking and credentials can be overridden with
-`--profile`, `--bucket`, `--instance-profile`, `--subnet-id` and `--no-public-ip`.
-
-## JMH
-
-The same cases are available in JMH sample mode for latency percentiles, with
-`OpsPerCpuSecondProfiler` as a secondary metric:
-
-```bash
-./gradlew :benchmarks:e2e-benchmarks:jmh
-./gradlew :benchmarks:e2e-benchmarks:jmh -Pjmh.testCaseId=awsJson1_0_GetItemOutput_M -Pjmh.fast
-```
-
-Results go to `build/results/jmh/results.json`. Cross-SDK submissions use the CPU-time runner,
-whose stop rule differs from JMH's timed iterations.
+The results schema is `smithy-java/e2e-ops-cpusec/2`, the same as the current harness writes, so
+`scripts/compare-ocs.py` and `scripts/run-metal-benchmarks.py` from the `main` checkout take this
+build's jar as the baseline side directly.
