@@ -1,5 +1,6 @@
 plugins {
     id("smithy-java.module-conventions")
+    id("smithy-java.jmh-conventions")
 }
 
 description = "Implements the rules engine traits used to resolve endpoints"
