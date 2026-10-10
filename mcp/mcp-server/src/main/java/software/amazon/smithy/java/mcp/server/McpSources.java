@@ -34,6 +34,24 @@ interface McpSources extends AutoCloseable {
             Consumer<JsonRpcResponse> responseWriter
     );
 
+    /**
+     * Binds a transport that applies its own delivery policy to catalog change events.
+     */
+    void bindTransport(CatalogListener listener, Consumer<JsonRpcResponse> responseWriter);
+
+    /**
+     * Receives catalog changes and other notifications relayed from remote peers.
+     */
+    interface CatalogListener {
+        /**
+         * A tools or prompts list changed. {@code original} is the remote notification that
+         * reported it, or {@code null} for a local change.
+         */
+        void onListChanged(McpMethod.Standard method, JsonRpcRequest original);
+
+        void onNotification(JsonRpcRequest notification);
+    }
+
     void initializeRemoteClients(McpProtocol protocol);
 
     default void ensureRemoteCatalogLoaded() {

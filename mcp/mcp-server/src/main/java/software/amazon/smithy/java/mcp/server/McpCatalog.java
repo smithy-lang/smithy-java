@@ -62,6 +62,7 @@ final class McpCatalog implements McpSources {
             new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Consumer<JsonRpcResponse>> responseWriters =
             new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<CatalogListener> listeners = new CopyOnWriteArrayList<>();
     private volatile JsonRpcRequest initializeRequest;
     private volatile McpProtocol initializeProtocol;
 
@@ -202,6 +203,13 @@ final class McpCatalog implements McpSources {
             Consumer<JsonRpcResponse> responseWriter
     ) {
         notificationWriters.addIfAbsent(notificationWriter);
+        responseWriters.addIfAbsent(responseWriter);
+        runOnce(remoteStart, () -> forEachRemoteInParallel("start", McpRemoteClient::start));
+    }
+
+    @Override
+    public void bindTransport(CatalogListener listener, Consumer<JsonRpcResponse> responseWriter) {
+        listeners.addIfAbsent(listener);
         responseWriters.addIfAbsent(responseWriter);
         runOnce(remoteStart, () -> forEachRemoteInParallel("start", McpRemoteClient::start));
     }
@@ -392,12 +400,24 @@ final class McpCatalog implements McpSources {
     }
 
     private void onRemoteNotification(McpRemoteClient client, JsonRpcRequest notification) {
-        if (McpMethod.Standard.NOTIFICATIONS_TOOLS_LIST_CHANGED.wireName().equals(notification.getMethod())) {
+        var method = McpMethod.parse(notification.getMethod());
+        boolean listChanged = false;
+        if (method == McpMethod.Standard.NOTIFICATIONS_TOOLS_LIST_CHANGED) {
             invalidate(client, toolRefreshStates, this::refreshTools);
-        } else if (McpMethod.Standard.NOTIFICATIONS_PROMPTS_LIST_CHANGED.wireName().equals(notification.getMethod())) {
+            listChanged = true;
+        } else if (method == McpMethod.Standard.NOTIFICATIONS_PROMPTS_LIST_CHANGED) {
             invalidate(client, promptRefreshStates, this::refreshPrompts);
+            listChanged = true;
         }
+        // Invalidate before delivery so a re-list triggered by the notification is fresh (#1377).
         notificationWriters.forEach(writer -> writer.accept(notification));
+        for (var listener : listeners) {
+            if (listChanged) {
+                listener.onListChanged((McpMethod.Standard) method, notification);
+            } else {
+                listener.onNotification(notification);
+            }
+        }
     }
 
     private void writeResponse(JsonRpcResponse response) {

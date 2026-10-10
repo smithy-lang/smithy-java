@@ -80,7 +80,7 @@ final class McpDomainOperations implements McpOperations {
     public McpOutcome discover(McpCall.Discover call, McpRequestContext context) {
         var protocol = protocols.require(context.protocolVersion());
         sources.ensureRemoteCatalogLoaded(protocol);
-        var capabilities = discoverCapabilities(protocol);
+        var capabilities = discoverCapabilities(protocol, context.transport());
         return new McpOutcome.Success(
                 call.id(),
                 Document.of(Map.of(
@@ -181,15 +181,45 @@ final class McpDomainOperations implements McpOperations {
         return builder.build();
     }
 
-    private Document discoverCapabilities(McpProtocol protocol) {
+    private Document discoverCapabilities(McpProtocol protocol, McpTransportContext transport) {
+        var deliverable = subscribable(protocol, transport);
         var capabilities = new HashMap<String, Document>();
-        if (supports(protocol, McpMethod.Standard.TOOLS_LIST)) {
+        if (deliverable.toolsListChanged()) {
+            capabilities.put("tools", Document.of(Map.of("listChanged", Document.of(true))));
+        } else if (supports(protocol, McpMethod.Standard.TOOLS_LIST)) {
             capabilities.put("tools", Document.of(Map.of()));
         }
-        if (supports(protocol, McpMethod.Standard.PROMPTS_LIST)) {
+        if (deliverable.promptsListChanged()) {
+            capabilities.put("prompts", Document.of(Map.of("listChanged", Document.of(true))));
+        } else if (supports(protocol, McpMethod.Standard.PROMPTS_LIST)) {
             capabilities.put("prompts", Document.of(Map.of()));
         }
         return Document.of(capabilities);
+    }
+
+    /**
+     * Notification types this server can deliver on a subscription over {@code transport}.
+     */
+    private McpSubscriptionFilter subscribable(McpProtocol protocol, McpTransportContext transport) {
+        if (!transport.supportsSubscriptions() || !supports(protocol, McpMethod.Standard.SUBSCRIPTIONS_LISTEN)) {
+            return McpSubscriptionFilter.NONE;
+        }
+        return new McpSubscriptionFilter(
+                supports(protocol, McpMethod.Standard.TOOLS_LIST),
+                supports(protocol, McpMethod.Standard.PROMPTS_LIST),
+                false,
+                List.of());
+    }
+
+    @Override
+    public McpOutcome listen(McpCall.Listen call, McpRequestContext context) {
+        var protocol = protocols.require(context.protocolVersion());
+        if (!context.transport().supportsSubscriptions()) {
+            throw protocol.unsupported(call.method());
+        }
+        return new McpOutcome.Subscribed(
+                call.id(),
+                call.notifications().intersect(subscribable(protocol, context.transport())));
     }
 
     private boolean supports(McpProtocol protocol, McpMethod.Standard method) {
