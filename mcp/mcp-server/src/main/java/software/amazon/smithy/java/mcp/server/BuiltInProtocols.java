@@ -35,7 +35,8 @@ final class BuiltInProtocols {
             McpMethod.Standard.PROMPTS_GET,
             McpMethod.Standard.COMPLETION_COMPLETE,
             McpMethod.Standard.TOOLS_LIST,
-            McpMethod.Standard.TOOLS_CALL);
+            McpMethod.Standard.TOOLS_CALL,
+            McpMethod.Standard.SUBSCRIPTIONS_LISTEN);
 
     private static final BuiltInProtocol V2024_11_05 = new BuiltInProtocol(
             KnownProtocolVersion.V2024_11_05,
