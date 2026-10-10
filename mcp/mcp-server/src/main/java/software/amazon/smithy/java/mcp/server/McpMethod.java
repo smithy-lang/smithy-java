@@ -45,7 +45,10 @@ public sealed interface McpMethod permits McpMethod.Standard, McpMethod.Extensio
         TOOLS_LIST("tools/list"),
         TOOLS_CALL("tools/call"),
         RESOURCES_READ("resources/read"),
+        SUBSCRIPTIONS_LISTEN("subscriptions/listen"),
         NOTIFICATIONS_INITIALIZED("notifications/initialized"),
+        NOTIFICATIONS_CANCELLED("notifications/cancelled"),
+        NOTIFICATIONS_SUBSCRIPTIONS_ACKNOWLEDGED("notifications/subscriptions/acknowledged"),
         NOTIFICATIONS_PROMPTS_LIST_CHANGED("notifications/prompts/list_changed"),
         NOTIFICATIONS_TOOLS_LIST_CHANGED("notifications/tools/list_changed");
 

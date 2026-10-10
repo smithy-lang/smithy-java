@@ -46,6 +46,7 @@ final class McpWireCodec {
             case McpCall.Complete c -> completionParams(c);
             case McpCall.SetLogLevel c -> Document.of(Map.of("level", Document.of(c.level())));
             case McpCall.ReadResource c -> Document.of(Map.of("uri", Document.of(c.uri())));
+            case McpCall.Listen c -> Document.of(Map.of("notifications", c.notifications().toDocument()));
             case McpCall.Notification c -> c.params();
             case McpCall.ExtensionCall<?> extension -> encodeExtension(extension);
             case McpCall.UnknownCall c -> c.params();
@@ -79,6 +80,8 @@ final class McpWireCodec {
                         .error(error.build())
                         .build();
             }
+            // The transport acknowledges the subscription and answers the request when it ends.
+            case McpOutcome.Subscribed ignored -> null;
             case McpOutcome.NoResponse ignored -> null;
         };
     }
