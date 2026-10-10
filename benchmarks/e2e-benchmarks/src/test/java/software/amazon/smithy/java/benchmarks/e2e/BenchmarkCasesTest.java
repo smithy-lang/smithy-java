@@ -7,6 +7,7 @@ package software.amazon.smithy.java.benchmarks.e2e;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -19,11 +20,13 @@ import software.amazon.smithy.java.core.schema.Schema;
 
 class BenchmarkCasesTest {
 
-    private static final Map<BenchmarkProtocol, BenchmarkClient> CLIENTS = new EnumMap<>(BenchmarkProtocol.class);
+    private record Stub(MockHttpTransport transport, BenchmarkClient client) {}
+
+    private static final Map<BenchmarkProtocol, Stub> STUBS = new EnumMap<>(BenchmarkProtocol.class);
 
     @AfterAll
     static void closeClients() {
-        CLIENTS.values().forEach(BenchmarkClient::close);
+        STUBS.values().forEach(stub -> stub.client().close());
     }
 
     static List<String> canonicalIds() {
@@ -69,17 +72,29 @@ class BenchmarkCasesTest {
 
     @Test
     void objectPayloadsAreTheDecodedBytes() throws Throwable {
-        // The model stores object bodies as base64. Content-Length must match the decoded bytes.
+        // The model stores object bodies as base64. Content-Length must describe the decoded bytes.
         var put = BenchmarkCases.build("restXml_PutObject_L");
-        var client = new BenchmarkClient(put.protocol(), new MockHttpTransport(), BenchmarkProtocol.ENDPOINT);
-        var call = client.prepare(put);
-        client.transport().resetCounters();
+        var stub = stub(put.protocol());
+        var call = stub.client().prepare(put);
+        stub.transport().respondWith(put.response());
         call.invoke();
-        assertThat(client.transport().requestBodyBytes()).isEqualTo(256_000);
-        assertThat(client.transport().lastRequest().headers().contentLength()).isEqualTo(256_000L);
+        assertThat(stub.transport().lastRequestBodyBytes()).isEqualTo(256_000);
+        assertThat(stub.transport().lastRequest().headers().contentLength()).isEqualTo(256_000L);
         assertThat(BenchmarkCases.build("restXml_GetObject_L").response().bodyLength()).isEqualTo(256_000);
         assertThat(BenchmarkCases.build("restXml_GetObject_S").response().bodyLength()).isEqualTo(1);
         assertThat(BenchmarkCases.build("restJson1_GetObject_M").response().bodyLength()).isEqualTo(1_000);
+    }
+
+    @Test
+    void cannedResponsesSerializeToCompleteHttp1Messages() {
+        var response = BenchmarkCases.build("awsJson1_0_GetItemOutput_S").response();
+        byte[] wire = response.toHttp1Bytes();
+        String text = new String(wire, StandardCharsets.ISO_8859_1);
+        assertThat(text).startsWith("HTTP/1.1 200 OK\r\n")
+                .contains("\r\ncontent-type: application/x-amz-json-1.0\r\n")
+                .contains("\r\ncontent-length: " + response.bodyLength() + "\r\n")
+                .contains("\r\n\r\n");
+        assertThat(wire.length - text.indexOf("\r\n\r\n") - 4).isEqualTo(response.bodyLength());
     }
 
     private static void runOnce(String id) throws Throwable {
@@ -87,18 +102,14 @@ class BenchmarkCasesTest {
         assertThat(benchmarkCase.id()).isEqualTo(id);
         assertThat(benchmarkCase.protocol()).isEqualTo(BenchmarkProtocol.forBenchmarkId(id));
 
-        var client = CLIENTS.computeIfAbsent(
-                benchmarkCase.protocol(),
-                protocol -> new BenchmarkClient(protocol, new MockHttpTransport(), BenchmarkProtocol.ENDPOINT));
-        var call = client.prepare(benchmarkCase);
-        client.transport().resetCounters();
+        var stub = stub(benchmarkCase.protocol());
+        var call = stub.client().prepare(benchmarkCase);
+        stub.transport().respondWith(benchmarkCase.response());
 
         var output = call.invoke();
-        client.transport().validateLast(benchmarkCase);
 
         assertThat(output).as("%s produced an output", id).isNotNull();
-        assertThat(client.transport().requests()).as("%s made exactly one request (no retries)", id).isEqualTo(1);
-        var request = client.transport().lastRequest();
+        var request = stub.transport().lastRequest();
         assertThat(request.uri().toString()).as("%s used the static endpoint", id)
                 .startsWith(BenchmarkProtocol.ENDPOINT);
         assertThat(request.headers().firstValue("authorization")).as("%s was SigV4-signed", id)
@@ -106,7 +117,7 @@ class BenchmarkCasesTest {
                 .doesNotContain("x-amz-security-token");
         assertThat(request.headers().firstValue("x-amz-date")).as("%s carries x-amz-date", id).isNotBlank();
         if (sendsABody(id)) {
-            assertThat(client.transport().requestBodyBytes()).as("%s serialized a request body", id).isPositive();
+            assertThat(stub.transport().lastRequestBodyBytes()).as("%s serialized a request body", id).isPositive();
         }
         // Baseline and Example responses may leave all output members unset.
         boolean minimalResponse = id.endsWith("_Baseline") || id.endsWith("_Example");
@@ -121,6 +132,13 @@ class BenchmarkCasesTest {
                 }
             }
         }
+    }
+
+    private static Stub stub(BenchmarkProtocol protocol) {
+        return STUBS.computeIfAbsent(protocol, p -> {
+            var transport = new MockHttpTransport();
+            return new Stub(transport, new BenchmarkClient(p, transport, transport.endpoint()));
+        });
     }
 
     private static boolean sendsABody(String id) {

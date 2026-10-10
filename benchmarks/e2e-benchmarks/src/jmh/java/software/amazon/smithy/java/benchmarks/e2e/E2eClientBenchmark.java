@@ -15,7 +15,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.infra.Blackhole;
 
 /**
- * Measures latency and operations per CPU-second with JMH.
+ * Measures latency and operations per CPU-second with JMH over the in-process stub.
  * Use E2eBenchmark for cross-SDK submissions.
  */
 @State(Scope.Benchmark)
@@ -30,8 +30,10 @@ public class E2eClientBenchmark {
     @Setup(Level.Trial)
     public void setup() {
         BenchmarkCase benchmarkCase = BenchmarkCases.build(testCaseId);
-        client = new BenchmarkClient(benchmarkCase.protocol(), new MockHttpTransport(), BenchmarkProtocol.ENDPOINT);
+        var stub = new MockHttpTransport();
+        client = new BenchmarkClient(benchmarkCase.protocol(), stub, stub.endpoint());
         call = client.prepare(benchmarkCase);
+        stub.respondWith(benchmarkCase.response());
     }
 
     @TearDown(Level.Trial)

@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
-"""Run smithy-java benchmarks on a bare-metal EC2 host through SSM and S3.
+"""Run the smithy-java e2e benchmark jar on a bare-metal EC2 host through SSM and S3.
 
-run executes the full cycle. setup-infra creates the bucket, role, and instance profile.
-resume continues a saved run. cleanup terminates its instance.
+The host installs Java, pins the CPU governor, downloads the jars, runs interleaved baseline and
+current samples with `java -Xbatch -jar`, and uploads the result files.
 
-Suites include e2e, serde, fixture, and h1scaling.
-The runner terminates the instance on exit unless you specify --keep-instance.
-Use cleanup after a crash. The host also shuts down after --max-hours."""
+  run (default)  build or take the jar(s), launch the host, run, download results, terminate
+  setup-infra    create the S3 bucket, IAM role and instance profile once per account
+  cleanup        terminate the instance recorded in the state file (or --instance-id)
+
+The instance is retained when --keep-instance is given or result files are missing.
+The host shuts itself down after --max-hours."""
 
 import argparse
-import glob
 import json
 import math
 import os
 import re
 import shlex
-import shutil
 import signal
 import subprocess
 import sys
@@ -29,19 +30,8 @@ except ImportError:  # pragma: no cover
     sys.exit("boto3 is required: pip install boto3")
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HOST_SCRIPT = os.path.join(PROJECT_ROOT, "scripts", "metal-host.py")
 E2E_JAR = os.path.join(PROJECT_ROOT, "benchmarks", "e2e-benchmarks", "build", "libs", "smithy-java-e2e-benchmark.jar")
-SERDE_JAR_GLOB = os.path.join(PROJECT_ROOT, "benchmarks", "serde-benchmarks", "build", "libs", "*-jmh.jar")
-H1_JMH_JAR_GLOB = os.path.join(PROJECT_ROOT, "http", "http-client", "build", "libs", "*-jmh.jar")
-H1_SERVER_JAR_GLOB = os.path.join(PROJECT_ROOT, "http", "http-client", "build", "libs", "*-jmh-server.jar")
-GRADLE_TASKS = {
-    "e2e": [":benchmarks:e2e-benchmarks:shadowJar"],
-    "serde": [":benchmarks:serde-benchmarks:jmhJar"],
-    "fixture": [":benchmarks:e2e-benchmarks:shadowJar", ":benchmarks:e2e-benchmarks:fixtureServerJar"],
-    "h1scaling": [":http:http-client:jmhJar", ":http:http-client:jmhServerJar"],
-}
-FIXTURE_SERVER_JAR = os.path.join(PROJECT_ROOT, "benchmarks", "e2e-benchmarks", "build", "libs", "smithy-java-fixture-server.jar")
-FIXTURE_DIR = os.path.join(PROJECT_ROOT, "benchmarks", "e2e-benchmarks", "fixture")
+GRADLE_TASK = ":benchmarks:e2e-benchmarks:shadowJar"
 
 DEFAULT_REGION = "us-east-1"
 DEFAULT_INSTANCE_TYPE = "m7i.metal-24xl"
@@ -52,27 +42,78 @@ HOST_WORK_DIR = "/opt/smithy-java-benchmark"
 STATE_FILE = "metal-run-state.json"
 TAG_MANAGED_BY = "smithy-java-run-metal-benchmarks"
 SSM_MANAGED_POLICY = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-
 AMI_PARAMETERS = {
     "x86_64": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64",
     "arm64": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64",
 }
 HOURLY_COST = {"m7i.metal-24xl": 4.84, "m7g.metal": 2.61}
-
 SSM_ONLINE_TIMEOUT_SECONDS = 25 * 60
-# Reject smoke tests outside this band because the host may be misconfigured or contended.
-SMOKE_CPU_WALL_RANGE = (0.75, 1.25)
+
+HOST_SCRIPT = r"""#!/bin/bash
+set -u
+WORK=__WORK__
+RESULTS=$WORK/results
+mkdir -p $WORK/jars $WORK/logs $RESULTS
+exec >> $WORK/progress.log 2>&1
+log() { echo "[$(date -u +%H:%M:%S)] $*"; }
+
+log "installing Amazon Corretto __JAVA_MAJOR__"
+if ! dnf install -y java-__JAVA_MAJOR__-amazon-corretto-headless >/dev/null 2>&1 \
+   && ! dnf install -y java-__JAVA_MAJOR__-amazon-corretto-devel >/dev/null 2>&1; then
+    ARCH=$(uname -m | sed 's/x86_64/x64/')
+    curl -fsSL "https://corretto.aws/downloads/latest/amazon-corretto-__JAVA_MAJOR__-$ARCH-linux-jdk.tar.gz" -o /tmp/corretto.tgz \
+        && mkdir -p /opt/corretto && tar -xzf /tmp/corretto.tgz -C /opt/corretto \
+        && export PATH=$(ls -d /opt/corretto/amazon-corretto-* | tail -1)/bin:$PATH
+fi
+if ! java -version >/dev/null 2>&1; then log "FATAL no java"; echo 1 > $WORK/DONE; exit 1; fi
+java -version 2>&1 | sed 's/^/    /'
+
+log "pinning the CPU governor"
+for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > "$g" 2>/dev/null; done
+[ -e /sys/devices/system/cpu/intel_pstate/no_turbo ] && echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo
+log "governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo absent) no_turbo=$(cat /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || echo absent) nproc=$(nproc)"
+
+log "downloading jars from __STAGE__/jars/"
+aws s3 cp --recursive --no-progress __STAGE__/jars/ $WORK/jars/ | sed 's/^/    /'
+
+failures=0
+for sample in $(seq 1 __SAMPLES__); do
+    for side in __SIDES__; do
+        out=$RESULTS/$side/sample$sample.json
+        mkdir -p "$(dirname "$out")"
+        log "$side sample $sample"
+        if java -Xbatch -jar $WORK/jars/$side.jar __E2E_ARGS__ --instance-type __INSTANCE_TYPE__ \
+               --notes "metal run __RUN_ID__, $side sample $sample" --output "$out" > $WORK/logs/$side-sample$sample.log 2>&1; then
+            grep -E "Overall|CPU/wall|Under-warmed" $WORK/logs/$side-sample$sample.log | sed 's/^/    /'
+        else
+            log "FAIL $side sample $sample (see logs/$side-sample$sample.log)"
+            tail -n 20 $WORK/logs/$side-sample$sample.log | sed 's/^/    /'
+            failures=$((failures + 1))
+        fi
+    done
+done
+
+expected=$(find $RESULTS -type f | wc -l | tr -d ' ')
+log "uploading $expected result file(s) to __RESULTS_URI__/results/"
+if ! aws s3 cp --recursive --no-progress $RESULTS __RESULTS_URI__/results/ > $WORK/logs/upload.log 2>&1; then
+    log "FAIL uploading results"
+    tail -n 20 $WORK/logs/upload.log | sed 's/^/    /'
+    failures=$((failures + 1))
+fi
+uploaded=$(aws s3 ls --recursive __RESULTS_URI__/results/ 2>/dev/null | wc -l | tr -d ' ')
+if [ "$uploaded" != "$expected" ]; then
+    log "FAIL only $uploaded of $expected result file(s) are in S3; they remain under $RESULTS on this host"
+    failures=$((failures + 1))
+fi
+aws s3 cp --recursive --no-progress $WORK/logs __RESULTS_URI__/logs/ > /dev/null 2>&1 || log "WARN could not upload logs"
+aws s3 cp --no-progress $WORK/progress.log __RESULTS_URI__/progress.log > /dev/null 2>&1 || true
+log "done, failures=$failures"
+echo $failures > $WORK/DONE
+"""
 
 
 def log(message: str) -> None:
     print("[%s] %s" % (time.strftime("%H:%M:%S"), message), flush=True)
-
-
-def newest(pattern: str, what: str) -> str:
-    candidates = sorted(glob.glob(pattern), key=os.path.getmtime)
-    if not candidates:
-        fail("%s not found (%s)" % (what, pattern))
-    return candidates[-1]
 
 
 def fail(message: str) -> None:
@@ -85,65 +126,36 @@ def compact(instance_type: str) -> str:
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
     command = "run"
-    if argv and argv[0] in ("run", "setup-infra", "resume", "cleanup"):
+    if argv and argv[0] in ("run", "setup-infra", "cleanup"):
         command = argv.pop(0)
 
     parser = argparse.ArgumentParser(
-        prog="run-metal-benchmarks.py [run|setup-infra|resume|cleanup]",
+        prog="run-metal-benchmarks.py [run|setup-infra|cleanup]",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     aws = parser.add_argument_group("AWS")
-    aws.add_argument("--region", default=DEFAULT_REGION, help="region to launch in (default %(default)s, per the SOP)")
+    aws.add_argument("--region", default=DEFAULT_REGION, help="region to launch in (default %(default)s)")
     aws.add_argument("--profile", default=None, help="AWS credentials profile (default: the environment's)")
-    aws.add_argument("--bucket", default=None,
-                     help="S3 bucket for staging and results (default perf-comparison-temp-<account-id>)")
-    aws.add_argument("--prefix", default=DEFAULT_PREFIX,
-                     help="S3 key prefix; <arch>/<run-id>/ is appended (default %(default)s)")
+    aws.add_argument("--bucket", default=None, help="S3 bucket for staging and results (default perf-comparison-temp-<account-id>)")
+    aws.add_argument("--prefix", default=DEFAULT_PREFIX, help="S3 key prefix; <arch>/<run-id>/ is appended (default %(default)s)")
     aws.add_argument("--instance-profile", default=DEFAULT_INSTANCE_PROFILE,
                      help="IAM instance profile with SSM core + bucket access (default %(default)s)")
 
     host = parser.add_argument_group("host")
-    host.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE,
-                      help="m7i.metal-24xl (x86) or m7g.metal (Graviton); default %(default)s")
+    host.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="m7i.metal-24xl (x86) or m7g.metal (Graviton); default %(default)s")
     host.add_argument("--subnet-id", default=None, help="launch into this subnet instead of the default VPC")
-    host.add_argument("--security-group-id", default=None, help="security group to attach (no ingress is needed)")
     host.add_argument("--no-public-ip", action="store_true",
                       help="do not associate a public IP; the subnet then needs NAT or SSM/S3 VPC endpoints")
     host.add_argument("--java-major", type=int, default=25, help="Corretto major version to install (default %(default)s)")
     host.add_argument("--max-hours", type=float, default=6.0,
                       help="dead-man switch: the host shuts itself down after this many hours (default %(default)s)")
 
-    bench = parser.add_argument_group("benchmarks")
-    bench.add_argument("--suite", default="e2e",
-                       help="comma-separated: e2e, serde, fixture, h1scaling (default %(default)s)")
-    bench.add_argument("--samples", type=int, default=3,
-                       help="e2e samples per side, interleaved baseline/current (default %(default)s)")
-    bench.add_argument("--baseline-jar", default=None,
-                       help="e2e jar built from the baseline commit; enables the baseline side and `compare`")
-    bench.add_argument("--current-jar", default=None, help="e2e jar to measure (default: build it)")
-    bench.add_argument("--e2e-args", default="", help="extra arguments for every e2e run, e.g. \"--min-measure-cpu-seconds 2\"")
-    bench.add_argument("--serde-args", default="", help="extra JMH arguments for the serde suite, e.g. \"-p testCaseId=x\"")
-    bench.add_argument("--serde-fast", action="store_true", help="serde: 1 warmup and 3 measurement iterations")
-    bench.add_argument("--fixture-benchmarks", default="rpcv2Cbor_PutItemRequest_Baseline,awsJson1_0_GetItemOutput_M,restXml_PutObject_L,restXml_GetObject_L",
-                       help="fixture suite: comma-separated e2e benchmark ids")
-    bench.add_argument("--fixture-modes", default="stub,https",
-                       help="fixture suite: comma-separated experiment modes (stub, http, https)")
-    bench.add_argument("--fixture-server-cpus", default="2", help="fixture suite: taskset list for the server")
-    bench.add_argument("--fixture-client-cpus", default="4-11", help="fixture suite: taskset list for the client JVM")
-    bench.add_argument("--h1-baseline-jmh-jar", default=None,
-                       help="h1scaling suite: a second http-client JMH jar (e.g. built from main) to run as the baseline")
-    bench.add_argument("--h1-concurrency", default="1,10,100", help="h1scaling suite: JMH -p concurrency list")
-    bench.add_argument("--h1-max-connections", default="100", help="h1scaling suite: JMH -p maxConnections list")
-    bench.add_argument("--h1-threads", default="platform,virtual",
-                       help="h1scaling suite: worker thread kinds to run (platform and/or virtual)")
-    bench.add_argument("--h1-includes", default="H1ScalingBenchmark.h1Smithy", help="h1scaling suite: JMH benchmark regex")
-    bench.add_argument("--h1-server-cpus", default="12-19", help="h1scaling suite: taskset list for the Netty server")
-    bench.add_argument("--h1-client-cpus", default="24-47", help="h1scaling suite: taskset list for the JMH JVM")
-    bench.add_argument("--h1-fast", action="store_true", help="h1scaling suite: short warmup and measurement iterations")
-    bench.add_argument("--lang", default="smithy-java", help="SDK label written by `compare` (default %(default)s)")
-    bench.add_argument("--skip-build", action="store_true", help="use the jars already in build/libs")
-    bench.add_argument("--skip-smoke", action="store_true", help="skip the smoke test")
-    bench.add_argument("--ignore-smoke-failure", action="store_true", help="continue even if the smoke test fails")
+    bench = parser.add_argument_group("benchmark")
+    bench.add_argument("--current-jar", default=None, help="e2e jar to measure (default: build it with Gradle)")
+    bench.add_argument("--baseline-jar", default=None, help="e2e jar built from the baseline commit; measured interleaved with current")
+    bench.add_argument("--samples", type=int, default=3, help="JVM invocations per side, interleaved (default %(default)s)")
+    bench.add_argument("--e2e-args", default="", help="extra arguments for every run, e.g. \"--mode https\" or \"--protocol rpcv2Cbor\"")
+    bench.add_argument("--skip-build", action="store_true", help="use the jar already in build/libs")
 
     flow = parser.add_argument_group("flow")
     flow.add_argument("--outdir", default=DEFAULT_OUTDIR, help="local directory for results and state (default %(default)s)")
@@ -155,25 +167,35 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
 
     args = parser.parse_args(argv)
     args.command = command
-    args.suites = [s.strip() for s in args.suite.split(",") if s.strip()]
-    for suite in args.suites:
-        if suite not in GRADLE_TASKS:
-            parser.error("unknown suite '%s'; expected a comma-separated subset of %s" % (suite, ", ".join(GRADLE_TASKS)))
-    if not args.suites:
-        parser.error("--suite must name at least one suite")
     if args.samples < 1:
         parser.error("--samples must be at least 1")
     if not math.isfinite(args.max_hours) or args.max_hours <= 0:
         parser.error("--max-hours must be finite and positive")
     if args.poll_seconds < 1:
         parser.error("--poll-seconds must be at least 1")
-    if args.baseline_jar and not ({"e2e", "fixture"} & set(args.suites)):
-        parser.error("--baseline-jar only applies to the e2e or fixture suite")
-    if args.h1_baseline_jmh_jar and "h1scaling" not in args.suites:
-        parser.error("--h1-baseline-jmh-jar only applies to the h1scaling suite")
-    if "fixture" in args.suites and "e2e" in args.suites:
-        parser.error("run the fixture suite without e2e; it reuses --samples as runs per mode")
+    args.e2e_arg_list = shlex.split(args.e2e_args) if args.e2e_args else []
+    for flag in ("--output", "--instance-type", "--notes"):
+        if flag in args.e2e_arg_list:
+            parser.error("%s is set by the host script; do not pass it in --e2e-args" % flag)
     return args
+
+
+def host_script(args: argparse.Namespace, run_id: str, stage_uri: str, results_uri: str, sides: List[str]) -> str:
+    replacements = {
+        "__WORK__": HOST_WORK_DIR,
+        "__JAVA_MAJOR__": str(args.java_major),
+        "__STAGE__": stage_uri,
+        "__RESULTS_URI__": results_uri,
+        "__SAMPLES__": str(args.samples),
+        "__SIDES__": " ".join(sides),
+        "__E2E_ARGS__": shlex.join(args.e2e_arg_list),
+        "__INSTANCE_TYPE__": shlex.quote(args.instance_type),
+        "__RUN_ID__": run_id,
+    }
+    script = HOST_SCRIPT
+    for key, value in replacements.items():
+        script = script.replace(key, value)
+    return script
 
 
 class MetalRun:
@@ -186,7 +208,6 @@ class MetalRun:
         self.s3 = self.session.client("s3")
         self.sts = self.session.client("sts")
         self.iam = self.session.client("iam")
-        self.account: Optional[str] = None
         self.arch: Optional[str] = None
         self.ami: Optional[str] = None
         self.bucket: Optional[str] = args.bucket
@@ -198,7 +219,6 @@ class MetalRun:
         self.terminated = False
         self.launched_at: Optional[float] = None
 
-
     @property
     def s3_prefix(self) -> str:
         return "%s/%s/%s" % (self.args.prefix.strip("/"), self.arch, self.run_id)
@@ -207,7 +227,11 @@ class MetalRun:
     def s3_uri(self) -> str:
         return "s3://%s/%s" % (self.bucket, self.s3_prefix)
 
-    def ssm_run(self, commands: List[str], comment: str, timeout_seconds: int = 3600, echo: bool = True) -> Tuple[str, str, str]:
+    @property
+    def sides(self) -> List[str]:
+        return ["baseline", "current"] if "baseline" in self.jars else ["current"]
+
+    def ssm_run(self, commands: List[str], comment: str, timeout_seconds: int = 3600) -> Tuple[str, str]:
         sent = None
         for attempt in range(12):
             try:
@@ -232,15 +256,8 @@ class MetalRun:
                 if error.response["Error"]["Code"] == "InvocationDoesNotExist":
                     continue
                 raise
-            status = invocation["Status"]
-            if status not in ("Pending", "InProgress", "Delayed"):
-                break
-        stdout = invocation.get("StandardOutputContent", "")
-        stderr = invocation.get("StandardErrorContent", "")
-        if echo:
-            for line in (stdout + ("\n" + stderr if stderr.strip() else "")).rstrip().splitlines():
-                print("    " + line, flush=True)
-        return status, stdout, stderr
+            if invocation["Status"] not in ("Pending", "InProgress", "Delayed"):
+                return invocation["Status"], invocation.get("StandardOutputContent", "") + invocation.get("StandardErrorContent", "")
 
     def instance_state(self) -> str:
         try:
@@ -251,25 +268,9 @@ class MetalRun:
 
     def write_state(self, phase: str) -> None:
         os.makedirs(self.args.outdir, exist_ok=True)
-        state = {
-            "instance_id": self.instance_id,
-            "region": self.args.region,
-            "profile": self.args.profile,
-            "run_id": self.run_id,
-            "arch": self.arch,
-            "bucket": self.bucket,
-            "prefix": self.args.prefix,
-            "instance_type": self.args.instance_type,
-            "outdir": self.args.outdir,
-            "suites": self.args.suites,
-            "baseline": bool(self.args.baseline_jar),
-            "current_jar": self.jars.get("current"),
-            "lang": self.args.lang,
-            "poll_seconds": self.args.poll_seconds,
-            "keep_instance": self.args.keep_instance,
-            "phase": phase,
-            "launched_at": self.launched_at,
-        }
+        state = {"instance_id": self.instance_id, "region": self.args.region, "profile": self.args.profile,
+                 "run_id": self.run_id, "bucket": self.bucket, "s3_uri": self.s3_uri, "outdir": self.outdir,
+                 "phase": phase, "launched_at": self.launched_at}
         with open(self.state_path, "w", encoding="utf-8") as handle:
             json.dump(state, handle, indent=2)
 
@@ -279,11 +280,10 @@ class MetalRun:
         except OSError:
             pass
 
-
     def preflight(self) -> None:
         log("preflight")
-        self.account = self.sts.get_caller_identity()["Account"]
-        self.bucket = self.bucket or "perf-comparison-temp-%s" % self.account
+        account = self.sts.get_caller_identity()["Account"]
+        self.bucket = self.bucket or "perf-comparison-temp-%s" % account
         try:
             self.s3.head_bucket(Bucket=self.bucket)
         except ClientError as error:
@@ -293,221 +293,85 @@ class MetalRun:
             self.iam.get_instance_profile(InstanceProfileName=self.args.instance_profile)
         except ClientError as error:
             if error.response["Error"]["Code"] == "NoSuchEntity":
-                fail("instance profile %s does not exist. Run `setup-infra` or pass --instance-profile."
-                     % self.args.instance_profile)
-            log("  warning: cannot read instance profile %s (%s); continuing"
-                % (self.args.instance_profile, error.response["Error"]["Code"]))
-
+                fail("instance profile %s does not exist. Run `setup-infra` or pass --instance-profile." % self.args.instance_profile)
+            log("  warning: cannot read instance profile %s (%s); continuing" % (self.args.instance_profile, error.response["Error"]["Code"]))
         types = self.ec2.describe_instance_types(InstanceTypes=[self.args.instance_type])["InstanceTypes"]
         if not types:
             fail("unknown instance type %s" % self.args.instance_type)
-        architectures = types[0]["ProcessorInfo"]["SupportedArchitectures"]
-        self.arch = "arm64" if "arm64" in architectures else "x86_64"
+        self.arch = "arm64" if "arm64" in types[0]["ProcessorInfo"]["SupportedArchitectures"] else "x86_64"
         if not types[0].get("BareMetal", False):
             log("  warning: %s is not a bare-metal instance type; expect run-to-run drift" % self.args.instance_type)
-        offerings = self.ec2.describe_instance_type_offerings(
-            Filters=[{"Name": "instance-type", "Values": [self.args.instance_type]}])["InstanceTypeOfferings"]
-        if not offerings:
+        if not self.ec2.describe_instance_type_offerings(
+                Filters=[{"Name": "instance-type", "Values": [self.args.instance_type]}])["InstanceTypeOfferings"]:
             fail("%s is not offered in %s" % (self.args.instance_type, self.args.region))
         self.ami = self.ssm.get_parameter(Name=AMI_PARAMETERS[self.arch])["Parameter"]["Value"]
-        if not self.args.subnet_id:
-            vpcs = self.ec2.describe_vpcs(Filters=[{"Name": "isDefault", "Values": ["true"]}])["Vpcs"]
-            if not vpcs:
-                fail("no default VPC in %s; pass --subnet-id (and --security-group-id)" % self.args.region)
-        if not os.path.isfile(HOST_SCRIPT):
-            fail("missing host script %s" % HOST_SCRIPT)
-
-        log("  account %s, region %s, %s (%s), AMI %s" % (self.account, self.args.region, self.args.instance_type,
-                                                          self.arch, self.ami))
+        if not self.args.subnet_id and not self.ec2.describe_vpcs(Filters=[{"Name": "isDefault", "Values": ["true"]}])["Vpcs"]:
+            fail("no default VPC in %s; pass --subnet-id" % self.args.region)
+        log("  account %s, region %s, %s (%s), AMI %s" % (account, self.args.region, self.args.instance_type, self.arch, self.ami))
         log("  bucket s3://%s, prefix %s" % (self.bucket, self.s3_prefix))
-        log("  suites %s, samples %d, baseline %s" % (",".join(self.args.suites), self.args.samples,
-                                                      "yes" if self.args.baseline_jar else "no"))
+        log("  samples %d, baseline %s, e2e args %s" % (self.args.samples, "yes" if self.args.baseline_jar else "no",
+                                                        shlex.join(self.args.e2e_arg_list) or "(none)"))
         cost = HOURLY_COST.get(self.args.instance_type)
         if cost:
             log("  cost about $%.2f/hour; dead-man shutdown after %.1f hours" % (cost, self.args.max_hours))
 
     def build(self) -> None:
-        if not self.args.skip_build:
-            tasks = [t for s in self.args.suites if not (s == "e2e" and self.args.current_jar) for t in GRADLE_TASKS[s]]
-            if tasks:
-                log("building %s" % " ".join(tasks))
-                subprocess.run([os.path.join(PROJECT_ROOT, "gradlew"), "-q"] + tasks, cwd=PROJECT_ROOT, check=True)
-        if "h1scaling" in self.args.suites:
-            self.jars["h1-jmh"] = newest(H1_JMH_JAR_GLOB, "http-client JMH jar")
-            self.jars["h1-server"] = newest(H1_SERVER_JAR_GLOB, "http-client benchmark server jar")
-            if self.args.h1_baseline_jmh_jar:
-                if not os.path.isfile(self.args.h1_baseline_jmh_jar):
-                    fail("baseline JMH jar not found at %s" % self.args.h1_baseline_jmh_jar)
-                if os.path.samefile(self.args.h1_baseline_jmh_jar, self.jars["h1-jmh"]):
-                    fail("--h1-baseline-jmh-jar is the same file as the current JMH jar")
-                self.jars["h1-jmh-baseline"] = self.args.h1_baseline_jmh_jar
-        if "fixture" in self.args.suites:
-            current = self.args.current_jar or E2E_JAR
-            if not os.path.isfile(current):
-                fail("e2e jar not found at %s" % current)
-            self.jars["current"] = current
-            if not os.path.isfile(FIXTURE_SERVER_JAR):
-                fail("fixture server jar not found at %s" % FIXTURE_SERVER_JAR)
-            self.jars["fixture-server.jar"] = FIXTURE_SERVER_JAR
-            if self.args.baseline_jar:
-                if not os.path.isfile(self.args.baseline_jar):
-                    fail("baseline jar not found at %s" % self.args.baseline_jar)
-                self.jars["baseline"] = self.args.baseline_jar
-        if "e2e" in self.args.suites:
-            current = self.args.current_jar or E2E_JAR
-            if not os.path.isfile(current):
-                fail("e2e jar not found at %s" % current)
-            self.jars["current"] = current
-            if self.args.baseline_jar:
-                if not os.path.isfile(self.args.baseline_jar):
-                    fail("baseline jar not found at %s" % self.args.baseline_jar)
-                if os.path.samefile(self.args.baseline_jar, current):
-                    fail("--baseline-jar is the same file as the current jar")
-                self.jars["baseline"] = self.args.baseline_jar
-        if "serde" in self.args.suites:
-            self.jars["serde"] = newest(SERDE_JAR_GLOB, "serde JMH jar")
-        if {"e2e", "fixture"} & set(self.args.suites):
-            self.jars["e2e-scheduler.py"] = os.path.join(FIXTURE_DIR, "e2e-scheduler.py")
-            self.jars["make-cert.sh"] = os.path.join(FIXTURE_DIR, "make-cert.sh")
-        self.write_run_config()
-        for role, path in self.jars.items():
-            log("  %s jar: %s (%.1f MB)" % (role, path, os.path.getsize(path) / 1e6))
-
-    def write_run_config(self) -> None:
-        os.makedirs(self.outdir, exist_ok=True)
-        if {"e2e", "fixture"} & set(self.args.suites):
-            manifest_path = os.path.join(self.outdir, "manifest.json")
-            with open(manifest_path, "w", encoding="utf-8") as handle:
-                json.dump(self.build_manifest(), handle, indent=2)
-            self.jars["manifest.json"] = manifest_path
-        if {"serde", "h1scaling"} & set(self.args.suites):
-            config_path = os.path.join(self.outdir, "suite-config.json")
-            with open(config_path, "w", encoding="utf-8") as handle:
-                json.dump(self.build_suite_config(), handle, indent=2)
-            self.jars["suite-config.json"] = config_path
-
-    def build_manifest(self) -> dict:
-        """Build the run manifest with host paths. The host uses IMDS to detect its instance type."""
-        host_jars = "%s/jars" % HOST_WORK_DIR
-        out_root = "%s/results/e2e" % HOST_WORK_DIR
-        tag = compact(self.args.instance_type)
-        sides = []
-        if "baseline" in self.jars:
-            sides.append({"label": "baseline", "jar": "%s/baseline.jar" % host_jars})
-        sides.append({"label": "current", "jar": "%s/current.jar" % host_jars})
-        cases, compare = [], []
-        if "e2e" in self.args.suites:
-            cases.append({"slot": "all", "group": "all", "mode": "fork-per-protocol", "transports": ["stub"]})
-            if len(sides) == 2:
-                compare.append({"out": "%s/%s_ocs_results" % (out_root, tag), "lang": self.args.lang,
-                                "baseline": {"slot": "all", "transport": "stub", "side": "baseline"},
-                                "current": {"slot": "all", "transport": "stub", "side": "current"}})
-        if "fixture" in self.args.suites:
-            modes = [m.strip() for m in self.args.fixture_modes.split(",") if m.strip()]
-            for bench in [b.strip() for b in self.args.fixture_benchmarks.split(",") if b.strip()]:
-                cases.append({"slot": "cases", "id": bench, "mode": "in-process", "transports": modes,
-                              "client_taskset": self.args.fixture_client_cpus})
-            for side in sides:
-                if "stub" in modes and "https" in modes:
-                    compare.append({"out": "%s/%s_%s_stub_vs_https" % (out_root, tag, side["label"]),
-                                    "lang": self.args.lang, "allow_transport_diff": True, "allow_partial": True,
-                                    "baseline": {"slot": "cases", "transport": "stub", "side": side["label"]},
-                                    "current": {"slot": "cases", "transport": "https", "side": side["label"]}})
-            if len(sides) == 2:
-                for transport in modes:
-                    compare.append({"out": "%s/%s_%s_baseline_vs_current" % (out_root, tag, transport),
-                                    "lang": self.args.lang,
-                                    "baseline": {"slot": "cases", "transport": transport, "side": "baseline"},
-                                    "current": {"slot": "cases", "transport": transport, "side": "current"}})
-        return {
-            "schema": "smithy-java/e2e-run-manifest/1",
-            "label": self.args.instance_type,
-            "instance_type": self.args.instance_type,
-            "imds": True,
-            "seed": 20261009,
-            "samples": self.args.samples,
-            "outdir": out_root,
-            "notes": "metal run",
-            "e2e_args": shlex.split(self.args.e2e_args) if self.args.e2e_args else [],
-            "server": {"jar": "%s/fixture-server.jar" % host_jars,
-                       "cert": "%s/fixture/certs/server.pem" % HOST_WORK_DIR,
-                       "key": "%s/fixture/certs/server-key.pem" % HOST_WORK_DIR,
-                       "make_cert": "%s/make-cert.sh" % host_jars},
-            "sides": sides,
-            "cases": cases,
-            "compare": compare,
-        }
-
-    def build_suite_config(self) -> dict:
-        config = {}
-        if "serde" in self.args.suites:
-            config["serde"] = {"jar": "serde.jar", "fast": bool(self.args.serde_fast),
-                               "args": shlex.split(self.args.serde_args) if self.args.serde_args else []}
-        if "h1scaling" in self.args.suites:
-            config["h1"] = {"concurrency": self.args.h1_concurrency,
-                            "max_connections": self.args.h1_max_connections,
-                            "threads": self.args.h1_threads, "includes": self.args.h1_includes,
-                            "server_cpus": self.args.h1_server_cpus, "client_cpus": self.args.h1_client_cpus,
-                            "fast": bool(self.args.h1_fast)}
-        return config
-
-    @staticmethod
-    def _staged_name(role: str) -> str:
-        return role if "." in role else "%s.jar" % role
+        current = self.args.current_jar or E2E_JAR
+        if not self.args.current_jar and not self.args.skip_build:
+            log("building %s" % GRADLE_TASK)
+            subprocess.run([os.path.join(PROJECT_ROOT, "gradlew"), "-q", GRADLE_TASK], cwd=PROJECT_ROOT, check=True)
+        if not os.path.isfile(current):
+            fail("e2e jar not found at %s" % current)
+        self.jars["current"] = current
+        if self.args.baseline_jar:
+            if not os.path.isfile(self.args.baseline_jar):
+                fail("baseline jar not found at %s" % self.args.baseline_jar)
+            if os.path.samefile(self.args.baseline_jar, current):
+                fail("--baseline-jar is the same file as the current jar")
+            self.jars["baseline"] = self.args.baseline_jar
+        for side, path in self.jars.items():
+            log("  %s jar: %s (%.1f MB)" % (side, path, os.path.getsize(path) / 1e6))
 
     def stage(self) -> None:
         log("staging to %s/stage/" % self.s3_uri)
-        self.s3.upload_file(HOST_SCRIPT, self.bucket, "%s/stage/metal-host.py" % self.s3_prefix)
-        for role, path in self.jars.items():
-            name = self._staged_name(role)
-            self.s3.upload_file(path, self.bucket, "%s/stage/jars/%s" % (self.s3_prefix, name))
-            log("  uploaded %s" % name)
+        for side, path in self.jars.items():
+            self.s3.upload_file(path, self.bucket, "%s/stage/jars/%s.jar" % (self.s3_prefix, side))
+        script = host_script(self.args, self.run_id, "%s/stage" % self.s3_uri, self.s3_uri, self.sides)
+        self.s3.put_object(Bucket=self.bucket, Key="%s/stage/host.sh" % self.s3_prefix, Body=script.encode("utf-8"))
+        os.makedirs(self.outdir, exist_ok=True)
+        with open(os.path.join(self.outdir, "host.sh"), "w", encoding="utf-8") as handle:
+            handle.write(script)
 
     def launch(self) -> None:
         root_device = self.ec2.describe_images(ImageIds=[self.ami])["Images"][0]["RootDeviceName"]
         minutes = max(1, int(self.args.max_hours * 60))
-        user_data = "#!/bin/bash\nshutdown -h +%d 'smithy-java benchmark dead-man switch'\n" % minutes
         params = dict(
-            ImageId=self.ami,
-            InstanceType=self.args.instance_type,
-            MinCount=1,
-            MaxCount=1,
+            ImageId=self.ami, InstanceType=self.args.instance_type, MinCount=1, MaxCount=1,
             IamInstanceProfile={"Name": self.args.instance_profile},
             InstanceInitiatedShutdownBehavior="terminate",
-            UserData=user_data,
+            UserData="#!/bin/bash\nshutdown -h +%d 'smithy-java benchmark dead-man switch'\n" % minutes,
             MetadataOptions={"HttpTokens": "required", "HttpEndpoint": "enabled"},
-            BlockDeviceMappings=[{
-                "DeviceName": root_device,
-                "Ebs": {"VolumeSize": 100, "VolumeType": "gp3", "DeleteOnTermination": True},
-            }],
-            TagSpecifications=[{
-                "ResourceType": "instance",
-                "Tags": [
-                    {"Key": "Name", "Value": "smithy-java-benchmark-%s" % self.run_id},
-                    {"Key": "ManagedBy", "Value": TAG_MANAGED_BY},
-                    {"Key": "RunId", "Value": self.run_id},
-                ],
-            }],
+            BlockDeviceMappings=[{"DeviceName": root_device,
+                                  "Ebs": {"VolumeSize": 100, "VolumeType": "gp3", "DeleteOnTermination": True}}],
+            TagSpecifications=[{"ResourceType": "instance", "Tags": [
+                {"Key": "Name", "Value": "smithy-java-benchmark-%s" % self.run_id},
+                {"Key": "ManagedBy", "Value": TAG_MANAGED_BY},
+                {"Key": "RunId", "Value": self.run_id}]}],
         )
-        if self.args.subnet_id or self.args.security_group_id or self.args.no_public_ip:
+        if self.args.subnet_id or self.args.no_public_ip:
             interface = {"DeviceIndex": 0, "AssociatePublicIpAddress": not self.args.no_public_ip}
             if self.args.subnet_id:
                 interface["SubnetId"] = self.args.subnet_id
-            if self.args.security_group_id:
-                interface["Groups"] = [self.args.security_group_id]
             params["NetworkInterfaces"] = [interface]
-
         log("launching %s (no key pair, SSM only)" % self.args.instance_type)
-        response = self.ec2.run_instances(**params)
-        self.instance_id = response["Instances"][0]["InstanceId"]
+        self.instance_id = self.ec2.run_instances(**params)["Instances"][0]["InstanceId"]
         self.launched_at = time.time()
         self.write_state("launched")
         log("  %s launched; state file %s" % (self.instance_id, self.state_path))
 
     def wait_for_ssm(self) -> None:
         log("waiting for the instance to boot and the SSM agent to come online (metal takes a while)")
-        self.ec2.get_waiter("instance_running").wait(
-            InstanceIds=[self.instance_id], WaiterConfig={"Delay": 15, "MaxAttempts": 80})
+        self.ec2.get_waiter("instance_running").wait(InstanceIds=[self.instance_id], WaiterConfig={"Delay": 15, "MaxAttempts": 80})
         deadline = time.time() + SSM_ONLINE_TIMEOUT_SECONDS
         while time.time() < deadline:
             info = self.ssm.describe_instance_information(
@@ -522,77 +386,33 @@ class MetalRun:
         fail("SSM agent did not come online within %d minutes; check the instance profile and network egress"
              % (SSM_ONLINE_TIMEOUT_SECONDS // 60))
 
-    def bootstrap(self) -> Dict[str, str]:
-        log("bootstrapping the host")
-        stage = "%s/stage" % self.s3_uri
-        status, stdout, _ = self.ssm_run([
+    def start_run(self) -> None:
+        log("starting the host script (detached; progress is polled every %d s)" % self.args.poll_seconds)
+        status, output = self.ssm_run([
             "set -e",
             "mkdir -p %s" % HOST_WORK_DIR,
-            "aws s3 cp %s/metal-host.py %s/metal-host.py" % (stage, HOST_WORK_DIR),
-            "python3 %s/metal-host.py bootstrap %s %s %d" % (HOST_WORK_DIR, HOST_WORK_DIR, stage, self.args.java_major),
-        ], "smithy-java benchmark bootstrap", timeout_seconds=1800)
-        if status != "Success":
-            fail("bootstrap ended with status %s" % status)
-        readiness = parse_kv_line(stdout, "READINESS")
-        if not readiness:
-            fail("bootstrap did not print a READINESS line")
-        expected_jars = sum(1 for role in self.jars if self._staged_name(role).endswith(".jar"))
-        if int(readiness.get("jars", "0")) < expected_jars:
-            fail("expected %d jars on the host, found %s" % (expected_jars, readiness.get("jars")))
-        if self.arch == "x86_64" and readiness.get("governor") != "performance":
-            log("  warning: CPU governor is %s, not performance" % readiness.get("governor"))
-        return readiness
-
-    def smoke(self) -> None:
-        if self.args.skip_smoke or "current" not in self.jars:
-            return
-        log("smoke test: one e2e benchmark at default settings")
-        status, stdout, _ = self.ssm_run(
-            ["python3 %s/metal-host.py smoke %s %s current.jar" % (HOST_WORK_DIR, HOST_WORK_DIR, self.args.instance_type)],
-            "smithy-java benchmark smoke test", timeout_seconds=1800)
-        result = parse_kv_line(stdout, "SMOKE")
-        problems = []
-        if status != "Success" or result.get("status") != "ok":
-            problems.append("the smoke benchmark failed")
-        else:
-            ratio = float(result.get("cpu_wall", "0"))
-            if not SMOKE_CPU_WALL_RANGE[0] <= ratio <= SMOKE_CPU_WALL_RANGE[1]:
-                problems.append("CPU/wall ratio %.3f outside %s; the host is contended or misconfigured"
-                                % (ratio, SMOKE_CPU_WALL_RANGE))
-            if result.get("xbatch") != "True":
-                problems.append("the benchmark JVM did not run with -Xbatch")
-        if problems:
-            message = "smoke test: " + "; ".join(problems)
-            if self.args.ignore_smoke_failure:
-                log("  warning: " + message)
-            else:
-                fail(message + " (use --ignore-smoke-failure to continue anyway)")
-
-    def start_run(self) -> None:
-        log("starting the benchmark matrix (detached on the host; progress is polled every %d s)" % self.args.poll_seconds)
-        command = "python3 %s/metal-host.py run %s %s %s" % (
-            HOST_WORK_DIR, HOST_WORK_DIR, self.s3_uri, ",".join(self.args.suites))
-        status, _, _ = self.ssm_run([
+            "aws s3 cp %s/stage/host.sh %s/host.sh" % (self.s3_uri, HOST_WORK_DIR),
+            "chmod +x %s/host.sh" % HOST_WORK_DIR,
             "rm -f %s/DONE" % HOST_WORK_DIR,
-            "nohup setsid %s > %s/host-run.out 2>&1 < /dev/null &" % (command, HOST_WORK_DIR),
+            "nohup setsid %s/host.sh > %s/host.out 2>&1 < /dev/null &" % (HOST_WORK_DIR, HOST_WORK_DIR),
             "sleep 2",
-            "pgrep -f 'metal-host.py run' > /dev/null && echo 'host runner started' || (cat %s/host-run.out; exit 1)"
-            % HOST_WORK_DIR,
+            "pgrep -f '%s/host.sh' > /dev/null && echo 'host script started' || (cat %s/host.out; exit 1)"
+            % (HOST_WORK_DIR, HOST_WORK_DIR),
         ], "smithy-java benchmark run", timeout_seconds=120)
         if status != "Success":
-            fail("could not start the benchmark run on the host")
+            fail("could not start the host script: %s" % output.strip())
         self.write_state("running")
 
     def await_run(self) -> int:
         printed = 0
         while True:
-            status, stdout, _ = self.ssm_run([
+            status, output = self.ssm_run([
                 "cat %s/DONE 2>/dev/null || true" % HOST_WORK_DIR,
                 "echo ---PROGRESS---",
                 "cat %s/progress.log 2>/dev/null || true" % HOST_WORK_DIR,
                 "echo ---PROCESS---",
-                "pgrep -f 'metal-host.py run' > /dev/null && echo running || echo stopped",
-            ], "smithy-java benchmark poll", timeout_seconds=60, echo=False)
+                "pgrep -f '%s/host.sh' > /dev/null && echo running || echo stopped" % HOST_WORK_DIR,
+            ], "smithy-java benchmark poll", timeout_seconds=60)
             if status != "Success":
                 state = self.instance_state()
                 if state != "running":
@@ -600,7 +420,7 @@ class MetalRun:
                 log("  poll returned %s; retrying" % status)
                 time.sleep(self.args.poll_seconds)
                 continue
-            sentinel, _, rest = stdout.partition("---PROGRESS---")
+            sentinel, _, rest = output.partition("---PROGRESS---")
             progress, _, process = rest.partition("---PROCESS---")
             lines = progress.strip().splitlines()
             for line in lines[printed:]:
@@ -611,22 +431,22 @@ class MetalRun:
                 log("host run complete, %d failure(s)" % failures)
                 return failures
             if "stopped" in process:
-                log("the host runner is no longer running and left no DONE sentinel; host output follows")
-                self.ssm_run([
-                    "echo '--- host-run.out ---'; tail -n 40 %s/host-run.out 2>/dev/null" % HOST_WORK_DIR,
-                    "echo '--- progress.log ---'; tail -n 20 %s/progress.log 2>/dev/null" % HOST_WORK_DIR,
-                    "for f in %s/logs/*.log; do echo \"--- $f ---\"; tail -n 15 \"$f\"; done 2>/dev/null" % HOST_WORK_DIR,
-                ], "smithy-java benchmark failure diagnostics", timeout_seconds=60)
-                fail("host runner died before writing the DONE sentinel (see the host output above)")
+                _, diagnostics = self.ssm_run(["tail -n 40 %s/host.out 2>/dev/null" % HOST_WORK_DIR],
+                                              "smithy-java benchmark diagnostics", timeout_seconds=60)
+                fail("the host script died before writing DONE; host output:\n%s" % diagnostics)
             time.sleep(self.args.poll_seconds)
 
-    def retrieve(self) -> str:
-        prefix = "%s/results/" % self.s3_prefix
+    @property
+    def expected_results(self) -> int:
+        return self.args.samples * len(self.sides)
+
+    def retrieve(self) -> Tuple[str, int]:
+        """Downloads the result files and returns the local directory and how many files arrived."""
         target = os.path.join(self.outdir, "results")
         log("retrieving %s/results/ to %s" % (self.s3_uri, target))
+        prefix = "%s/results/" % self.s3_prefix
         count = 0
-        paginator = self.s3.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+        for page in self.s3.get_paginator("list_objects_v2").paginate(Bucket=self.bucket, Prefix=prefix):
             for obj in page.get("Contents", []):
                 relative = obj["Key"][len(prefix):]
                 if not relative or relative.endswith("/"):
@@ -635,23 +455,23 @@ class MetalRun:
                 os.makedirs(os.path.dirname(local), exist_ok=True)
                 self.s3.download_file(self.bucket, obj["Key"], local)
                 count += 1
-        log("  %d file(s)" % count)
-        if count == 0:
-            fail("no results were uploaded; the host run may have failed before it got that far")
-        return target
+        log("  %d of %d expected result file(s); logs stay under %s/logs/" % (count, self.expected_results, self.s3_uri))
+        return target, count
 
-    def compare(self, results_dir: str, failures: int = 0) -> None:
-        found = []
-        for root, _dirs, files in os.walk(results_dir):
-            for name in files:
-                if name.endswith("_ocs_results.md") or name.endswith("_ocs_results.json"):
-                    found.append(os.path.join(root, name))
-        if not found:
-            note = " (the host run reported %d failure(s))" % failures if failures else ""
-            log("no *_ocs_results files were produced on the host%s" % note)
-            return
-        for comparison in sorted(found):
-            log("  comparison: %s" % comparison)
+    def retrieve_all(self) -> str:
+        """Retrieves the results, retrying the host's upload once; keeps the instance if files are still missing."""
+        target, count = self.retrieve()
+        if count < self.expected_results:
+            log("re-uploading from the host and retrying")
+            self.ssm_run(["aws s3 cp --recursive --no-progress %s/results %s/results/" % (HOST_WORK_DIR, self.s3_uri)],
+                         "smithy-java benchmark re-upload", timeout_seconds=600)
+            target, count = self.retrieve()
+        if count < self.expected_results:
+            self.args.keep_instance = True
+            fail("retrieved %d of %d result files. The instance is KEPT so the rest can be fetched from %s/results "
+                 "on the host (SSM session); terminate it afterwards with `cleanup`. The dead-man switch still fires "
+                 "after %.1f hours." % (count, self.expected_results, HOST_WORK_DIR, self.args.max_hours))
+        return target
 
     def terminate(self) -> None:
         if self.terminated or not self.instance_id:
@@ -672,8 +492,7 @@ class MetalRun:
             self.clear_state()
             return
         for _ in range(12):
-            state = self.instance_state()
-            if state in ("shutting-down", "terminated"):
+            if self.instance_state() in ("shutting-down", "terminated"):
                 break
             time.sleep(5)
         state = self.instance_state()
@@ -684,57 +503,26 @@ class MetalRun:
         self.terminated = True
         self.clear_state()
 
-
     def execute(self) -> int:
         self.install_signal_handlers()
         try:
             self.preflight()
             if self.args.dry_run:
-                log("dry run: nothing launched")
+                log("dry run: nothing launched. The host would run:")
+                print(host_script(self.args, self.run_id, "%s/stage" % self.s3_uri, self.s3_uri,
+                                  ["baseline", "current"] if self.args.baseline_jar else ["current"]))
                 return 0
             self.build()
             self.stage()
             self.launch()
             self.wait_for_ssm()
-            self.bootstrap()
-            self.smoke()
             self.start_run()
             failures = self.await_run()
-            results = self.retrieve()
-            self.compare(results, failures)
-            log("results: %s and %s/" % (self.outdir, self.s3_uri))
-            return 1 if failures else 0
-        finally:
-            self.terminate()
-
-    def resume(self, state: dict) -> int:
-        self.instance_id = state["instance_id"]
-        self.run_id = state["run_id"]
-        self.arch = state["arch"]
-        self.bucket = state["bucket"]
-        self.args.prefix = state["prefix"]
-        self.args.instance_type = state["instance_type"]
-        self.args.suites = state["suites"]
-        self.args.lang = state.get("lang", self.args.lang)
-        self.args.keep_instance = self.args.keep_instance or state.get("keep_instance", False)
-        self.launched_at = state.get("launched_at")
-        if state.get("current_jar"):
-            self.jars["current"] = state["current_jar"]
-        if state.get("baseline"):
-            self.jars["baseline"] = "baseline.jar"
-        self.outdir = os.path.join(state["outdir"], self.run_id)
-        self.install_signal_handlers()
-        try:
-            state_name = self.instance_state()
-            if state_name != "running":
-                fail("instance %s is %s; nothing to resume. Results, if any, are under %s"
-                     % (self.instance_id, state_name, self.s3_uri))
-            log("resuming run %s on %s (phase %s)" % (self.run_id, self.instance_id, state.get("phase")))
-            if state.get("phase") != "running":
-                fail("the run had not been started yet; terminate with `cleanup` and start over")
-            failures = self.await_run()
-            results = self.retrieve()
-            self.compare(results, failures)
+            results = self.retrieve_all()
+            log("results: %s (also %s/)" % (results, self.s3_uri))
+            if "baseline" in self.jars:
+                log("compare: python3 scripts/compare-ocs.py --baseline %s/baseline/*.json --current %s/current/*.json "
+                    "--out results/smithy-java/%s_ocs_results" % (results, results, compact(self.args.instance_type)))
             return 1 if failures else 0
         finally:
             self.terminate()
@@ -744,13 +532,6 @@ class MetalRun:
             raise SystemExit("interrupted by signal %d" % signum)
         signal.signal(signal.SIGINT, handler)
         signal.signal(signal.SIGTERM, handler)
-
-
-def parse_kv_line(output: str, marker: str) -> Dict[str, str]:
-    for line in output.splitlines():
-        if line.startswith(marker + " "):
-            return dict(part.split("=", 1) for part in line.split()[1:] if "=" in part)
-    return {}
 
 
 def load_state(outdir: str) -> Optional[dict]:
@@ -797,10 +578,8 @@ def setup_infra(args: argparse.Namespace) -> int:
         log("  exists")
     iam.attach_role_policy(RoleName=role, PolicyArn=SSM_MANAGED_POLICY)
     bucket_policy = {"Version": "2012-10-17", "Statement": [
-        {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-         "Resource": "arn:aws:s3:::%s/*" % bucket},
-        {"Effect": "Allow", "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
-         "Resource": "arn:aws:s3:::%s" % bucket},
+        {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], "Resource": "arn:aws:s3:::%s/*" % bucket},
+        {"Effect": "Allow", "Action": ["s3:ListBucket", "s3:GetBucketLocation"], "Resource": "arn:aws:s3:::%s" % bucket},
     ]}
     iam.put_role_policy(RoleName=role, PolicyName="SmithyJavaBenchmarkBucketAccess", PolicyDocument=json.dumps(bucket_policy))
 
@@ -826,7 +605,6 @@ def main(argv: List[str]) -> int:
     args = parse_args(argv)
     if args.command == "setup-infra":
         return setup_infra(args)
-
     if args.command == "cleanup":
         state = load_state(args.outdir)
         instance_id = args.instance_id or (state or {}).get("instance_id")
@@ -840,20 +618,10 @@ def main(argv: List[str]) -> int:
         run.args.keep_instance = False
         run.terminate()
         return 0
-
-    if args.command == "resume":
-        state = load_state(args.outdir)
-        if not state:
-            fail("no state file at %s; nothing to resume" % os.path.join(args.outdir, STATE_FILE))
-        args.region = state.get("region", args.region)
-        args.profile = state.get("profile", args.profile)
-        args.poll_seconds = state.get("poll_seconds", args.poll_seconds)
-        return MetalRun(args).resume(state)
-
     existing = load_state(args.outdir)
     if existing and not args.dry_run:
-        fail("a run is already recorded in %s (instance %s). Use `resume` to finish it or `cleanup` to terminate it."
-             % (os.path.join(args.outdir, STATE_FILE), existing.get("instance_id")))
+        fail("a run is already recorded in %s (instance %s, results at %s). Run `cleanup` to terminate it first."
+             % (os.path.join(args.outdir, STATE_FILE), existing.get("instance_id"), existing.get("s3_uri")))
     return MetalRun(args).execute()
 
 

@@ -16,67 +16,66 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class FixtureServerTest {
 
     private static final byte[] BODY = "{\"Item\":{\"pk\":{\"S\":\"1\"}}}".getBytes(StandardCharsets.UTF_8);
-    private static final String EXPECTED_HEAD = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+    private static final String HEAD = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
             + "Content-Length: " + BODY.length + "\r\nx-amzn-RequestId: benchmark\r\n\r\n";
+    private static final byte[] FIXTURE = concat(HEAD.getBytes(StandardCharsets.US_ASCII), BODY);
 
-    @TempDir
-    static Path tmp;
-    private static ServerSocketChannel listener;
-    private static Thread acceptor;
+    private static FixtureServer server;
+    private static ServerSocketChannel data;
+    private static ServerSocketChannel control;
     private static int port;
+    private static int controlPort;
 
     @BeforeAll
     static void start() throws Exception {
-        Path body = tmp.resolve("body.json");
-        Files.write(body, BODY);
-        var fixture = Fixture.load(body, 200, "application/json", List.of(Map.entry("x-amzn-RequestId", "benchmark")));
-        listener = ServerSocketChannel.open();
-        listener.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
-        port = ((InetSocketAddress) listener.getLocalAddress()).getPort();
-        acceptor = Thread.ofPlatform().daemon().start(() -> {
+        server = new FixtureServer();
+        server.respondWith(FIXTURE);
+        data = ServerSocketChannel.open();
+        data.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+        port = ((InetSocketAddress) data.getLocalAddress()).getPort();
+        control = ServerSocketChannel.open();
+        control.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+        controlPort = ((InetSocketAddress) control.getLocalAddress()).getPort();
+        Thread.ofPlatform().daemon().start(() -> {
             try {
-                FixtureServer.serve(listener, fixture, null, 1024, true);
+                server.serve(data, null);
             } catch (IOException e) {}
         });
+        Thread.ofPlatform().daemon().start(() -> server.serveControl(control));
     }
 
     @AfterAll
     static void stop() throws Exception {
-        listener.close();
-        acceptor.join(5_000);
+        data.close();
+        control.close();
     }
 
     @Test
     void keepAliveServesRepeatedRequestsOnOneConnection() throws Exception {
-        try (var client = connect()) {
+        try (var client = connect(port)) {
             for (int i = 0; i < 3; i++) {
                 send(client, "GET /any/path?x=" + i + " HTTP/1.1\r\nHost: localhost\r\n\r\n");
                 assertThat(readResponse(client, BODY.length))
-                        .isEqualTo(EXPECTED_HEAD + new String(BODY, StandardCharsets.UTF_8));
+                        .isEqualTo(HEAD + new String(BODY, StandardCharsets.UTF_8));
             }
         }
     }
 
     @Test
     void requestBodiesAreDrainedWhetherBufferedOrNot() throws Exception {
-        try (var client = connect()) {
+        try (var client = connect(port)) {
             // This body fits in the header read buffer.
             send(client, "POST / HTTP/1.1\r\nHost: h\r\nContent-Length: 5\r\n\r\nhello");
             assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
             // This body exceeds the read buffer and must drain from the socket.
-            String big = "x".repeat(5_000);
+            String big = "x".repeat(FixtureServer.READ_BUFFER + 5_000);
             send(client, "PUT /obj HTTP/1.1\r\nHost: h\r\nContent-Length: " + big.length() + "\r\n\r\n" + big);
             assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
             send(client, "GET / HTTP/1.1\r\nHost: h\r\n\r\n");
@@ -86,7 +85,7 @@ class FixtureServerTest {
 
     @Test
     void chunkedUploadsWithTrailersAreDrained() throws Exception {
-        try (var client = connect()) {
+        try (var client = connect(port)) {
             String chunk = "y".repeat(3_000);
             send(client,
                     "POST / HTTP/1.1\r\nHost: h\r\nTransfer-Encoding: chunked\r\nTrailer: x-crc\r\n\r\n"
@@ -101,7 +100,7 @@ class FixtureServerTest {
 
     @Test
     void chunkDataRequiresACrlfTerminator() throws Exception {
-        try (var client = connect()) {
+        try (var client = connect(port)) {
             send(client,
                     "POST / HTTP/1.1\r\nHost: h\r\nTransfer-Encoding: chunked\r\n\r\n"
                             + "3\r\nabcXX\r\n0\r\n\r\n");
@@ -111,18 +110,8 @@ class FixtureServerTest {
     }
 
     @Test
-    void headGetsHeadersOnly() throws Exception {
-        try (var client = connect()) {
-            send(client, "HEAD / HTTP/1.1\r\nHost: h\r\n\r\n");
-            assertThat(readResponse(client, 0)).isEqualTo(EXPECTED_HEAD);
-            send(client, "GET / HTTP/1.1\r\nHost: h\r\n\r\n");
-            assertThat(readResponse(client, BODY.length)).endsWith(new String(BODY, StandardCharsets.UTF_8));
-        }
-    }
-
-    @Test
     void fragmentedHeadIsFramedCorrectly() throws Exception {
-        try (var client = connect()) {
+        try (var client = connect(port)) {
             byte[] request = "GET / HTTP/1.1\r\nHost: h\r\nX-A: 1\r\n\r\n".getBytes(StandardCharsets.US_ASCII);
             OutputStream out = client.getOutputStream();
             for (byte b : request) {
@@ -135,7 +124,7 @@ class FixtureServerTest {
 
     @Test
     void pipelinedRequestsAreAnsweredInOrder() throws Exception {
-        try (var client = connect()) {
+        try (var client = connect(port)) {
             send(client, "GET /1 HTTP/1.1\r\nHost: h\r\n\r\nGET /2 HTTP/1.1\r\nHost: h\r\n\r\n");
             assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
             assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
@@ -143,89 +132,139 @@ class FixtureServerTest {
     }
 
     @Test
-    void expectContinueIsAnsweredBeforeTheBodyIsRead() throws Exception {
-        try (var client = connect()) {
-            send(client, "PUT / HTTP/1.1\r\nHost: h\r\nContent-Length: 3\r\nExpect: 100-continue\r\n\r\n");
-            assertThat(readLine(client.getInputStream())).isEqualTo("HTTP/1.1 100 Continue");
-            assertThat(readLine(client.getInputStream())).isEmpty();
-            send(client, "abc");
-            assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
-        }
-    }
-
-    @Test
-    void connectionCloseIsHonoured() throws Exception {
-        try (var client = connect()) {
+    void connectionCloseAndHttp10GetOneResponseThenAClose() throws Exception {
+        try (var client = connect(port)) {
             send(client, "GET / HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n");
-            String response = readResponse(client, BODY.length);
-            assertThat(response).contains("\r\nConnection: close\r\n");
+            assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
+            assertThat(client.getInputStream().read()).as("server closed").isEqualTo(-1);
+        }
+        try (var client = connect(port)) {
+            send(client, "GET / HTTP/1.0\r\n\r\n");
+            assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
             assertThat(client.getInputStream().read()).as("server closed").isEqualTo(-1);
         }
     }
 
     @Test
-    void ambiguousFramingGetsA400AndAClose() throws Exception {
-        try (var client = connect()) {
+    void malformedFramingGetsA400AndAClose() throws Exception {
+        try (var client = connect(port)) {
             send(client, "POST / HTTP/1.1\r\nHost: h\r\nContent-Length: 3\r\nTransfer-Encoding: chunked\r\n\r\n");
             assertThat(readResponse(client, 0)).startsWith("HTTP/1.1 400 Bad Request");
             assertThat(client.getInputStream().read()).isEqualTo(-1);
         }
-        try (var client = connect()) {
+        try (var client = connect(port)) {
             send(client, "POST / HTTP/1.1\r\nHost: h\r\nTransfer-Encoding: gzip, chunked\r\n\r\n");
+            assertThat(readResponse(client, 0)).startsWith("HTTP/1.1 400 Bad Request");
+        }
+        try (var client = connect(port)) {
+            send(client,
+                    "GET / HTTP/1.1\r\nHost: h\r\nX-Big: " + "z".repeat(FixtureServer.READ_BUFFER + 100)
+                            + "\r\n\r\n");
             assertThat(readResponse(client, 0)).startsWith("HTTP/1.1 400 Bad Request");
         }
     }
 
     @Test
-    void oversizedHeadGetsA431() throws Exception {
-        try (var client = connect()) {
-            send(client, "GET / HTTP/1.1\r\nHost: h\r\nX-Big: " + "z".repeat(2_000) + "\r\n\r\n");
-            assertThat(readResponse(client, 0)).startsWith("HTTP/1.1 431 ");
+    void controlPortSwitchesTheResponseForOpenAndNewConnections() throws Exception {
+        byte[] body2 = "{\"Item\":{\"pk\":{\"S\":\"second\"}}}".getBytes(StandardCharsets.UTF_8);
+        byte[] fixture2 = concat(("HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: "
+                + body2.length + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII), body2);
+        try (var open = connect(port)) {
+            send(open, "GET / HTTP/1.1\r\nHost: h\r\n\r\n");
+            assertThat(readResponse(open, BODY.length)).endsWith(new String(BODY, StandardCharsets.UTF_8));
+
+            assertThat(control("POST /fixture HTTP/1.1\r\nHost: c\r\nContent-Length: " + fixture2.length + "\r\n\r\n",
+                    fixture2)).startsWith("HTTP/1.1 204");
+
+            send(open, "GET / HTTP/1.1\r\nHost: h\r\n\r\n");
+            assertThat(readResponse(open, body2.length)).as("kept-alive connection sees the new fixture")
+                    .endsWith(new String(body2, StandardCharsets.UTF_8));
+            try (var fresh = connect(port)) {
+                send(fresh, "GET / HTTP/1.1\r\nHost: h\r\n\r\n");
+                assertThat(readResponse(fresh, body2.length)).endsWith(new String(body2, StandardCharsets.UTF_8));
+            }
+        } finally {
+            server.respondWith(FIXTURE);
         }
     }
 
     @Test
-    void bodilessStatusesRejectABodyAndOmitContentLength() throws Exception {
-        Path body = tmp.resolve("body204.bin");
-        Files.write(body, BODY);
-        assertThatThrownBy(() -> Fixture.load(body, 204, "text/plain", List.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("empty body");
-        Path empty = tmp.resolve("empty.bin");
-        Files.write(empty, new byte[0]);
-        var fixture = Fixture.load(empty, 204, "text/plain", List.of());
-        assertThat(new String(fixture.response(false, false), StandardCharsets.US_ASCII))
-                .isEqualTo("HTTP/1.1 204 No Content\r\nContent-Type: text/plain\r\n\r\n");
-        assertThat(new String(Fixture.load(empty, 205, "text/plain", List.of()).response(false, true),
-                StandardCharsets.US_ASCII))
-                .isEqualTo("HTTP/1.1 205 Reset Content\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n"
-                        + "Connection: close\r\n\r\n");
+    void controlPortRejectsBadFixturesAndOtherRequests() throws Exception {
+        byte[] garbage = "not a response".getBytes(StandardCharsets.US_ASCII);
+        assertThat(control("POST /fixture HTTP/1.1\r\nHost: c\r\nContent-Length: " + garbage.length + "\r\n\r\n",
+                garbage)).startsWith("HTTP/1.1 400");
+        byte[] wrongLength = "HTTP/1.1 200 OK\r\nContent-Length: 99\r\n\r\nabc".getBytes(StandardCharsets.US_ASCII);
+        assertThat(control("POST /fixture HTTP/1.1\r\nHost: c\r\nContent-Length: " + wrongLength.length + "\r\n\r\n",
+                wrongLength)).startsWith("HTTP/1.1 400");
+        assertThat(control("POST /fixture HTTP/1.1\r\nHost: c\r\n\r\n", new byte[0]))
+                .as("a fixture needs a Content-Length")
+                .startsWith("HTTP/1.1 400");
+        assertThat(control("GET /fixture HTTP/1.1\r\nHost: c\r\n\r\n", new byte[0])).startsWith("HTTP/1.1 404");
+        assertThat(control("POST /other HTTP/1.1\r\nHost: c\r\nContent-Length: 0\r\n\r\n", new byte[0]))
+                .startsWith("HTTP/1.1 404");
+        // The data port still serves the original fixture after all of that.
+        try (var client = connect(port)) {
+            send(client, "GET / HTTP/1.1\r\nHost: h\r\n\r\n");
+            assertThat(readResponse(client, BODY.length)).isEqualTo(HEAD + new String(BODY, StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
+    void answers503UntilAFixtureIsSet() throws Exception {
+        var fresh = new FixtureServer();
+        try (var listener = ServerSocketChannel.open()) {
+            listener.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+            Thread.ofPlatform().daemon().start(() -> {
+                try {
+                    fresh.serve(listener, null);
+                } catch (IOException e) {}
+            });
+            try (var client = connect(((InetSocketAddress) listener.getLocalAddress()).getPort())) {
+                send(client, "GET / HTTP/1.1\r\nHost: h\r\n\r\n");
+                assertThat(readResponse(client, 0)).startsWith("HTTP/1.1 503 Service Unavailable");
+            }
+        }
+    }
+
+    @Test
+    void validatesFixtures() {
+        assertThat(FixtureServer.isValidResponse(FIXTURE)).isTrue();
+        assertThat(FixtureServer.isValidResponse("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".getBytes())).isTrue();
+        assertThat(FixtureServer.isValidResponse("HTTP/1.1 200 OK\r\n\r\n".getBytes())).as("needs Content-Length")
+                .isFalse();
+        assertThat(FixtureServer.isValidResponse("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n".getBytes()))
+                .as("short body")
+                .isFalse();
+        assertThat(FixtureServer.isValidResponse("HTTP/1.1 200 OK\r\nContent-Length: x\r\n\r\n".getBytes())).isFalse();
+        assertThat(FixtureServer.isValidResponse("HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n".getBytes())).isFalse();
+        assertThat(FixtureServer.isValidResponse("HTTP/1.1 200 OK\r\nContent-Length: 0".getBytes())).isFalse();
     }
 
     @Test
     void parsesTheServerCommandLine() {
-        var o = FixtureServer.Options.parse(new String[] {
-                "--listen",
-                "127.0.0.1:0",
-                "--body",
-                "x.body",
-                "--status",
-                "200",
-                "--content-type",
-                "application/cbor",
-                "--header",
-                "x-amzn-RequestId: benchmark",
-                "--plaintext",
-                "--tls-version",
-                "1.3"});
-        assertThat(o.listenPort).isZero();
-        assertThat(o.headers).containsExactly(Map.entry("x-amzn-RequestId", "benchmark"));
-        assertThat(o.plaintext).isTrue();
+        var o = FixtureServer.Options.parse(new String[] {"--listen", "127.0.0.1:0", "--control", "127.0.0.1:0"});
+        assertThat(o.listen.getPort()).isZero();
+        assertThat(o.control.getPort()).isZero();
+        assertThat(o.help).isFalse();
+        assertThat(FixtureServer.Options.parse(new String[0]).listen.getAddress().isLoopbackAddress()).isTrue();
+        assertThatThrownBy(() -> FixtureServer.Options.parse(new String[] {"--listen", "nonsense"}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("host:port");
         assertThatThrownBy(() -> FixtureServer.Options.parse(new String[] {"--body", "x"}))
-                .hasMessageContaining("--cert and --key");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown argument");
     }
 
-    private static Socket connect() throws IOException {
+    private static String control(String head, byte[] body) throws IOException {
+        try (var socket = connect(controlPort)) {
+            socket.getOutputStream().write(head.getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().write(body);
+            socket.getOutputStream().flush();
+            return readLine(socket.getInputStream());
+        }
+    }
+
+    private static Socket connect(int port) throws IOException {
         var socket = new Socket();
         socket.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 2_000);
         socket.setSoTimeout(5_000);
@@ -268,5 +307,12 @@ class FixtureServerTest {
             sb.append((char) c);
         }
         throw new IOException("EOF while reading a line; got '" + sb + "'");
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+        byte[] out = new byte[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
     }
 }

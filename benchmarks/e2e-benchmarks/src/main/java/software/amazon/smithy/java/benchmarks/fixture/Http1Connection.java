@@ -8,46 +8,40 @@ package software.amazon.smithy.java.benchmarks.fixture;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintStream;
-import java.util.Locale;
 import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
 
 /**
- * Frames requests in a reusable buffer and writes prepared response bytes.
- * Rejects ambiguous framing, unsupported transfer encodings, and headers that exceed the buffer.
+ * Serves one connection: frame each request in a reusable buffer, drain its body, write the current response.
+ * Only the headers that affect framing are parsed. Malformed framing gets a 400 and a close.
  */
 final class Http1Connection implements Runnable {
 
-    private static final byte[] CONTENT_LENGTH = Fixture.ascii("content-length");
-    private static final byte[] TRANSFER_ENCODING = Fixture.ascii("transfer-encoding");
-    private static final byte[] CONNECTION = Fixture.ascii("connection");
-    private static final byte[] EXPECT = Fixture.ascii("expect");
-    private static final byte[] CHUNKED = Fixture.ascii("chunked");
-    private static final byte[] CLOSE = Fixture.ascii("close");
-    private static final byte[] CONTINUE = Fixture.ascii("100-continue");
-    private static final byte[] HTTP_1_1 = Fixture.ascii("HTTP/1.1");
+    private static final byte[] BAD_REQUEST =
+            FixtureServer.ascii("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    private static final byte[] CONTENT_LENGTH = FixtureServer.ascii("content-length");
+    private static final byte[] TRANSFER_ENCODING = FixtureServer.ascii("transfer-encoding");
+    private static final byte[] CONNECTION = FixtureServer.ascii("connection");
+    private static final byte[] CHUNKED = FixtureServer.ascii("chunked");
+    private static final byte[] CLOSE = FixtureServer.ascii("close");
+    private static final byte[] HTTP_1_1 = FixtureServer.ascii("HTTP/1.1");
 
     private final ConnectionTransport transport;
-    private final Fixture fixture;
+    private final FixtureServer server;
     private final byte[] buf;
-    private final Timing timing;
     private int pos;
     private int limit;
     private int scanned;
     private InputStream in;
 
-    private boolean head;
     private boolean close;
     private boolean chunked;
-    private boolean expectContinue;
     private long contentLength;
     private boolean bad;
 
-    Http1Connection(ConnectionTransport transport, Fixture fixture, int readBuffer, Timing timing) {
+    Http1Connection(ConnectionTransport transport, FixtureServer server, int readBuffer) {
         this.transport = transport;
-        this.fixture = fixture;
+        this.server = server;
         this.buf = new byte[readBuffer];
-        this.timing = timing;
     }
 
     @Override
@@ -60,9 +54,8 @@ final class Http1Connection implements Runnable {
                 if (headEnd < 0) {
                     return;
                 }
-                long served = timing != null ? System.nanoTime() : 0;
                 if (headEnd == Integer.MAX_VALUE) {
-                    out.write(Fixture.HEADERS_TOO_LARGE_431);
+                    out.write(BAD_REQUEST);
                     out.flush();
                     return;
                 }
@@ -70,25 +63,18 @@ final class Http1Connection implements Runnable {
                 pos = headEnd;
                 scanned = headEnd;
                 if (bad) {
-                    out.write(Fixture.BAD_REQUEST_400);
+                    out.write(BAD_REQUEST);
                     out.flush();
                     return;
-                }
-                if (expectContinue && (chunked || contentLength > 0)) {
-                    out.write(Fixture.CONTINUE_100);
-                    out.flush();
                 }
                 if (chunked) {
                     drainChunked();
                 } else if (contentLength > 0) {
                     drain(contentLength);
                 }
-                // Flush any TLS records that the transport still buffers.
-                out.write(fixture.response(head, close));
+                // The flush pushes out any TLS record the transport still buffers.
+                out.write(server.response());
                 out.flush();
-                if (timing != null) {
-                    timing.served(System.nanoTime() - served);
-                }
                 if (close) {
                     return;
                 }
@@ -97,11 +83,7 @@ final class Http1Connection implements Runnable {
                 }
             }
         } catch (IOException e) {
-            // Ignore client disconnects.
-        } finally {
-            if (timing != null) {
-                timing.report(System.err);
-            }
+            // A client disconnect ends the connection quietly.
         }
     }
 
@@ -118,7 +100,7 @@ final class Http1Connection implements Runnable {
                 }
                 compact();
             }
-            int n = read(limit, buf.length - limit);
+            int n = in.read(buf, limit, buf.length - limit);
             if (n < 0) {
                 return -1;
             }
@@ -126,7 +108,7 @@ final class Http1Connection implements Runnable {
         }
     }
 
-    /** Rescan three bytes to detect a header terminator split across reads. */
+    /** Rescans three bytes so a header terminator split across reads is still found. */
     private int findHeadEnd() {
         int i = Math.max(pos, scanned - 3);
         int stop = limit - 3;
@@ -142,23 +124,19 @@ final class Http1Connection implements Runnable {
     }
 
     private void parseHead(int headEnd) {
-        head = false;
         close = false;
         chunked = false;
-        expectContinue = false;
         contentLength = 0;
         bad = false;
         boolean sawContentLength = false;
 
         int lineEnd = indexOfCrlf(pos, headEnd);
-        int space = indexOf((byte) ' ', pos, lineEnd);
-        if (space < 0) {
+        if (indexOf((byte) ' ', pos, lineEnd) < 0) {
             bad = true;
             return;
         }
-        head = space - pos == 4 && buf[pos] == 'H' && buf[pos + 1] == 'E' && buf[pos + 2] == 'A' && buf[pos + 3] == 'D';
         if (lineEnd - pos < 8 || !regionEquals(lineEnd - 8, HTTP_1_1)) {
-            // Close the connection after one response unless the request uses HTTP/1.1.
+            // Anything but HTTP/1.1 gets one response and a close.
             close = true;
         }
 
@@ -196,8 +174,6 @@ final class Http1Connection implements Runnable {
                 if (containsTokenIgnoreCase(valueStart, valueEnd, CLOSE)) {
                     close = true;
                 }
-            } else if (nameIs(lineStart, colon, EXPECT)) {
-                expectContinue = valueIsIgnoreCase(valueStart, valueEnd, CONTINUE);
             }
             lineStart = lineEnd + 2;
         }
@@ -219,7 +195,7 @@ final class Http1Connection implements Runnable {
         }
         pos = limit = scanned = 0;
         while (remaining > 0) {
-            int n = read(0, (int) Math.min(buf.length, remaining));
+            int n = in.read(buf, 0, (int) Math.min(buf.length, remaining));
             if (n < 0) {
                 throw new IOException("EOF inside a request body");
             }
@@ -244,6 +220,7 @@ final class Http1Connection implements Runnable {
             }
             pos += 2;
         }
+        // Trailers end with an empty line.
         while (true) {
             int lineEnd = fillLine();
             boolean empty = lineEnd == pos;
@@ -267,22 +244,12 @@ final class Http1Connection implements Runnable {
                 }
                 compact();
             }
-            int n = read(limit, buf.length - limit);
+            int n = in.read(buf, limit, buf.length - limit);
             if (n < 0) {
                 throw new IOException("EOF inside a chunked body");
             }
             limit += n;
         }
-    }
-
-    private int read(int offset, int length) throws IOException {
-        if (timing == null) {
-            return in.read(buf, offset, length);
-        }
-        long before = System.nanoTime();
-        int n = in.read(buf, offset, length);
-        timing.waited(System.nanoTime() - before);
-        return n;
     }
 
     private void compact() {
@@ -413,43 +380,5 @@ final class Http1Connection implements Runnable {
 
     private static byte lower(byte b) {
         return b >= 'A' && b <= 'Z' ? (byte) (b + 32) : b;
-    }
-
-    /**
-     * Optional timing measures header completion to response write, plus time blocked in read.
-     * Adds two clock reads per request.
-     */
-    static final class Timing {
-        private long requests;
-        private long serviceNanos;
-        private long serviceMaxNanos;
-        private long waitNanos;
-        private long waits;
-
-        void served(long nanos) {
-            requests++;
-            serviceNanos += nanos;
-            if (nanos > serviceMaxNanos) {
-                serviceMaxNanos = nanos;
-            }
-        }
-
-        void waited(long nanos) {
-            waits++;
-            waitNanos += nanos;
-        }
-
-        void report(PrintStream out) {
-            if (requests == 0) {
-                return;
-            }
-            out.printf(Locale.ROOT,
-                    "timing: requests=%d service_mean_us=%.2f service_max_us=%.1f idle_mean_us=%.2f reads=%d%n",
-                    requests,
-                    serviceNanos / 1_000.0 / requests,
-                    serviceMaxNanos / 1_000.0,
-                    waitNanos / 1_000.0 / requests,
-                    waits);
-        }
     }
 }

@@ -32,6 +32,3 @@ mise.toml
 **/bin
 
 benchmarks/e2e-benchmarks/profiles
-
-# Generated self-signed TLS material for the e2e fixture server (made on demand by fixture/make-cert.sh)
-benchmarks/e2e-benchmarks/fixture/certs

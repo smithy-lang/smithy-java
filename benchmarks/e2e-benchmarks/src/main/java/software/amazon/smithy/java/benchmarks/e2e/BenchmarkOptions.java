@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.benchmarks.e2e;
 
-import java.net.URI;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -20,17 +19,13 @@ final class BenchmarkOptions {
 
     private static final DateTimeFormatter OUTPUT_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
+    private Mode mode = Mode.STUB;
     private Set<BenchmarkProtocol> protocols = EnumSet.allOf(BenchmarkProtocol.class);
     private List<String> filters = List.of();
     private boolean allModelCases;
-    private double minMeasureCpuSeconds = CpuTimeRunner.DEFAULT_MIN_MEASURE_CPU_SECONDS;
-    private TransportMode transport = TransportMode.STUB;
-    private String endpoint;
     private Path output;
     private String instanceType;
     private String notes;
-    private boolean inProcess;
-    private boolean child;
     private boolean list;
     private boolean help;
 
@@ -41,6 +36,7 @@ final class BenchmarkOptions {
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
+                case "--mode" -> options.mode = Mode.parse(value(args, ++i, arg));
                 case "--protocol" -> {
                     options.protocols = EnumSet.noneOf(BenchmarkProtocol.class);
                     for (String name : value(args, ++i, arg).split(",")) {
@@ -61,18 +57,9 @@ final class BenchmarkOptions {
                     options.filters = List.copyOf(filters);
                 }
                 case "--all-model-cases" -> options.allModelCases = true;
-                case "--min-measure-cpu-seconds" ->
-                    options.minMeasureCpuSeconds = parseDouble(value(args, ++i, arg), arg);
-                case "--transport" -> options.transport = TransportMode.parse(value(args, ++i, arg));
-                case "--endpoint" -> options.endpoint = value(args, ++i, arg);
                 case "--output" -> options.output = Path.of(value(args, ++i, arg));
                 case "--instance-type" -> options.instanceType = value(args, ++i, arg);
                 case "--notes" -> options.notes = value(args, ++i, arg);
-                case "--in-process" -> options.inProcess = true;
-                case "--child" -> {
-                    options.child = true;
-                    options.inProcess = true;
-                }
                 case "--list" -> options.list = true;
                 case "--help", "-h" -> options.help = true;
                 default -> throw new IllegalArgumentException("Unknown argument '" + arg + "'");
@@ -82,20 +69,11 @@ final class BenchmarkOptions {
             options.output = Path.of("e2e-ops-cpusec-"
                     + LocalDateTime.now(ZoneOffset.UTC).format(OUTPUT_TIMESTAMP) + ".json");
         }
-        if (options.endpoint == null) {
-            options.endpoint = options.transport.defaultEndpoint();
-        } else if (!options.transport.isNetwork()) {
-            throw new IllegalArgumentException("--endpoint only applies to --transport http or https");
-        }
-        if (options.transport.isNetwork()) {
-            URI uri = URI.create(options.endpoint);
-            if (!options.transport.label().equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
-                throw new IllegalArgumentException("--endpoint must be an absolute " + options.transport.label()
-                        + " URL with a host");
-            }
-        }
-        options.settings();
         return options;
+    }
+
+    Mode mode() {
+        return mode;
     }
 
     Set<BenchmarkProtocol> protocols() {
@@ -122,32 +100,12 @@ final class BenchmarkOptions {
         return notes;
     }
 
-    TransportMode transport() {
-        return transport;
-    }
-
-    String endpoint() {
-        return endpoint;
-    }
-
-    boolean inProcess() {
-        return inProcess;
-    }
-
-    boolean child() {
-        return child;
-    }
-
     boolean list() {
         return list;
     }
 
     boolean help() {
         return help;
-    }
-
-    CpuTimeRunner.Settings settings() {
-        return CpuTimeRunner.Settings.standard(minMeasureCpuSeconds);
     }
 
     List<String> selectIds() {
@@ -175,37 +133,6 @@ final class BenchmarkOptions {
         return false;
     }
 
-    List<String> childArgs(BenchmarkProtocol protocol, Path childOutput, String instanceType) {
-        List<String> args = new ArrayList<>();
-        args.add("--child");
-        args.add("--protocol");
-        args.add(protocol.idPrefix());
-        if (!filters.isEmpty()) {
-            args.add("--filter");
-            args.add(String.join(",", filters));
-        }
-        if (allModelCases) {
-            args.add("--all-model-cases");
-        }
-        args.add("--min-measure-cpu-seconds");
-        args.add(Double.toString(minMeasureCpuSeconds));
-        if (transport.isNetwork()) {
-            args.add("--transport");
-            args.add(transport.label());
-            args.add("--endpoint");
-            args.add(endpoint);
-        }
-        args.add("--instance-type");
-        args.add(instanceType);
-        if (notes != null) {
-            args.add("--notes");
-            args.add(notes);
-        }
-        args.add("--output");
-        args.add(childOutput.toString());
-        return args;
-    }
-
     private static String value(String[] args, int index, String flag) {
         if (index >= args.length) {
             throw new IllegalArgumentException(flag + " requires a value");
@@ -213,62 +140,32 @@ final class BenchmarkOptions {
         return args[index];
     }
 
-    private static double parseDouble(String value, String flag) {
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(flag + " expects a number, got '" + value + "'");
-        }
-    }
-
     static String usage() {
         return """
                 smithy-java serde E2E ops/CPU-sec benchmark
 
                 Usage:
-                  java -jar smithy-java-e2e-benchmark.jar [options]
-                  java -jar smithy-java-e2e-benchmark.jar compare --baseline <file|dir> --current <file|dir> --out <prefix>
-                  java -jar smithy-java-e2e-benchmark.jar export-fixture <benchmark-id> [--out DIR]
+                  java -Xbatch -jar smithy-java-e2e-benchmark.jar [options]
 
-                Runs each benchmark as a complete generated-client call and reports operations per process
-                CPU-second. The loop is the cross-SDK one: warm up until JIT compilation goes quiet, then
-                iterate until 50,000 iterations or 5 seconds of process CPU time, whichever comes first,
-                checking every 100 iterations. One child JVM per protocol is launched with -Xbatch and the
-                results are merged into one file.
+                Runs complete generated-client calls in this JVM and reports operations per process
+                CPU-second. Each case gets one checked call, automatic warmup, System.gc(), and measurement.
+                Measurement stops at 50,000 iterations or 5 seconds of CPU time, whichever comes first,
+                with a minimum of 1 second of CPU time. Run with -Xbatch to disable background JIT compilation.
 
-                Selection:
+                  --mode MODE              stub (default): in-process canned responses, the cross-SDK configuration
+                                           https: smithy-java's HTTP client over TLS (BoringSSL) to a fixture
+                                           server started in a child JVM, which serves each case's response in turn
                   --protocol NAMES         Comma-separated: awsJson1_0, rpcv2Cbor, awsQuery, restJson1, restXml
                                            (default: all)
                   --filter SUBSTRINGS      Case-insensitive substrings matched against benchmark ids
-                  --all-model-cases        Include the smithy-java-only cases (WideTypes, OutOfOrder) in
-                                           addition to the 71 canonical cross-SDK benchmarks
+                  --all-model-cases        Include WideTypes and OutOfOrder cases outside the 71 canonical cases
                   --list                   Print the selected benchmark ids and exit
-
-                Transport:
-                  --transport MODE         stub (default): the in-process mock, the cross-SDK configuration.
-                                           http or https: smithy-java's own HTTP client (BoringSSL TLS) against
-                                           a fixture server that serves the benchmark's response, one fixture
-                                           per server run; see export-fixture
-                  --endpoint URL           The fixture server (default http://127.0.0.1:8080 or
-                                           https://127.0.0.1:8443)
-
-                Measurement:
-                  --min-measure-cpu-seconds S
-                                           Never close a measured window before S seconds of process CPU time
-                                           (default 1). The JVM reads process CPU time in 10 ms ticks on Linux,
-                                           so a shorter window is quantized; 0 restores the literal cross-SDK
-                                           loop, and a large value gives a profiler a long steady-state window
-                  --in-process             Run in this JVM instead of one child JVM per protocol, for attaching
-                                           a profiler (add -Xbatch yourself to match the child JVMs)
-
-                Output:
                   --output PATH            Results file (default e2e-ops-cpusec-<timestamp>.json)
                   --instance-type TYPE     Record this instance type instead of querying IMDSv2
                   --notes TEXT             Free-form annotation recorded in metadata
                   --help                   Show this message
 
-                JVM flags given to this process (for example -Dsmithy-java.* toggles or -Xmx) are forwarded to
-                the child JVMs.
+                Compare a baseline run with a current run using scripts/compare-ocs.py.
                 """;
     }
 }

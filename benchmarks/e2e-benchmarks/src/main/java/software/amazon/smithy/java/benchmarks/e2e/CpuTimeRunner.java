@@ -8,23 +8,22 @@ package software.amazon.smithy.java.benchmarks.e2e;
 import java.lang.management.CompilationMXBean;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
 import java.util.List;
 import java.util.Locale;
 import software.amazon.smithy.java.benchmarks.ProcessCpuTime;
 
+/** The cross-SDK measurement loop: warm up, System.gc(), then iterate until the stop rule is met. */
 final class CpuTimeRunner {
 
-    static final long DEFAULT_MIN_ITERATIONS = 50_000;
-    static final double DEFAULT_MIN_CPU_SECONDS = 5.0;
-    static final int DEFAULT_CHECK_INTERVAL = 100;
-    /** Linux process CPU time uses 10 ms ticks. A one-second measurement floor reduces rounding error. */
-    static final double DEFAULT_MIN_MEASURE_CPU_SECONDS = 1.0;
+    static final long MIN_ITERATIONS = 50_000;
+    static final double MIN_CPU_SECONDS = 5.0;
+    static final int CHECK_INTERVAL = 100;
+    /** Linux reports process CPU time in 10 ms ticks; a one-second floor keeps that rounding below 1%. */
+    static final double MIN_MEASURE_CPU_SECONDS = 1.0;
 
     static final double UNDER_WARMED_JIT_SHARE = 0.05;
 
     private static final CompilationMXBean COMPILATION = ManagementFactory.getCompilationMXBean();
-    private static final ThreadMXBean THREADS = ManagementFactory.getThreadMXBean();
     private static final List<GarbageCollectorMXBean> COLLECTORS = ManagementFactory.getGarbageCollectorMXBeans();
 
     private final Settings settings;
@@ -33,19 +32,16 @@ final class CpuTimeRunner {
         this.settings = settings;
     }
 
-    /** Calls beforeMeasurement after warmup and GC, immediately before measurement. */
-    Measurement run(Invocation invocation, Runnable beforeMeasurement) throws Throwable {
+    Measurement run(Invocation invocation) throws Throwable {
         WarmupOutcome warmup = settings.warmup().automatic()
                 ? warmupAutomatically(invocation)
                 : warmupFixed(invocation, settings.warmup().iterations());
         System.gc();
-        beforeMeasurement.run();
 
         long gcCountBefore = gcCount();
         long gcMillisBefore = gcMillis();
         long jitMillisBefore = jitMillis();
         long wallBefore = System.nanoTime();
-        long threadCpuBefore = threadCpuNanos();
         long cpuBefore = ProcessCpuTime.now();
 
         long minIterations = settings.minIterations();
@@ -67,12 +63,10 @@ final class CpuTimeRunner {
         }
 
         long cpuAfter = ProcessCpuTime.now();
-        long threadCpuAfter = threadCpuNanos();
         long wallAfter = System.nanoTime();
         return new Measurement(
                 iterations,
                 cpuAfter - cpuBefore,
-                threadCpuAfter - threadCpuBefore,
                 wallAfter - wallBefore,
                 jitMillis() - jitMillisBefore,
                 gcCount() - gcCountBefore,
@@ -87,7 +81,7 @@ final class CpuTimeRunner {
         return new WarmupOutcome(iterations, false, false, 0);
     }
 
-    /** Use compiler activity to detect steady state. Throughput can appear stable before C2 installs optimized code. */
+    /** Uses compiler activity to detect steady state; throughput can look stable before C2 installs its code. */
     private static WarmupOutcome warmupAutomatically(Invocation invocation) throws Throwable {
         long iterations = 0;
         int quietChunks = 0;
@@ -126,10 +120,6 @@ final class CpuTimeRunner {
         return COMPILATION != null && COMPILATION.isCompilationTimeMonitoringSupported()
                 ? COMPILATION.getTotalCompilationTime()
                 : 0;
-    }
-
-    private static long threadCpuNanos() {
-        return THREADS.isCurrentThreadCpuTimeSupported() ? THREADS.getCurrentThreadCpuTime() : 0;
     }
 
     private static long gcCount() {
@@ -185,16 +175,12 @@ final class CpuTimeRunner {
             }
         }
 
+        /** The cross-SDK rule with the one-second floor and automatic warmup. */
         static Settings standard() {
-            return standard(DEFAULT_MIN_MEASURE_CPU_SECONDS);
-        }
-
-        static Settings standard(double minMeasureCpuSeconds) {
-            return new Settings(
-                    DEFAULT_MIN_ITERATIONS,
-                    DEFAULT_MIN_CPU_SECONDS,
-                    DEFAULT_CHECK_INTERVAL,
-                    minMeasureCpuSeconds,
+            return new Settings(MIN_ITERATIONS,
+                    MIN_CPU_SECONDS,
+                    CHECK_INTERVAL,
+                    MIN_MEASURE_CPU_SECONDS,
                     Warmup.auto());
         }
 
@@ -272,7 +258,6 @@ final class CpuTimeRunner {
     record Measurement(
             long iterations,
             long processCpuNanos,
-            long threadCpuNanos,
             long wallNanos,
             long jitMillis,
             long gcCount,
@@ -285,11 +270,6 @@ final class CpuTimeRunner {
 
         double opsPerWallSecond() {
             return iterations * 1_000_000_000.0 / wallNanos;
-        }
-
-        /** Measures only benchmark-thread CPU time. Excludes JIT and GC threads. */
-        double opsPerThreadCpuSecond() {
-            return threadCpuNanos > 0 ? iterations * 1_000_000_000.0 / threadCpuNanos : 0;
         }
 
         double cpuWallRatio() {

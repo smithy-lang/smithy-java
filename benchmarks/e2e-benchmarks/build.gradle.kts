@@ -7,13 +7,16 @@ plugins {
 }
 
 description =
-    "Cross-SDK serde E2E ops/CPU-sec benchmark: complete generated-client calls with the HTTP transport mocked in-process."
+    "Cross-SDK serde E2E ops/CPU-sec benchmark: complete generated-client calls against an in-process stub or a fixture server over HTTPS."
 
 application {
     mainClass.set("software.amazon.smithy.java.benchmarks.e2e.E2eBenchmark")
+    // Disable background JIT compilation for Gradle runs.
+    applicationDefaultJvmArgs = listOf("-Xbatch")
 }
 
 val sharedModelDir = layout.projectDirectory.dir("../serde-benchmarks/model")
+val netty = "4.2.18.Final"
 
 dependencies {
     implementation(project(":benchmarks:benchmark-commons"))
@@ -65,28 +68,11 @@ dependencies {
     // Use the same typed inputs as serde-benchmarks.
     implementation(project(":protocol-test-harness"))
 
+    // The fixture server uses Netty's SslContext; client-http-boringssl supplies the native libraries.
+    implementation("io.netty:netty-handler:$netty")
+    implementation("io.netty:netty-buffer:$netty")
+
     jmhImplementation(project(":benchmarks:benchmark-commons"))
-}
-
-// Keep fixture server classes out of the client jar.
-val fixtureServer: SourceSet by sourceSets.creating
-
-val netty = "4.2.18.Final"
-val tcnative = "2.0.84.Final"
-
-dependencies {
-    "fixtureServerImplementation"(project(":http:http-client"))
-    "fixtureServerImplementation"("io.netty:netty-handler:$netty")
-    "fixtureServerImplementation"("io.netty:netty-buffer:$netty")
-    "fixtureServerImplementation"("io.netty:netty-tcnative-boringssl-static:$tcnative")
-    "fixtureServerRuntimeOnly"("io.netty:netty-tcnative-boringssl-static:$tcnative:osx-aarch_64")
-    "fixtureServerRuntimeOnly"("io.netty:netty-tcnative-boringssl-static:$tcnative:osx-x86_64")
-    "fixtureServerRuntimeOnly"("io.netty:netty-tcnative-boringssl-static:$tcnative:linux-x86_64")
-    "fixtureServerRuntimeOnly"("io.netty:netty-tcnative-boringssl-static:$tcnative:linux-aarch_64")
-
-    testImplementation(fixtureServer.output)
-    testImplementation("io.netty:netty-handler:$netty")
-    testImplementation("io.netty:netty-tcnative-boringssl-static:$tcnative")
 }
 
 // Package the shared models for runtime discovery.
@@ -255,49 +241,6 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 
 tasks.named("assemble") {
     dependsOn("shadowJar")
-}
-
-val fixtureServerJar by tasks.registering(com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar::class) {
-    group = "build"
-    description = "Shaded, runnable HTTP/1.1 fixture server (BoringSSL TLS) for the http/https transport modes."
-    from(fixtureServer.output)
-    configurations = listOf(project.configurations["fixtureServerRuntimeClasspath"])
-    archiveBaseName.set("smithy-java-fixture-server")
-    archiveClassifier.set("")
-    archiveVersion.set("")
-    manifest { attributes("Main-Class" to "software.amazon.smithy.java.benchmarks.fixture.FixtureServer") }
-    mergeServiceFiles()
-    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
-}
-
-tasks.named("assemble") {
-    dependsOn(fixtureServerJar)
-}
-
-val transportBenchmark by tasks.registering(Exec::class) {
-    group = "benchmark"
-    description = "Run the e2e benchmark over the real HTTP transport against the fixture server (-Ptransport, -Pbenchmarks, -Pruns)."
-    dependsOn("shadowJar", fixtureServerJar)
-    // Resolve paths during configuration to support the Gradle configuration cache.
-    val transport = (project.findProperty("transport") as String?) ?: "https"
-    val benchmarks = (project.findProperty("benchmarks") as String?)
-        ?: "rpcv2Cbor_PutItemRequest_Baseline,awsJson1_0_GetItemOutput_M,restXml_PutObject_L,restXml_GetObject_L"
-    val runs = (project.findProperty("runs") as String?) ?: "3"
-    val script = file("fixture/e2e-scheduler.py").absolutePath
-    val e2eJar = layout.buildDirectory.file("libs/smithy-java-e2e-benchmark.jar").get().asFile.absolutePath
-    val serverJar = layout.buildDirectory.file("libs/smithy-java-fixture-server.jar").get().asFile.absolutePath
-    val outDir = layout.buildDirectory.dir("transport-benchmark").get().asFile.absolutePath
-    val javaBin = javaToolchains.launcherFor(java.toolchain).get().executablePath.asFile.absolutePath
-    commandLine(
-        "python3", script,
-        "--java", javaBin,
-        "--jar", e2eJar,
-        "--server-jar", serverJar,
-        "--modes", "stub,$transport",
-        "--benchmarks", benchmarks,
-        "--runs", runs,
-        "--outdir", outDir,
-    )
 }
 
 val canonicalBenchmarkIds =
