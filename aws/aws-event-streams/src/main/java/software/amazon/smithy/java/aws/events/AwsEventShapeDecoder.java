@@ -168,18 +168,16 @@ final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends Serial
 
         @Override
         public <T> void readStruct(Schema schema, T builder, ShapeDeserializer.StructMemberConsumer<T> consumer) {
-            var payloadWritten = false;
-            for (Schema member : schema.members()) {
-                if (member.hasTrait(TraitKey.EVENT_HEADER_TRAIT)
-                        && headersDeserializer.headers.containsKey(member.memberName())) {
+            var ext = EventStreamSchemaExtensions.extensionOf(schema);
+            for (Schema member : ext.headerMembers()) {
+                if (headersDeserializer.headers.containsKey(member.memberName())) {
                     consumer.accept(builder, member, headersDeserializer);
-                } else if (member.hasTrait(TraitKey.EVENT_PAYLOAD_TRAIT)) {
-                    consumer.accept(builder, member, codecDeserializer);
-                    payloadWritten = true;
                 }
             }
-            // Deserialize from the payload if still needed.
-            if (!payloadWritten) {
+            var eventPayloadMember = ext.eventPayloadMember();
+            if (eventPayloadMember != null) {
+                consumer.accept(builder, eventPayloadMember, codecDeserializer);
+            } else {
                 codecDeserializer.readStruct(schema, builder, consumer);
             }
         }
