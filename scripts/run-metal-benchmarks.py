@@ -1,37 +1,12 @@
 #!/usr/bin/env python3
-"""Run the smithy-java benchmarks on a bare-metal EC2 host, end to end, and leave the results in S3.
+"""Run smithy-java benchmarks on a bare-metal EC2 host through SSM and S3.
 
-Implements the metal procedure from AwsSdkPerformanceBenchmarkModels results/ocs-sop.md with no SSH, no
-key pair and no inbound network access: the instance is driven with SSM Run Command, and every artifact
-moves through S3 (jars and the host script up, results down).
+run executes the full cycle. setup-infra creates the bucket, role, and instance profile.
+resume continues a saved run. cleanup terminates its instance.
 
-    preflight -> build jars -> stage to S3 -> launch -> wait for SSM -> bootstrap -> smoke test
-             -> detached run (interleaved samples) -> poll -> retrieve -> compare -> terminate
-
-Subcommands (run is the default):
-  run          the whole cycle above
-  setup-infra  one-time, idempotent: S3 bucket, IAM role and instance profile (SSM + bucket access)
-  resume       reattach to the instance recorded in the state file and finish the cycle
-  cleanup      terminate the instance recorded in the state file (or --instance-id)
-
-Cost: m7i.metal-24xl is about $4.84/hour and m7g.metal about $2.61/hour. The instance is terminated in a
-finally block and on SIGINT/SIGTERM, its id is written to <outdir>/metal-run-state.json the moment it
-launches, it shuts itself down after --max-hours as a dead-man switch, and `cleanup` finishes the job
-after a crash. Check the EC2 console anyway after an abnormal exit.
-
-Examples:
-  python3 scripts/run-metal-benchmarks.py setup-infra
-  python3 scripts/run-metal-benchmarks.py --dry-run
-  python3 scripts/run-metal-benchmarks.py --baseline-jar /tmp/baseline/smithy-java-e2e-benchmark.jar
-  python3 scripts/run-metal-benchmarks.py --instance-type m7g.metal --suite e2e,serde --samples 3
-  python3 scripts/run-metal-benchmarks.py --suite fixture,h1scaling --samples 5 \
-      --h1-baseline-jmh-jar ../smithy-java-before/http/http-client/build/libs/http-client-1.7.0-jmh.jar
-  python3 scripts/run-metal-benchmarks.py resume
-
-Suites: e2e (the cross-SDK ops/CPU-sec loop), serde (JMH serialization), fixture (stub vs real transport
-against the Java fixture server) and h1scaling (the http-client module's JMH concurrency
-benchmark against its Netty server, current jar vs an optional baseline jar, platform and virtual workers).
-"""
+Suites include e2e, serde, fixture, and h1scaling.
+The runner terminates the instance on exit unless you specify --keep-instance.
+Use cleanup after a crash. The host also shuts down after --max-hours."""
 
 import argparse
 import glob
@@ -62,10 +37,7 @@ H1_SERVER_JAR_GLOB = os.path.join(PROJECT_ROOT, "http", "http-client", "build", 
 GRADLE_TASKS = {
     "e2e": [":benchmarks:e2e-benchmarks:shadowJar"],
     "serde": [":benchmarks:serde-benchmarks:jmhJar"],
-    # The fixture experiment runs the e2e jar against the Java fixture server; both are built here and staged.
     "fixture": [":benchmarks:e2e-benchmarks:shadowJar", ":benchmarks:e2e-benchmarks:fixtureServerJar"],
-    # Concurrent-caller check for client transport changes: the http-client module's H1ScalingBenchmark
-    # (JMH) against its Netty BenchmarkServer, current jar vs an optional baseline jar.
     "h1scaling": [":http:http-client:jmhJar", ":http:http-client:jmhServerJar"],
 }
 FIXTURE_SERVER_JAR = os.path.join(PROJECT_ROOT, "benchmarks", "e2e-benchmarks", "build", "libs", "smithy-java-fixture-server.jar")
@@ -81,16 +53,14 @@ STATE_FILE = "metal-run-state.json"
 TAG_MANAGED_BY = "smithy-java-run-metal-benchmarks"
 SSM_MANAGED_POLICY = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 
-# Amazon Linux 2023, resolved from the public SSM parameters so no AMI id is hard-coded.
 AMI_PARAMETERS = {
     "x86_64": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64",
     "arm64": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64",
 }
 HOURLY_COST = {"m7i.metal-24xl": 4.84, "m7g.metal": 2.61}
 
-# Metal hosts take several minutes to boot and register with SSM.
 SSM_ONLINE_TIMEOUT_SECONDS = 25 * 60
-# A smoke test outside this CPU/wall band means a misconfigured or contended host, not an SDK result.
+# Reject smoke tests outside this band because the host may be misconfigured or contended.
 SMOKE_CPU_WALL_RANGE = (0.75, 1.25)
 
 
@@ -99,7 +69,6 @@ def log(message: str) -> None:
 
 
 def newest(pattern: str, what: str) -> str:
-    """The most recently modified file matching a glob, or exit with a message naming what was expected."""
     candidates = sorted(glob.glob(pattern), key=os.path.getmtime)
     if not candidates:
         fail("%s not found (%s)" % (what, pattern))
@@ -111,7 +80,6 @@ def fail(message: str) -> None:
 
 
 def compact(instance_type: str) -> str:
-    """m7i.metal-24xl -> m7imetal24xl, the SOP's results file prefix."""
     return re.sub(r"[^a-z0-9]", "", instance_type.lower())
 
 
@@ -209,7 +177,6 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
 
 
 class MetalRun:
-    """One benchmark run on one freshly launched metal instance."""
 
     def __init__(self, args: argparse.Namespace):
         self.args = args
@@ -231,7 +198,6 @@ class MetalRun:
         self.terminated = False
         self.launched_at: Optional[float] = None
 
-    # ----------------------------------------------------------------------------------------- helpers
 
     @property
     def s3_prefix(self) -> str:
@@ -242,7 +208,6 @@ class MetalRun:
         return "s3://%s/%s" % (self.bucket, self.s3_prefix)
 
     def ssm_run(self, commands: List[str], comment: str, timeout_seconds: int = 3600, echo: bool = True) -> Tuple[str, str, str]:
-        """Runs shell commands on the host with SSM Run Command and waits for them. Returns status, stdout, stderr."""
         sent = None
         for attempt in range(12):
             try:
@@ -255,7 +220,7 @@ class MetalRun:
                 break
             except ClientError as error:
                 if error.response["Error"]["Code"] == "InvalidInstanceId" and attempt < 11:
-                    time.sleep(10)  # the agent has not finished registering yet
+                    time.sleep(10)
                     continue
                 raise
         command_id = sent["Command"]["CommandId"]
@@ -314,7 +279,6 @@ class MetalRun:
         except OSError:
             pass
 
-    # ----------------------------------------------------------------------------------------- phases
 
     def preflight(self) -> None:
         log("preflight")
@@ -384,9 +348,7 @@ class MetalRun:
             self.jars["current"] = current
             if not os.path.isfile(FIXTURE_SERVER_JAR):
                 fail("fixture server jar not found at %s" % FIXTURE_SERVER_JAR)
-            # The fixture server jar is used by the scheduler for the https transport study.
             self.jars["fixture-server.jar"] = FIXTURE_SERVER_JAR
-            # With a baseline jar, the fixture experiment runs both the old and current clients (stub + https).
             if self.args.baseline_jar:
                 if not os.path.isfile(self.args.baseline_jar):
                     fail("baseline jar not found at %s" % self.args.baseline_jar)
@@ -405,8 +367,6 @@ class MetalRun:
         if "serde" in self.args.suites:
             self.jars["serde"] = newest(SERDE_JAR_GLOB, "serde JMH jar")
         if {"e2e", "fixture"} & set(self.args.suites):
-            # The one scheduler and the cert helper go flat alongside the jars; the host runner invokes the
-            # scheduler with the staged manifest.json.
             self.jars["e2e-scheduler.py"] = os.path.join(FIXTURE_DIR, "e2e-scheduler.py")
             self.jars["make-cert.sh"] = os.path.join(FIXTURE_DIR, "make-cert.sh")
         self.write_run_config()
@@ -414,8 +374,6 @@ class MetalRun:
             log("  %s jar: %s (%.1f MB)" % (role, path, os.path.getsize(path) / 1e6))
 
     def write_run_config(self) -> None:
-        """Write the staged manifest.json (e2e/fixture) and suite-config.json (serde/h1scaling) that the host
-        runner consumes, so no configuration travels as positional shell strings."""
         os.makedirs(self.outdir, exist_ok=True)
         if {"e2e", "fixture"} & set(self.args.suites):
             manifest_path = os.path.join(self.outdir, "manifest.json")
@@ -429,9 +387,7 @@ class MetalRun:
             self.jars["suite-config.json"] = config_path
 
     def build_manifest(self) -> dict:
-        """The e2e run manifest (schema smithy-java/e2e-run-manifest/1): the canonical all-benchmarks submission
-        run and/or the per-case transport study, over the two sides, plus which comparisons to produce. Paths are
-        host paths; the host reads IMDS for the instance type."""
+        """Build the run manifest with host paths. The host uses IMDS to detect its instance type."""
         host_jars = "%s/jars" % HOST_WORK_DIR
         out_root = "%s/results/e2e" % HOST_WORK_DIR
         tag = compact(self.args.instance_type)
@@ -483,7 +439,6 @@ class MetalRun:
         }
 
     def build_suite_config(self) -> dict:
-        """serde and h1scaling parameters for the host runner (replacing the old FIXTURE_*/H1_* environment)."""
         config = {}
         if "serde" in self.args.suites:
             config["serde"] = {"jar": "serde.jar", "fast": bool(self.args.serde_fast),
@@ -504,7 +459,6 @@ class MetalRun:
         log("staging to %s/stage/" % self.s3_uri)
         self.s3.upload_file(HOST_SCRIPT, self.bucket, "%s/stage/metal-host.py" % self.s3_prefix)
         for role, path in self.jars.items():
-            # Everything under stage/jars/ is downloaded to the host's jars/ directory by the bootstrap.
             name = self._staged_name(role)
             self.s3.upload_file(path, self.bucket, "%s/stage/jars/%s" % (self.s3_prefix, name))
             log("  uploaded %s" % name)
@@ -687,9 +641,6 @@ class MetalRun:
         return target
 
     def compare(self, results_dir: str, failures: int = 0) -> None:
-        # The host scheduler already produced the ocs comparison files through the one comparison
-        # implementation (the jar's `compare`), which owns comparability, sample acceptance, aggregation and
-        # uncertainty, and uploaded them with the rest of results/. Here we only surface what came back.
         found = []
         for root, _dirs, files in os.walk(results_dir):
             for name in files:
@@ -733,7 +684,6 @@ class MetalRun:
         self.terminated = True
         self.clear_state()
 
-    # ----------------------------------------------------------------------------------------- flows
 
     def execute(self) -> int:
         self.install_signal_handlers()
@@ -812,7 +762,6 @@ def load_state(outdir: str) -> Optional[dict]:
 
 
 def setup_infra(args: argparse.Namespace) -> int:
-    """Creates the bucket, role and instance profile the runs need. Idempotent."""
     session = boto3.Session(profile_name=args.profile, region_name=args.region)
     account = session.client("sts").get_caller_identity()["Account"]
     bucket = args.bucket or "perf-comparison-temp-%s" % account

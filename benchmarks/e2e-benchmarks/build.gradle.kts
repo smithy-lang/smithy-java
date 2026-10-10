@@ -1,4 +1,3 @@
-// Note: Not published
 plugins {
     id("smithy-java.java-conventions")
     id("com.gradleup.shadow")
@@ -14,13 +13,11 @@ application {
     mainClass.set("software.amazon.smithy.java.benchmarks.e2e.E2eBenchmark")
 }
 
-// Codegen imports this model; GenerateSmithyManifest makes it discoverable at runtime.
 val sharedModelDir = layout.projectDirectory.dir("../serde-benchmarks/model")
 
 dependencies {
     implementation(project(":benchmarks:benchmark-commons"))
 
-    // Codegen resolves protocol/auth factories and the credential-chain plugin from this classpath.
     smithyBuild(project(":codegen:codegen-plugin"))
     smithyBuild(project(":client:client-core"))
     smithyBuild(project(":client:client-rpcv2-cbor"))
@@ -31,14 +28,12 @@ dependencies {
     smithyBuild(project(":aws:aws-sigv4"))
     smithyBuild(project(":aws:client:aws-client-core"))
 
-    // The model is assembled at runtime (BenchmarkCases) to index the tagged test cases.
     implementation(libs.smithy.model)
     implementation(libs.smithy.aws.traits)
     implementation(libs.smithy.protocol.traits)
     implementation(libs.smithy.protocol.test.traits)
     implementation(libs.smithy.utils)
 
-    // Runtime stack under test: what a customer's generated client pulls in.
     implementation(project(":core"))
     implementation(project(":io"))
     implementation(project(":logging"))
@@ -46,7 +41,6 @@ dependencies {
     implementation(project(":client:client-core"))
     implementation(project(":client:client-http"))
     implementation(project(":client:client-http-binding"))
-    // Network modes use smithy-java's HTTP client with BoringSSL for HTTPS.
     implementation(project(":client:client-http-smithy"))
     implementation(project(":client:client-http-boringssl"))
     implementation(project(":http:http-client"))
@@ -68,15 +62,13 @@ dependencies {
     implementation(project(":codecs:cbor-codec"))
     implementation(project(":codecs:xml-codec"))
 
-    // ProtocolTestDocument turns each test case's `params` Node into a typed input at setup,
-    // exactly as serde-benchmarks does, so both suites serialize identical inputs.
+    // Use the same typed inputs as serde-benchmarks.
     implementation(project(":protocol-test-harness"))
 
-    // JMH view of the same benchmarks (src/jmh). The profiler lives in benchmark-commons.
     jmhImplementation(project(":benchmarks:benchmark-commons"))
 }
 
-// Keep server classes out of the client jar; FixtureServerTransports bridges to package-private transports.
+// Keep fixture server classes out of the client jar.
 val fixtureServer: SourceSet by sourceSets.creating
 
 val netty = "4.2.18.Final"
@@ -92,15 +84,12 @@ dependencies {
     "fixtureServerRuntimeOnly"("io.netty:netty-tcnative-boringssl-static:$tcnative:linux-x86_64")
     "fixtureServerRuntimeOnly"("io.netty:netty-tcnative-boringssl-static:$tcnative:linux-aarch_64")
 
-    // The server's tests live in src/test next to the benchmark tests, so give the test classpath the
-    // server classes and the one netty type they touch (OpenSsl.isAvailable()).
     testImplementation(fixtureServer.output)
     testImplementation("io.netty:netty-handler:$netty")
     testImplementation("io.netty:netty-tcnative-boringssl-static:$tcnative")
 }
 
-// Copies the shared .smithy files to META-INF/smithy/ and writes the model manifest so
-// `Model.assembler().discoverModels()` finds them on the runtime classpath.
+// Package the shared models for runtime discovery.
 abstract class GenerateSmithyManifest : DefaultTask() {
     @get:InputDirectory
     abstract val sourceDir: DirectoryProperty
@@ -135,8 +124,7 @@ val generateSmithyManifest by tasks.registering(GenerateSmithyManifest::class) {
     outputDir.set(layout.buildDirectory.dir("generated-resources/smithy-manifest"))
 }
 
-// Records the git commit the jar was built from. The jar is usually copied to a benchmark
-// host without the repository, and the cross-SDK results schema wants the commit hash.
+// Record build details for benchmark hosts without the repository.
 abstract class WriteBuildInfo : DefaultTask() {
     @get:Input
     abstract val commit: Property<String>
@@ -176,9 +164,7 @@ val writeBuildInfo by tasks.registering(WriteBuildInfo::class) {
     outputDir.set(layout.buildDirectory.dir("generated-resources/build-info"))
 }
 
-// Each codegen projection registers its own META-INF/services/...SchemaIndex. A plain copy keeps
-// only one of the duplicate paths, so merge them into one descriptor per service type and feed
-// that to processResources instead of the per-projection copies.
+// Merge service descriptors before processResources can overwrite duplicate paths.
 abstract class MergeServiceFiles : DefaultTask() {
     @get:InputFiles
     abstract val serviceDirs: ConfigurableFileCollection
@@ -204,8 +190,7 @@ abstract class MergeServiceFiles : DefaultTask() {
     }
 }
 
-// One codegen projection per protocol, each emitting into its own package so same-named
-// shapes from different protocols don't collide.
+// Separate protocol packages prevent shape name collisions.
 val codegenProjections =
     listOf(
         "aws-json-rpc-1-0-client",
@@ -233,7 +218,6 @@ afterEvaluate {
         }
         resources {
             projectionPaths.forEach { srcDir("$it/resources") }
-            // The per-projection descriptors are replaced by the merged ones below.
             exclude("META-INF/services/**")
             srcDir(generateSmithyManifest)
             srcDir(writeBuildInfo)
@@ -249,7 +233,6 @@ tasks.named("compileJava") {
 }
 
 tasks.named<Copy>("processResources") {
-    // Service descriptors are merged above; any other duplicate resource is a bug worth seeing.
     duplicatesStrategy = DuplicatesStrategy.FAIL
     dependsOn("smithyBuild")
 }
@@ -263,11 +246,10 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
     mergeServiceFiles()
-    // Keep META-INF/smithy/manifest entries from each jar so all models are discovered at runtime.
+    // Append all model manifests so runtime discovery finds every model.
     transform(com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransformer::class.java) {
         resource = "META-INF/smithy/manifest"
     }
-    // Avoid collisions between MANIFEST/SF files from third-party jars.
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
 
@@ -296,8 +278,7 @@ val transportBenchmark by tasks.registering(Exec::class) {
     group = "benchmark"
     description = "Run the e2e benchmark over the real HTTP transport against the fixture server (-Ptransport, -Pbenchmarks, -Pruns)."
     dependsOn("shadowJar", fixtureServerJar)
-    // Everything is resolved to plain strings here, at configuration time: an Exec task that captured
-    // project/layout references for execution would break the Gradle configuration cache.
+    // Resolve paths during configuration to support the Gradle configuration cache.
     val transport = (project.findProperty("transport") as String?) ?: "https"
     val benchmarks = (project.findProperty("benchmarks") as String?)
         ?: "rpcv2Cbor_PutItemRequest_Baseline,awsJson1_0_GetItemOutput_M,restXml_PutObject_L,restXml_GetObject_L"
@@ -319,7 +300,6 @@ val transportBenchmark by tasks.registering(Exec::class) {
     )
 }
 
-// JMH and the CPU-time runner share the canonical ids; -Pjmh.testCaseId overrides them.
 val canonicalBenchmarkIds =
     file("src/main/resources/software/amazon/smithy/java/benchmarks/e2e/canonical-benchmarks.txt")
         .readLines()
@@ -354,9 +334,7 @@ jmh {
     resultsFile = layout.buildDirectory.file("results/jmh/results.json")
 }
 
-// With shadow applied before jmh, jmhJar is a ShadowJar. Merge duplicate META-INF/services/
-// entries from the codegen projections instead of overwriting them, and keep every model
-// manifest.
+// Preserve service descriptors and model manifests in the JMH jar.
 tasks.jmhJar {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     filesNotMatching(listOf("META-INF/services/**", "META-INF/smithy/manifest")) {

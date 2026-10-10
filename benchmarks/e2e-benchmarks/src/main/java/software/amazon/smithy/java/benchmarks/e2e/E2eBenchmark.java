@@ -26,9 +26,6 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.model.node.ObjectNode;
 
-/**
- * Runs the cross-SDK benchmark in one {@code -Xbatch} JVM per protocol, with comparison and fixture export commands.
- */
 public final class E2eBenchmark {
 
     private E2eBenchmark() {}
@@ -75,7 +72,6 @@ public final class E2eBenchmark {
         System.exit(options.inProcess() ? runInProcess(options, ids) : forkPerProtocol(options, ids));
     }
 
-    /** Runs the selected benchmarks in this JVM and writes the results file. */
     static int runInProcess(BenchmarkOptions options, List<String> ids) {
         var settings = options.settings();
         var runner = new CpuTimeRunner(settings);
@@ -99,8 +95,7 @@ public final class E2eBenchmark {
 
                 Measurement m;
                 try {
-                    // Untimed validation call: the response must be the benchmark's fixture, and a payload case
-                    // must actually deserialize its expected output, before timing anything.
+                    // Check the fixture and output before measurement.
                     SerializableStruct output = call.invoke();
                     transport.validateLast(benchmarkCase);
                     validateWorkload(benchmarkCase, output);
@@ -147,14 +142,13 @@ public final class E2eBenchmark {
         return 0;
     }
 
-    /** Launches one child JVM per selected protocol, with {@code -Xbatch}, and merges their results into one file. */
     static int forkPerProtocol(BenchmarkOptions options, List<String> ids) throws IOException, InterruptedException {
         Instant started = Instant.now();
         var protocols = EnumSet.noneOf(BenchmarkProtocol.class);
         for (String id : ids) {
             protocols.add(BenchmarkProtocol.forBenchmarkId(id));
         }
-        // Resolved once here (IMDS is a network call) and handed to every child.
+        // Resolve IMDS once and pass the instance type to each child.
         String instanceType = Environment.instanceType(options.instanceType());
 
         Path tmp = Files.createTempDirectory("smithy-java-e2e-");
@@ -183,7 +177,7 @@ public final class E2eBenchmark {
             }
         }
 
-        // Record the benchmark JVMs' flags (-Xbatch and anything forwarded), not the launcher's.
+        // Record the measured child JVM flags.
         var environment = Environment.capture(instanceType);
         if (childJava != null) {
             environment = environment.toBuilder().withMember("java", childJava).build();
@@ -209,10 +203,6 @@ public final class E2eBenchmark {
         return 0;
     }
 
-    /**
-     * Launches this program again in a fresh JVM with the same JVM flags plus {@code -Xbatch}, the same classpath,
-     * and the given program arguments, inheriting stdout/stderr.
-     */
     static int spawn(List<String> programArgs) throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
@@ -228,7 +218,6 @@ public final class E2eBenchmark {
         return new ProcessBuilder(command).inheritIO().start().waitFor();
     }
 
-    /** The transport for this run: the in-process stub, or smithy-java's HTTP client pointed at a fixture server. */
     static CountingTransport newTransport(BenchmarkOptions options) {
         return options.transport().isNetwork()
                 ? NetworkTransport.create(options.transport())
@@ -243,10 +232,7 @@ public final class E2eBenchmark {
         return ManagementFactory.getRuntimeMXBean().getInputArguments().contains("-Xbatch");
     }
 
-    /**
-     * Checks that a response-side benchmark actually produced its expected output, so a fixture that merely
-     * matches the status and length cannot stand in for a different workload. Runs on the untimed validation call.
-     */
+    /** Checks output values before measurement. Matching status and length alone does not prove the workload is correct. */
     private static void validateWorkload(BenchmarkCase benchmarkCase, SerializableStruct output) {
         boolean minimal = benchmarkCase.id().endsWith("_Baseline") || benchmarkCase.id().endsWith("_Example");
         if (benchmarkCase.source() != BenchmarkCase.Source.RESPONSE || minimal) {

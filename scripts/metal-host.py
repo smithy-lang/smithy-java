@@ -1,22 +1,7 @@
 #!/usr/bin/env python3
-"""Host-side runner for scripts/run-metal-benchmarks.py.
-
-Staged to the bare-metal instance and executed there by SSM Run Command; nothing here runs locally. python3 is
-preinstalled on Amazon Linux 2023, so this is the only host-side program: the orchestrator's SSM commands are
-one-liners that `aws s3 cp` this file down and `python3 metal-host.py <subcommand> ...`. There is no shell
-runner and no `eval`; the benchmark matrix is described by a staged manifest.json and suite-config.json.
-
-Subcommands:
-  bootstrap <work_dir> <stage_uri> <java_major>
-      Install a JDK, pin CPU frequency scaling, download the staged artifacts, print a READINESS line.
-  smoke <work_dir> <instance_type> <e2e_jar>
-      Run one e2e benchmark and print a SMOKE line with the health figures the orchestrator gates on.
-  run <work_dir> <s3_results_uri> <suites_csv>
-      Run the benchmark matrix (e2e/fixture via e2e-scheduler.py, serde and h1scaling via JMH), upload results
-      to S3, write the DONE sentinel. Launched detached so it survives the SSM command that started it;
-      progress goes to progress.log. One failing suite does not abandon the rest; failures are counted and
-      reported through the sentinel.
-"""
+"""Run benchmarks on the EC2 host for run-metal-benchmarks.py.
+Bootstrap installs Java and downloads artifacts. Smoke checks host readiness.
+Run executes staged suites, uploads results to S3, and writes the DONE sentinel."""
 
 import glob
 import json
@@ -37,7 +22,6 @@ def fatal(message):
 
 
 def sh(command, **kwargs):
-    """Run a command, inheriting stdout/stderr unless redirected by the caller."""
     return subprocess.run(command, **kwargs)
 
 
@@ -60,9 +44,6 @@ def java_home(work_dir):
         return handle.read().strip()
 
 
-# -------------------------------------------------------------------------------------------------
-# bootstrap
-# -------------------------------------------------------------------------------------------------
 def install_jdk(major):
     for package in ("java-%d-amazon-corretto-devel" % major, "java-%d-amazon-corretto-headless" % major):
         if sh(["dnf", "install", "-y", package], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
@@ -139,7 +120,6 @@ def bootstrap(work_dir, stage_uri, java_major):
         print("    " + line)
     digits = "".join(c for c in version_text.split('"')[1] if c.isdigit()) if '"' in version_text else ""
     found_major = int(digits[:2]) if digits.startswith(("1", "2")) else (int(digits) if digits.isdigit() else 0)
-    # The version string is like "21.0.5"; take the leading major component robustly.
     try:
         found_major = int(version_text.split('"')[1].split(".")[0])
     except (IndexError, ValueError):
@@ -173,9 +153,6 @@ def bootstrap(work_dir, stage_uri, java_major):
           % (found_major, jar_count, governor, no_turbo, nproc))
 
 
-# -------------------------------------------------------------------------------------------------
-# smoke
-# -------------------------------------------------------------------------------------------------
 def smoke(work_dir, instance_type, e2e_jar):
     java = os.path.join(java_home(work_dir), "bin", "java")
     os.makedirs(os.path.join(work_dir, "logs"), exist_ok=True)
@@ -201,11 +178,7 @@ def smoke(work_dir, instance_type, e2e_jar):
         report["metadata"]["background_jit_compilation_disabled"]))
 
 
-# -------------------------------------------------------------------------------------------------
-# run: the matrix
-# -------------------------------------------------------------------------------------------------
 def e2e_fixture_suite(work_dir, java, log_dir):
-    """e2e + fixture are one manifest-driven scheduler run that also invokes the one comparison tool."""
     manifest = os.path.join(work_dir, "jars", "manifest.json")
     if not os.path.isfile(manifest):
         log("FAIL  e2e/fixture: run manifest not staged at %s" % manifest)
@@ -235,8 +208,7 @@ def serde_suite(work_dir, java, log_dir, suite_config):
         return False
     out_dir = os.path.join(work_dir, "results", "serde")
     os.makedirs(out_dir, exist_ok=True)
-    # The JMH jar's runtime dependencies may be nested jars on the manifest Class-Path, so run it from an
-    # exploded directory as a real classpath.
+    # Expand nested JMH dependencies into the runtime classpath.
     cp_dir = os.path.join(work_dir, "serde-classpath")
     shutil.rmtree(cp_dir, ignore_errors=True)
     os.makedirs(cp_dir, exist_ok=True)
@@ -248,14 +220,14 @@ def serde_suite(work_dir, java, log_dir, suite_config):
     jmh += (["-wi", "1", "-w", "5s", "-i", "3", "-r", "5s"] if serde_fast
             else ["-wi", "5", "-w", "2s", "-i", "10", "-r", "5s"])
     jmh += [str(a) for a in serde_args]
-    # Registered last so its measurement excludes other profilers' setup and teardown.
+    # Register this profiler last to exclude other profilers' setup and teardown.
     jmh += ["-foe", "true", "-prof", "software.amazon.smithy.java.benchmarks.OpsPerCpuSecondProfiler"]
     serde_log = os.path.join(log_dir, "serde-jmh.log")
     log("serde: starting JMH")
     with open(serde_log, "w", encoding="utf-8") as handle:
         status = sh(jmh, stdout=handle, stderr=subprocess.STDOUT).returncode
         if status == 0:
-            # The converter runs here so EC2 instance type detection (IMDS) works.
+            # Convert on the host so IMDS can detect the instance type.
             status = sh([java, "-cp", classpath, "software.amazon.smithy.java.benchmarks.serde.JmhResultConverter",
                          "--input", os.path.join(out_dir, "results.json"),
                          "--output-prefix", os.path.join(out_dir, "output")],
@@ -328,9 +300,7 @@ def h1scaling_suite(work_dir, java, log_dir, suite_config):
                     status_ok = False
                     continue
                 log("ok    h1scaling %s" % label)
-                # Verify the jar honoured the requested worker mode. The current harness prints a
-                # BENCH_THREAD_MODE line from BenchmarkSupport's static init; a pre-flag baseline jar prints
-                # none, so its run is the per-invocation virtual default regardless of -Djmh.bench.threads.
+                # Older jars omit the thread mode marker and use their default virtual workers.
                 detected = detect_thread_mode(run_log)
                 if side == "baseline" and detected is None:
                     log("WARN  h1scaling baseline-%s reported no thread mode: the jar pre-dates "
@@ -364,7 +334,6 @@ def do_run(work_dir, results_uri, suites):
         os.remove(sentinel)
     java = os.path.join(java_home(work_dir), "bin", "java")
 
-    # Everything the detached run prints goes to progress.log, as the shell runner's `exec >> progress` did.
     progress_handle = open(progress, "a", buffering=1, encoding="utf-8")
     os.dup2(progress_handle.fileno(), 1)
     os.dup2(progress_handle.fileno(), 2)
@@ -412,9 +381,6 @@ def do_run(work_dir, results_uri, suites):
     log("sentinel written, failures=%d" % failures)
 
 
-# -------------------------------------------------------------------------------------------------
-# small helpers
-# -------------------------------------------------------------------------------------------------
 def tail_lines(path, count):
     try:
         with open(path, encoding="utf-8") as handle:

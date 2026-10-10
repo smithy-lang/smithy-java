@@ -7,12 +7,7 @@ package software.amazon.smithy.java.benchmarks.e2e;
 
 import java.util.Collection;
 
-/**
- * Geometric mean computed in log space: the cross-SDK aggregation for ops/CPU-sec composites.
- *
- * <p>ops/CPU-sec spans orders of magnitude across payload sizes, and an arithmetic mean would let the fastest
- * benchmarks dominate.
- */
+/** Uses a geometric mean so the fastest benchmarks do not dominate the aggregate. */
 final class GeometricMean {
 
     private GeometricMean() {}

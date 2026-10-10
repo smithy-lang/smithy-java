@@ -5,13 +5,6 @@
 
 package software.amazon.smithy.java.benchmarks.e2e;
 
-/**
- * How the generated client reaches the response fixture.
- *
- * <p>{@code stub} is the cross-SDK configuration: the transport is replaced in-process and no bytes leave the JVM.
- * {@code http} and {@code https} drive smithy-java's own HTTP client, TLS included, against a fixture server that
- * returns the same response bytes, so the full client path can be compared with the stub on identical operations.
- */
 enum TransportMode {
     STUB("stub"),
     HTTP("http"),

@@ -17,9 +17,6 @@ import software.amazon.smithy.java.benchmarks.live.s3.model.GetObjectInput;
 import software.amazon.smithy.java.benchmarks.live.s3.model.PutObjectInput;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
-/**
- * Wraps the smithy-java DynamoDB and S3 clients with the four operations the benchmark exercises.
- */
 final class ActionExecutor {
 
     private final DynamoDBClient ddb;
@@ -47,8 +44,7 @@ final class ActionExecutor {
     }
 
     void putObject(String bucket, String key, int objectSize) {
-        // The reference runner reuses a single in-memory body across all uploads.
-        // DataStream.ofBytes wraps the array without copying, so each call is a thin handle over the same buffer.
+        // Reuse the payload buffer to match the reference runner.
         var body = DataStream.ofBytes(payload, 0, objectSize, "application/octet-stream");
         s3.putObject(PutObjectInput.builder()
                 .bucket(bucket)
@@ -63,7 +59,6 @@ final class ActionExecutor {
                 .bucket(bucket)
                 .key(key)
                 .build());
-        // discard() drains and releases the underlying source.
         var body = output.getBody();
         if (body != null) {
             try {

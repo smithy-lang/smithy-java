@@ -164,15 +164,12 @@ public final class BenchmarkSupport {
         }
     }
 
-    // -Djmh.bench.threads=platform uses cached pools; the default creates virtual threads per invocation.
     private static final boolean PLATFORM_THREADS =
             "platform".equalsIgnoreCase(System.getProperty("jmh.bench.threads", "virtual"));
     private static final Map<Integer, ExecutorService> PLATFORM_POOLS = new ConcurrentHashMap<>();
 
     static {
-        // Self-describing: the metal runner greps this line from the JMH fork log to confirm the effective
-        // worker-thread mode. A jar built before -Djmh.bench.threads existed prints nothing, which the runner
-        // treats as "ran the built-in virtual default" rather than mislabelling it platform or virtual.
+        // The metal runner reads this line to check the worker thread mode.
         System.out.println("BENCH_THREAD_MODE=" + (PLATFORM_THREADS ? "platform" : "virtual")
                 + " (jmh.bench.threads=" + System.getProperty("jmh.bench.threads", "virtual") + ")");
     }
@@ -181,7 +178,7 @@ public final class BenchmarkSupport {
         if (!PLATFORM_THREADS) {
             return Executors.newVirtualThreadPerTaskExecutor();
         }
-        // Cached per concurrency so thread start-up is not charged to every invocation.
+        // Reuse platform workers to exclude thread startup from each invocation.
         return PLATFORM_POOLS.computeIfAbsent(concurrency, n -> Executors.newFixedThreadPool(n, r -> {
             Thread t = new Thread(r, "bench-worker");
             t.setDaemon(true);
@@ -189,7 +186,6 @@ public final class BenchmarkSupport {
         }));
     }
 
-    /** Runs concurrent workers until {@code totalRequests} is reached. */
     public static <T> void runBenchmark(
             int concurrency,
             int totalRequests,
@@ -235,7 +231,7 @@ public final class BenchmarkSupport {
             }
         } finally {
             if (!PLATFORM_THREADS) {
-                executor.close(); // per-invocation virtual-thread executor; platform pools are cached
+                executor.close();
             }
         }
 

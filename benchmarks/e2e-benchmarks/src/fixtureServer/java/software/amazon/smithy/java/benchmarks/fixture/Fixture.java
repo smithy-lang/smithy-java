@@ -13,11 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/**
- * The one response this server returns, prepared once at startup as complete byte arrays so that serving a request
- * is a single {@code write}. Four variants cover the HTTP/1.1 cases that change the bytes: with or without the body
- * ({@code HEAD}), and with or without {@code Connection: close}.
- */
+/** Prepares response bytes once for HEAD requests and Connection: close. */
 final class Fixture {
 
     static final byte[] CONTINUE_100 = ascii("HTTP/1.1 100 Continue\r\n\r\n");
@@ -57,12 +53,6 @@ final class Fixture {
         this.headOnlyClose = headClose;
     }
 
-    /**
-     * @param bodyFile     file whose bytes are the response body
-     * @param status       response status, 200..599
-     * @param contentType  value of {@code Content-Type}
-     * @param fixedHeaders additional fixed headers, in order
-     */
     static Fixture load(Path bodyFile, int status, String contentType, List<Map.Entry<String, String>> fixedHeaders)
             throws IOException {
         if (status < 200 || status > 599) {
@@ -74,7 +64,7 @@ final class Fixture {
             throw new IllegalArgumentException("status " + status + " requires an empty body, got " + body.length
                     + " bytes in " + bodyFile);
         }
-        // Content-Length is omitted for 204 and 304, as the control server does; 205 keeps an explicit zero.
+        // Omit Content-Length for 204 and 304. Keep an explicit zero for 205.
         boolean contentLength = status != 204 && status != 304;
         for (var header : fixedHeaders) {
             String name = header.getKey().toLowerCase(Locale.ROOT);
@@ -99,7 +89,6 @@ final class Fixture {
         return body;
     }
 
-    /** The complete response bytes for a request. */
     byte[] response(boolean headRequest, boolean close) {
         if (headRequest) {
             return close ? headOnlyClose : headOnly;

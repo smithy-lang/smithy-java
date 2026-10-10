@@ -48,9 +48,7 @@ class FixtureServerTest {
         acceptor = Thread.ofPlatform().daemon().start(() -> {
             try {
                 FixtureServer.serve(listener, fixture, null, 1024, true);
-            } catch (IOException e) {
-                // closed by stop()
-            }
+            } catch (IOException e) {}
         });
     }
 
@@ -74,14 +72,13 @@ class FixtureServerTest {
     @Test
     void requestBodiesAreDrainedWhetherBufferedOrNot() throws Exception {
         try (var client = connect()) {
-            // Smaller than the read buffer: arrives with the head.
+            // This body fits in the header read buffer.
             send(client, "POST / HTTP/1.1\r\nHost: h\r\nContent-Length: 5\r\n\r\nhello");
             assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
-            // Larger than the 1 KB read buffer: drained straight from the socket.
+            // This body exceeds the read buffer and must drain from the socket.
             String big = "x".repeat(5_000);
             send(client, "PUT /obj HTTP/1.1\r\nHost: h\r\nContent-Length: " + big.length() + "\r\n\r\n" + big);
             assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
-            // Still alive afterwards.
             send(client, "GET / HTTP/1.1\r\nHost: h\r\n\r\n");
             assertThat(readResponse(client, BODY.length)).startsWith("HTTP/1.1 200 OK");
         }
@@ -240,7 +237,6 @@ class FixtureServerTest {
         socket.getOutputStream().flush();
     }
 
-    /** Reads a response head plus exactly {@code bodyLength} body bytes. */
     private static String readResponse(Socket socket, int bodyLength) throws IOException {
         InputStream in = socket.getInputStream();
         var sb = new StringBuilder();

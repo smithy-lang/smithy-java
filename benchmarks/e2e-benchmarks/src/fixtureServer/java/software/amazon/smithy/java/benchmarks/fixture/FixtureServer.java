@@ -31,22 +31,14 @@ import software.amazon.smithy.java.http.client.connection.ConnectionTransport;
 import software.amazon.smithy.java.http.client.connection.FixtureServerTransports;
 
 /**
- * A fixture server for SDK client benchmarks: every request on every path gets the same prepared response. Accepts
- * on the main thread and serves each connection on its own platform thread with blocking socket I/O; the TLS
- * handshake runs on the connection's thread, never on the acceptor.
- *
- * <p>TLS is BoringSSL (netty-tcnative), the engine the smithy client uses, driven by the http-client's
- * {@code SSLEngineTransport}. There is no other TLS path: if the native library is missing the server refuses to
- * start rather than silently measuring a different engine.
- *
- * <p>The first output line is {@code Listening on <scheme>://<host>:<port> ...}, which {@code fixture/e2e-scheduler.py}
- * waits for before it points the client at the server.
+ * Serves one prepared response with a platform thread per connection.
+ * TLS requires BoringSSL. The server refuses to start if the native library is unavailable.
  */
 public final class FixtureServer {
 
     static final String VERSION = "smithy-java-fixture-server 0.2.0 (platform thread per connection, BoringSSL TLS)";
     static final int DEFAULT_READ_BUFFER = 16 * 1024;
-    /** Ciphertext buffering: two records in, four records out so a large response is a few writes, not one per record. */
+    /** Buffer multiple TLS records to reduce socket writes. */
     static final int TLS_READ_BUFFER = 32 * 1024;
     static final int TLS_WRITE_BUFFER = 64 * 1024;
 
@@ -78,7 +70,7 @@ public final class FixtureServer {
         listener.setOption(StandardSocketOptions.SO_REUSEADDR, true);
         listener.bind(new InetSocketAddress(InetAddress.getByName(options.listenHost), options.listenPort), 1024);
 
-        // fixture/e2e-scheduler.py parses this first line to learn the chosen port.
+        // The scheduler reads this line to find the port.
         var bound = (InetSocketAddress) listener.getLocalAddress();
         System.out.printf("Listening on %s://%s:%d backend=thread-per-connection tls=%s response_bytes=%d%n",
                 tls == null ? "http" : "https",
@@ -91,9 +83,6 @@ public final class FixtureServer {
         serve(listener, fixture, tls, options.readBuffer, options.timing);
     }
 
-    /**
-     * A server-side BoringSSL context from PEM files, TLS 1.3 unless told otherwise, advertising HTTP/1.1 via ALPN.
-     */
     static SslContext serverSslContext(Path certificateChain, Path privateKey, String[] protocols) throws SSLException {
         if (!OpenSsl.isAvailable()) {
             throw new IllegalStateException(
@@ -112,7 +101,6 @@ public final class FixtureServer {
         return builder.build();
     }
 
-    /** Accepts until the listener is closed, one platform thread per connection. */
     static void serve(ServerSocketChannel listener, Fixture fixture, SslContext tls, int readBuffer, boolean timing)
             throws IOException {
         ThreadFactory threads = Thread.ofPlatform().daemon().name("fixture-conn-", 0).factory();
@@ -130,8 +118,7 @@ public final class FixtureServer {
                 try {
                     transport = open(channel.socket(), tls);
                 } catch (IOException | RuntimeException e) {
-                    // Handshake failure or a client that went away before it; the transport factory already
-                    // released the engine and closed the socket.
+                    // The transport factory closes the socket and releases the engine on handshake failure.
                     return;
                 }
                 new Http1Connection(transport, fixture, readBuffer, timer).run();
@@ -139,7 +126,6 @@ public final class FixtureServer {
         }
     }
 
-    /** The accepted socket as a transport: plain, or handshaken TLS with a fresh server-mode engine. */
     private static ConnectionTransport open(Socket socket, SslContext tls) throws IOException {
         if (tls == null) {
             return FixtureServerTransports.plaintext(socket);

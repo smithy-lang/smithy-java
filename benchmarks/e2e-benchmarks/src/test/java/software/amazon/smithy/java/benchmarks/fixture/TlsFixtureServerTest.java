@@ -30,10 +30,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * A JDK TLS client against the BoringSSL server: TLS 1.3, ALPN, keep-alive, multi-record responses and uploads.
- * Skipped where netty-tcnative cannot load or {@code openssl} is not available to mint a certificate.
- */
 class TlsFixtureServerTest {
 
     private static final int BODY_BYTES = 70_000;
@@ -66,9 +62,7 @@ class TlsFixtureServerTest {
         Thread.ofPlatform().daemon().start(() -> {
             try {
                 FixtureServer.serve(listener, fixture, tls, FixtureServer.DEFAULT_READ_BUFFER, false);
-            } catch (IOException e) {
-                // closed by stop()
-            }
+            } catch (IOException e) {}
         });
         clientContext = trusting(cert);
     }
@@ -178,7 +172,6 @@ class TlsFixtureServerTest {
         socket.getOutputStream().flush();
     }
 
-    /** Reads a response head through the blank line. */
     private static String readHead(InputStream in) throws IOException {
         var sb = new StringBuilder();
         int c;

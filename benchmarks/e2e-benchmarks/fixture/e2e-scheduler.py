@@ -1,29 +1,8 @@
 #!/usr/bin/env python3
-"""Single scheduler for the smithy-java e2e ops/CPU-sec matrix: side x case x transport x sample.
-
-One tool runs the whole matrix, locally and on a pinned bare-metal host, driven by a JSON run manifest
-(``--manifest``) instead of positional shell arguments reconstructed with ``eval``. It replaces both the
-old per-benchmark transport driver and the e2e sample loop that used to live in the host-side runner.
-
-It does *no* statistics of its own. Every run writes the e2e jar's own results file; comparison, sample
-acceptance, aggregation and uncertainty are the job of the one implementation, the jar's ``compare``
-subcommand (CompareRuns), which this script invokes for each requested pair.
-
-Two measurement shapes, both expressed as "cases" in the manifest:
-  * ``group: all``  - the canonical submission run: the whole benchmark set in one jar invocation that forks
-    one -Xbatch child JVM per protocol. Transport must be ``stub`` (the in-process mock); no server.
-  * ``id: <bench>`` - the transport study: one benchmark per JVM (``--in-process --filter``), over ``stub``
-    and/or ``https``. Non-stub transports start the Java fixture server (platform thread per connection,
-    BoringSSL TLS) on a free loopback port for that one benchmark's canned response.
-
-Raw layout under ``<outdir>/raw/<slot>/<transport>/<side>/<key>.run<i>.json`` so that each (slot, transport,
-side) directory is exactly one comparable set for ``compare``. ``key`` is the benchmark id, or ``all`` for the
-canonical group. Run bookkeeping (which runs ran, failures, timing) goes to ``run-metadata.json``; the ocs comparison files are
-written where each manifest ``compare`` entry asks.
-
-Without ``--manifest`` the command-line flags build an equivalent manifest for a local transport study, so
-``./gradlew :benchmarks:e2e-benchmarks:transportBenchmark`` and ad-hoc local runs keep working.
-"""
+"""Run the e2e benchmark matrix from a JSON manifest or local command-line options.
+The jar compares results and computes statistics.
+Canonical runs use one child JVM per protocol with the stub transport.
+Individual cases use one JVM and may use a fixture server."""
 
 import argparse
 import json
@@ -44,13 +23,12 @@ DEFAULT_JAR = os.path.join(MODULE_DIR, "build", "libs", "smithy-java-e2e-benchma
 DEFAULT_SERVER_JAR = os.path.join(MODULE_DIR, "build", "libs", "smithy-java-fixture-server.jar")
 MANIFEST_SCHEMA = "smithy-java/e2e-run-manifest/1"
 DEFAULT_PILOT = [
-    "rpcv2Cbor_PutItemRequest_Baseline",   # tiny request and response
-    "awsJson1_0_GetItemOutput_M",          # medium structured response
-    "restXml_PutObject_L",                 # large upload
-    "restXml_GetObject_L",                 # large streaming download
+    "rpcv2Cbor_PutItemRequest_Baseline",
+    "awsJson1_0_GetItemOutput_M",
+    "restXml_PutObject_L",
+    "restXml_GetObject_L",
 ]
-# The server allocates per connection, not per request, so a small single-threaded heap keeps the JVM's own
-# threads out of the way on a pinned core; -Xbatch keeps compilation off the serving thread once warm.
+# Use SerialGC to reduce competing JVM threads. -Xbatch keeps compilation off the serving thread after warmup.
 SERVER_JVM_FLAGS = ["-Xbatch", "-XX:+UseSerialGC", "-Xms64m", "-Xmx64m", "-XX:+AlwaysPreTouch",
                     "-Dio.netty.leakDetection.level=disabled"]
 
@@ -59,9 +37,6 @@ def log(message: str) -> None:
     print("[%s] %s" % (time.strftime("%H:%M:%S"), message), flush=True)
 
 
-# ---------------------------------------------------------------------------------------------------------
-# Command-line interface (local transport study) -> manifest
-# ---------------------------------------------------------------------------------------------------------
 def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--manifest", default=None,
@@ -105,7 +80,6 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
 
 
 def manifest_from_args(args: argparse.Namespace) -> dict:
-    """A local transport study: per-case runs over the requested modes, for current (and optional baseline)."""
     sides = [{"label": "current", "jar": os.path.abspath(args.jar)}]
     if args.baseline_jar:
         sides.insert(0, {"label": "baseline", "jar": os.path.abspath(args.baseline_jar)})
@@ -143,9 +117,6 @@ def manifest_from_args(args: argparse.Namespace) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------------------------------------
-# Manifest loading and validation
-# ---------------------------------------------------------------------------------------------------------
 def load_manifest(path: str) -> dict:
     with open(path, encoding="utf-8") as handle:
         manifest = json.load(handle)
@@ -183,7 +154,6 @@ def validate_manifest(m: dict) -> None:
 
 
 def context(manifest: dict, java: str) -> SimpleNamespace:
-    """The subset of fields FixtureServer and run_once read, assembled from the manifest."""
     server = manifest.get("server") or {}
     return SimpleNamespace(
         java=java,
@@ -202,16 +172,12 @@ def context(manifest: dict, java: str) -> SimpleNamespace:
     )
 
 
-# ---------------------------------------------------------------------------------------------------------
-# Fixture server and single runs
-# ---------------------------------------------------------------------------------------------------------
 class FixtureServer:
-    """One fixture server process, started on a free port, stopped with SIGTERM."""
 
     def __init__(self, mode: str, fixture: dict, args):
         command = [args.java] + list(getattr(args, "server_jvm_flags", SERVER_JVM_FLAGS)) \
             + ["-jar", args.server_jar, "--listen", "127.0.0.1:0"]
-        command += list(fixture["server_args"])  # the body path is absolute in the fixture description
+        command += list(fixture["server_args"])
         if mode == "https":
             command += ["--cert", args.cert, "--key", args.key, "--tls-version", "1.3"]
         else:
@@ -254,8 +220,7 @@ def export_fixture(ctx, jar: str, benchmark: str, fixtures_dir: str) -> dict:
 
 def run_once(args, benchmark: str, protocol: str, mode: str, server: Optional["FixtureServer"],
              output: str, jar: Optional[str] = None) -> Tuple[Optional[dict], str]:
-    """One per-benchmark, in-process run (the transport study). The launcher JVM is the measuring JVM, so
-    -Xbatch belongs on it. Returns (report, console) or (None, console) on failure."""
+    """Measure one case in this JVM with -Xbatch. Return (report, console), or (None, console) on failure."""
     jar = jar or getattr(args, "jar", None)
     command = [args.java, "-Xbatch", "-jar", jar, "--protocol", protocol, "--filter", benchmark, "--output", output,
                "--notes", "transport benchmark, mode %s" % mode, "--in-process"]
@@ -281,8 +246,7 @@ def run_once(args, benchmark: str, protocol: str, mode: str, server: Optional["F
 
 
 def run_canonical(args, jar: str, output: str) -> Tuple[Optional[dict], str]:
-    """The canonical submission run: the whole set, forking one -Xbatch child JVM per protocol (so -Xbatch
-    is applied by the jar to the children, not the launcher). Stub transport, no server."""
+    """Run all canonical cases with the stub transport. The jar applies -Xbatch to each protocol child JVM."""
     command = [args.java, "-jar", jar, "--output", output, "--notes", args.notes]
     if not args.imds:
         command += ["--instance-type", getattr(args, "instance_type", None) or args.label]
@@ -297,9 +261,6 @@ def run_canonical(args, jar: str, output: str) -> Tuple[Optional[dict], str]:
         return json.load(handle), completed.stdout
 
 
-# ---------------------------------------------------------------------------------------------------------
-# The scheduler
-# ---------------------------------------------------------------------------------------------------------
 def ensure_cert(ctx) -> None:
     if not ctx.cert or not ctx.make_cert:
         return
@@ -315,7 +276,6 @@ def raw_dir(outdir: str, slot: str, transport: str, side: str) -> str:
 
 
 def execute(manifest: dict, java: str) -> dict:
-    """Run the full matrix. Returns a bookkeeping dict with the list of failed runs."""
     ctx = context(manifest, java)
     outdir = manifest["outdir"]
     fixtures_dir = os.path.join(outdir, "fixtures")
@@ -333,8 +293,6 @@ def execute(manifest: dict, java: str) -> dict:
     for case in manifest["cases"]:
         slot = case.get("slot", "all" if case.get("group") == "all" else "cases")
         transports = case["transports"]
-        # A case may pin its client JVMs to specific cores; the canonical all-benchmarks run is left unpinned
-        # (as it historically was) by omitting client_taskset at both the case and manifest level.
         ctx.client_taskset = case.get("client_taskset", manifest.get("client_taskset", ""))
         fixture = None
         if case.get("group") == "all":
@@ -353,8 +311,7 @@ def execute(manifest: dict, java: str) -> dict:
                 if transport != "stub":
                     servers[transport] = FixtureServer(transport, fixture, ctx)
                     log("   %s on %s" % (transport, servers[transport].url))
-            # Balanced order: shuffle the (transport, side, sample) units within the case so neither a
-            # transport nor a side is systematically favoured by drift. Servers stay up for the whole case.
+            # Shuffle runs within each case to reduce bias from drift.
             units = [(t, s, i) for t in transports for s in sides for i in range(1, samples + 1)]
             rng.shuffle(units)
             for transport, side, i in units:
@@ -381,9 +338,6 @@ def execute(manifest: dict, java: str) -> dict:
 
 
 def run_comparisons(manifest: dict, java: str, bookkeeping: dict) -> List[dict]:
-    """Invoke the one comparison implementation (the jar's `compare`) for each requested pair. The scheduler
-    never computes statistics; it only decides a pair is runnable (both sides produced files) and hands the
-    directories to CompareRuns, which owns acceptance, aggregation and uncertainty."""
     outdir = manifest["outdir"]
     compare_jar = manifest.get("compare_jar") or manifest["sides"][-1]["jar"]
     produced: List[dict] = []

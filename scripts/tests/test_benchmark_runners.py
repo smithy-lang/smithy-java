@@ -34,10 +34,10 @@ class SchedulerTests(unittest.TestCase):
     def test_stop_reaps_an_already_exited_server_and_is_idempotent(self):
         server = scheduler.FixtureServer.__new__(scheduler.FixtureServer)
         server.process = subprocess.Popen([sys.executable, "-c", "pass"], stdout=subprocess.PIPE)
-        server.process.stdout.read()  # EOF observes exit without reaping the process
+        server.process.stdout.read()  # Read EOF without reaping the process.
         server.stop()
         self.assertEqual(server.process.returncode, 0)
-        server.stop()  # idempotent
+        server.stop()
 
     def test_startup_accepts_jvm_warnings_before_readiness(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -52,7 +52,7 @@ class SchedulerTests(unittest.TestCase):
                 self.assertEqual(server.url, "http://127.0.0.1:1234")
             finally:
                 server.stop()
-            self.assertIsNotNone(server.process.returncode)  # stop() reaped the server
+            self.assertIsNotNone(server.process.returncode)
 
 
 class MetalTests(unittest.TestCase):
@@ -116,7 +116,7 @@ class ManifestTests(unittest.TestCase):
             "--jar", "/tmp/current.jar", "--baseline-jar", "/tmp/baseline.jar",
             "--benchmarks", "restXml_GetObject_L", "--modes", "stub,https", "--runs", "3"])
         manifest = scheduler.manifest_from_args(args)
-        scheduler.validate_manifest(manifest)  # must not raise
+        scheduler.validate_manifest(manifest)
         self.assertEqual(manifest["samples"], 3)
         self.assertEqual([s["label"] for s in manifest["sides"]], ["baseline", "current"])
         outs = [c["out"].rsplit("/", 1)[-1] for c in manifest["compare"]]
@@ -130,10 +130,10 @@ class ManifestTests(unittest.TestCase):
             "--instance-type", "m7i.metal-24xl", "--samples", "5", "--baseline-jar", "/tmp/baseline.jar"])
         run.jars = {"current": "/x/current.jar", "baseline": "/x/baseline.jar"}
         manifest = run.build_manifest()
-        scheduler.validate_manifest(manifest)  # the orchestrator and scheduler agree on the schema
+        scheduler.validate_manifest(manifest)
         self.assertEqual(manifest["samples"], 5)
         self.assertTrue(manifest["imds"])
-        self.assertIn("all", [c.get("group") for c in manifest["cases"]])  # the canonical submission case
+        self.assertIn("all", [c.get("group") for c in manifest["cases"]])
         self.assertTrue(any(c["out"].endswith("_ocs_results") for c in manifest["compare"]))
 
     def test_metal_fixture_manifest_matches_scheduler_schema(self):
@@ -144,7 +144,7 @@ class ManifestTests(unittest.TestCase):
         run.jars = {"current": "/x/current.jar", "baseline": "/x/baseline.jar"}
         manifest = run.build_manifest()
         scheduler.validate_manifest(manifest)
-        self.assertTrue(all(c.get("id") for c in manifest["cases"]))  # per-case transport study, no 'all'
+        self.assertTrue(all(c.get("id") for c in manifest["cases"]))
         self.assertTrue(any("stub_vs_https" in c["out"] for c in manifest["compare"]))
 
 

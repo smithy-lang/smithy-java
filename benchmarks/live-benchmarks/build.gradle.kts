@@ -1,4 +1,3 @@
-// Note: Not published
 plugins {
     id("smithy-java.java-conventions")
     id("com.gradleup.shadow")
@@ -15,25 +14,18 @@ application {
 dependencies {
     implementation(project(":benchmarks:benchmark-commons"))
 
-    // Codegen plugin and runtime modules referenced by generated client code.
     smithyBuild(project(":codegen:codegen-plugin"))
     smithyBuild(project(":client:client-core"))
     smithyBuild(project(":client:client-waiters"))
-    // Needed at codegen time so RulesEngineBuilder loads AwsRulesExtension via ServiceLoader.
+    // Codegen loads AwsRulesExtension through ServiceLoader.
     smithyBuild(project(":aws:client:aws-client-rulesengine"))
-    // Codegen needs the plugin class on its classpath so `Class.forName(...)` resolves it
-    // when wiring it into the generated client.
+    // Codegen loads the S3 Express plugin through reflection.
     smithyBuild(project(":aws:aws-sigv4-s3express"))
 
-    // AWS service models pulled from Maven (https://github.com/aws/api-models-aws).
-    // The smithy-base plugin only loads models from sources + runtimeClasspath
-    // for the source projection, so these go on `implementation`. The codegen
-    // plugin (and the runtime stack) read shape definitions through these
-    // JARs at build time and at runtime.
+    // The source projection loads these models from runtimeClasspath.
     implementation("software.amazon.api.models:dynamodb:1.0.14")
     implementation("software.amazon.api.models:s3:1.0.24")
 
-    // Runtime stack the generated clients depend on.
     implementation(project(":core"))
     implementation(project(":io"))
     implementation(project(":logging"))
@@ -51,39 +43,29 @@ dependencies {
     implementation(project(":http:http-api"))
     implementation(project(":http:http-binding"))
 
-    // AWS-specific runtime: SigV4, AWS protocols, AWS endpoints.
     implementation(project(":aws:aws-sigv4"))
     implementation(project(":aws:aws-sigv4-s3express"))
     implementation(project(":aws:aws-auth-api"))
     implementation(project(":aws:client:aws-client-core"))
     implementation(project(":aws:client:aws-client-http"))
-    implementation(project(":aws:client:aws-client-restxml")) // S3 protocol
-    implementation(project(":aws:client:aws-client-awsjson")) // DynamoDB protocol
+    implementation(project(":aws:client:aws-client-restxml"))
+    implementation(project(":aws:client:aws-client-awsjson"))
     implementation(project(":aws:client:aws-client-rulesengine"))
-    implementation(project(":aws:client:aws-client-s3")) // S3 virtual-host bucket addressing
+    implementation(project(":aws:client:aws-client-s3"))
 
-    // Codecs
     implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":codecs:xml-codec"))
 
-    // AWS Smithy traits (needed for SigV4Trait etc. on the runtime classpath
-    // when generated code references trait IDs).
     implementation(libs.smithy.aws.traits)
     implementation(libs.smithy.model)
 
-    // smithy-java credential chain
     implementation(project(":aws:aws-credential-chain"))
     implementation(project(":aws:aws-credentials-imds"))
 
-    // Alternate transports — selected at runtime via -Dlive.transport=smithy|smithy-boringssl
     implementation(project(":client:client-http-smithy"))
     implementation(project(":client:client-http-boringssl"))
 }
 
-// Two projections so that DynamoDB and S3 generate into different namespaces
-// and don't collide. Each projection filters down to just the one service
-// it wants; the model JAR for s3 only has the s3 model, but the projection
-// makes the intent explicit and gives us a stable name.
 val codegenProjections = listOf("dynamodb-client", "s3-client")
 
 afterEvaluate {
@@ -100,9 +82,7 @@ afterEvaluate {
         }
     }
     tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
-        // Feed original service descriptors to Shadow. processResources writes
-        // duplicate paths to one output directory, which loses all but one
-        // projection before mergeServiceFiles() can see them.
+        // Pass original service descriptors to Shadow before processResources overwrites duplicate paths.
         projectionPaths.forEach { path ->
             from("$path/resources") {
                 include("META-INF/services/**")
@@ -120,8 +100,6 @@ tasks.named<Copy>("processResources") {
     dependsOn("smithyBuild")
 }
 
-// The shaded jar is what users invoke from run-benchmark.py, mirroring
-// `java -jar runners/java-workload-runner/target/workload-runner-1.0.0.jar`.
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
     archiveBaseName.set("smithy-java-live-benchmark-runner")
     archiveClassifier.set("")
@@ -131,12 +109,10 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
     mergeServiceFiles()
-    // Keep META-INF/smithy/manifest entries from each codegen projection
-    // so all schema indexes are discovered at runtime.
+    // Append all model manifests so runtime discovery finds every model.
     transform(com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransformer::class.java) {
         resource = "META-INF/smithy/manifest"
     }
-    // Avoid collisions between MANIFEST/SF files from third-party jars.
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
 
@@ -144,7 +120,6 @@ tasks.named("assemble") {
     dependsOn("shadowJar")
 }
 
-// Don't run benchmarks under `./gradlew check`, they hit live AWS.
 tasks.named("check") {
     enabled = true
 }

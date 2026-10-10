@@ -9,42 +9,31 @@ import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 
-/**
- * A transport the harness can observe: the in-process stub or an instrumented real transport.
- */
 interface CountingTransport extends ClientTransport<HttpRequest, HttpResponse> {
 
-    /** Points the transport at a benchmark: the stub installs its canned response, a real transport records what it must see. */
     void prepare(BenchmarkCase benchmarkCase);
 
     void resetCounters();
 
-    /** Requests sent since the last reset. */
+    /** Counts requests since the last reset. */
     long requests();
 
-    /** Request body bytes produced since the last reset. */
+    /** Counts request body bytes since the last reset. */
     long requestBodyBytes();
 
-    /** The most recently sent request. */
     HttpRequest lastRequest();
 
-    /** Status of the most recent response, or -1 before any. */
+    /** Returns -1 before the first response. */
     int lastResponseStatus();
 
-    /** Declared length of the most recent response body, or -1 if unknown. */
+    /** Returns -1 if the response body length is unknown. */
     long lastResponseLength();
 
-    /** Wire HTTP version of the most recent response, or {@code "unknown"}. */
+    /** Returns the wire HTTP version, or "unknown". */
     String lastHttpVersion();
 
-    /** Short description for results metadata. */
     String description();
 
-    /**
-     * Checks the most recent exchange against the benchmark's fixture: same status and body length. The stub always
-     * matches; a fixture server serves one fixture per run, so a mismatch means the server was started for a
-     * different benchmark.
-     */
     default void validateLast(BenchmarkCase benchmarkCase) {
         var expected = benchmarkCase.response();
         if (lastResponseStatus() != expected.statusCode()) {

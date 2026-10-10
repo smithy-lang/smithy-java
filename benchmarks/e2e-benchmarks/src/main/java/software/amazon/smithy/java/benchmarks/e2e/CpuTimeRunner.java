@@ -13,22 +13,14 @@ import java.util.List;
 import java.util.Locale;
 import software.amazon.smithy.java.benchmarks.ProcessCpuTime;
 
-/**
- * Measures operations per process CPU-second after warmup and GC.
- */
 final class CpuTimeRunner {
 
     static final long DEFAULT_MIN_ITERATIONS = 50_000;
     static final double DEFAULT_MIN_CPU_SECONDS = 5.0;
     static final int DEFAULT_CHECK_INTERVAL = 100;
-    /**
-     * Never close a measured window before this much process CPU time. On Linux the JVM reads process CPU time
-     * from {@code /proc} in 10 ms ticks, and a fast benchmark finishes 50,000 iterations in a fraction of a
-     * second, which would leave the number quantized to a few percent. The spec asks for at least one second.
-     */
+    /** Linux process CPU time uses 10 ms ticks. A one-second measurement floor reduces rounding error. */
     static final double DEFAULT_MIN_MEASURE_CPU_SECONDS = 1.0;
 
-    /** Share of the measured window spent compiling above which a benchmark is flagged as under-warmed. */
     static final double UNDER_WARMED_JIT_SHARE = 0.05;
 
     private static final CompilationMXBean COMPILATION = ManagementFactory.getCompilationMXBean();
@@ -41,12 +33,7 @@ final class CpuTimeRunner {
         this.settings = settings;
     }
 
-    /**
-     * Warms up, then measures.
-     *
-     * @param invocation        the operation to measure
-     * @param beforeMeasurement runs after warmup and GC, immediately before the measured window opens
-     */
+    /** Calls beforeMeasurement after warmup and GC, immediately before measurement. */
     Measurement run(Invocation invocation, Runnable beforeMeasurement) throws Throwable {
         WarmupOutcome warmup = settings.warmup().automatic()
                 ? warmupAutomatically(invocation)
@@ -100,15 +87,7 @@ final class CpuTimeRunner {
         return new WarmupOutcome(iterations, false, false, 0);
     }
 
-    /**
-     * Warms in chunks and stops once compilation has been quiet (below {@link Warmup#AUTO_QUIET_JIT_SHARE} of chunk
-     * wall time) for at least {@link Warmup#AUTO_QUIET_CHUNKS} consecutive chunks and
-     * {@link Warmup#AUTO_QUIET_SECONDS} of wall time, after a floor and before a cap.
-     *
-     * <p>Compiler activity is watched rather than throughput because the approach to steady state is a cliff, not
-     * a ramp: throughput can look stable for tens of thousands of iterations and then jump several-fold when C2
-     * installs the fully inlined pipeline. Compilation time separates the two states with no overlap.
-     */
+    /** Use compiler activity to detect steady state. Throughput can appear stable before C2 installs optimized code. */
     private static WarmupOutcome warmupAutomatically(Invocation invocation) throws Throwable {
         long iterations = 0;
         int quietChunks = 0;
@@ -181,15 +160,8 @@ final class CpuTimeRunner {
     }
 
     /**
-     * Loop parameters.
-     *
-     * @param minIterations stop once this many iterations have run
-     * @param minCpuSeconds stop once this much process CPU time has elapsed; {@code 0} disables the time-based stop
-     *                      so every benchmark runs exactly {@code minIterations}
-     * @param checkInterval        how often (in iterations) the stop conditions are checked
-     * @param minMeasureCpuSeconds never stop before this much process CPU time has elapsed, whatever the other two
-     *                             conditions say; {@code 0} disables the floor
-     * @param warmup               the warmup policy
+     * Stops at the iteration or CPU limit, subject to the measurement floor.
+     * Zero minCpuSeconds disables the CPU limit. Zero minMeasureCpuSeconds disables the floor.
      */
     record Settings(
             long minIterations,
@@ -217,7 +189,6 @@ final class CpuTimeRunner {
             return standard(DEFAULT_MIN_MEASURE_CPU_SECONDS);
         }
 
-        /** The cross-SDK stop rule and automatic warmup, with the given CPU-time floor. */
         static Settings standard(double minMeasureCpuSeconds) {
             return new Settings(
                     DEFAULT_MIN_ITERATIONS,
@@ -227,7 +198,6 @@ final class CpuTimeRunner {
                     Warmup.auto());
         }
 
-        /** The stop condition in the wording the cross-SDK results schema uses. */
         String stopCondition() {
             String base;
             if (minCpuSeconds > 0) {
@@ -256,12 +226,6 @@ final class CpuTimeRunner {
         }
     }
 
-    /**
-     * Warmup policy.
-     *
-     * @param automatic  warm until JIT compilation goes quiet
-     * @param iterations the exact warmup count when not automatic
-     */
     record Warmup(boolean automatic, long iterations) {
 
         static final int AUTO_CHUNK = 2_000;
@@ -323,7 +287,7 @@ final class CpuTimeRunner {
             return iterations * 1_000_000_000.0 / wallNanos;
         }
 
-        /** Ops per benchmark-thread CPU-second: nanosecond resolution, but blind to JIT and GC threads. */
+        /** Measures only benchmark-thread CPU time. Excludes JIT and GC threads. */
         double opsPerThreadCpuSecond() {
             return threadCpuNanos > 0 ? iterations * 1_000_000_000.0 / threadCpuNanos : 0;
         }

@@ -25,35 +25,21 @@ import software.amazon.smithy.java.client.http.smithy.SmithyHttpClientTransport;
 import software.amazon.smithy.java.http.client.HttpClient;
 import software.amazon.smithy.java.http.client.connection.HttpVersionPolicy;
 
-/**
- * Constructs the smithy-java-generated DynamoDB and S3 clients used by the benchmark.
- * Region comes from the benchmark runner; credentials come directly from the EC2 IMDSv2 endpoint.
- */
 final class Clients {
 
     private static final IdentityResolver<AwsCredentialsIdentity> IMDS = buildImds();
 
     private Clients() {}
 
-    /**
-     * Apply a {@code -D<prop>=<bytes|auto>} socket-buffer knob: use the property value when set
-     * (where {@code auto}/{@code -1} means "kernel autotune"), otherwise apply {@code defaultBytes}.
-     * Pass {@code -1} as the default to leave the socket at kernel autotune when the property is unset.
-     */
+    /** A value of auto or -1 leaves socket buffer sizing to the kernel. */
     private static void applyBufferProp(String prop, int defaultBytes, IntConsumer setter) {
         Integer value = parseBufferProp(prop);
         int bytes = value != null ? value : defaultBytes;
-        // -1 == kernel autotune: leave the socket option unset.
         if (bytes != -1) {
             setter.accept(bytes);
         }
     }
 
-    /**
-     * Apply a TLS buffer-size knob: use {@code -D<prop>=<bytes>} when set, else {@code defaultBytes}.
-     * Unlike the socket SO_*BUF knobs there is no "auto"/-1 form — these are concrete buffer
-     * capacities, not a kernel-autotune toggle — so a value of -1 is rejected.
-     */
     private static void applyTlsBufferProp(String prop, int defaultBytes, IntConsumer setter) {
         Integer value = parseBufferProp(prop);
         int bytes = value != null ? value : defaultBytes;
@@ -63,9 +49,6 @@ final class Clients {
         setter.accept(bytes);
     }
 
-    /**
-     * Parse a {@code -D<prop>=<bytes|auto>} property: {@code -1} for "auto", null if unset.
-     */
     private static Integer parseBufferProp(String prop) {
         var value = System.getProperty(prop);
         if (value == null) {
@@ -79,18 +62,11 @@ final class Clients {
         return Integer.getInteger("live.maxconns", 1024);
     }
 
-    /**
-     * Returns the alternate transport selected via {@code -Dlive.transport=...}, or null for the
-     * default JDK HttpClient. Recognized values: {@code smithy}, {@code smithy-boringssl}.
-     */
     private static ClientTransport<?, ?> selectTransport() {
         var name = System.getProperty("live.transport", "").trim().toLowerCase();
         return switch (name) {
             case "", "jdk" -> null;
             case "smithy" -> new SmithyHttpClientTransport(smithyPool(false));
-            // Same smithy native transport, but TLS is driven by the BoringSSL (netty-tcnative)
-            // SSLEngine instead of the JDK engine — keeps the cheaper AES-GCM without the Netty
-            // pipeline. Falls back to the JDK provider if tcnative is unavailable on the host.
             case "smithy-boringssl" -> new SmithyHttpClientTransport(smithyPool(true));
             default -> throw new IllegalArgumentException(
                     "Unknown live.transport: '" + name
@@ -98,16 +74,7 @@ final class Clients {
         };
     }
 
-    /**
-     * Build the smithy native transport's HTTP client. Shared by the {@code smithy} and
-     * {@code smithy-boringssl} variants; the latter injects the BoringSSL SSLEngine factory.
-     *
-     * <p>Smithy HTTP client defaults to ENFORCE_HTTP_2 which fails on S3 (H1-only); AUTOMATIC also
-     * fails (the pool routes HTTPS to the H2 manager, which refuses an ALPN result of "http/1.1").
-     * Force ENFORCE_HTTP_1_1 so the pool routes to the H1 manager from the start. The pool's default
-     * maxConnectionsPerRoute=20 throttles a single-bucket benchmark hard, so use the shared
-     * -Dlive.maxconns cap (default unbounded) for equal footing with netty.
-     */
+    /** Force HTTP/1.1 for S3 and use the shared connection limit to avoid pool throttling. */
     private static HttpClient smithyPool(boolean boringSsl) {
         int maxConns = maxConnections();
         var builder = HttpClient.builder()
@@ -118,7 +85,6 @@ final class Clients {
         applyBufferProp("live.smithy.sendbuf", 1024 * 1024, builder::socketSendBufferSize);
         applyTlsBufferProp("live.smithy.tls.readbuf", 256 * 1024, builder::tlsReadBufferSize);
         applyTlsBufferProp("live.smithy.tls.writebuf", 256 * 1024, builder::tlsWriteBufferSize);
-        // The epoll transport is selected automatically when the native library is available.
         if (boringSsl) {
             if (BoringSslTlsProvider.available()) {
                 builder.tlsProvider(BoringSslTlsProvider.create(false));
@@ -142,12 +108,8 @@ final class Clients {
     }
 
     static S3Client s3(String region) {
-        // S3ExpressPlugin is an AutoClientPlugin discovered via ServiceLoader. It reads
-        // CREATE_SESSION_CALLBACK from the builder's context and (when present) registers
-        // S3ExpressAuthScheme + the bucket interceptor + disable-session-auth resolver. We
-        // just have to provide the callback that can call createSession on the same client
-        // we're configuring — chicken-and-egg resolved by an AtomicReference that gets
-        // populated after build(). TODO: fix
+        // The session callback needs the client after construction.
+        // TODO: Fix the callback's dependency on client construction.
         var clientRef = new AtomicReference<S3Client>();
         CreateSessionCallback createSession = (bucket, baseCreds) -> {
             S3Client client = clientRef.get();

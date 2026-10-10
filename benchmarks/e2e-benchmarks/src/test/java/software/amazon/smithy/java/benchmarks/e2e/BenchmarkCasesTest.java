@@ -17,10 +17,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.Schema;
 
-/**
- * Every benchmark must run end to end through its generated client exactly once per call, with no retries, and
- * produce a populated output. A benchmark that throws would fail a real run, so it fails here first.
- */
 class BenchmarkCasesTest {
 
     private static final Map<BenchmarkProtocol, BenchmarkClient> CLIENTS = new EnumMap<>(BenchmarkProtocol.class);
@@ -73,10 +69,7 @@ class BenchmarkCasesTest {
 
     @Test
     void objectPayloadsAreTheDecodedBytes() throws Throwable {
-        // The model stores S3 object bodies base64-encoded and its ContentLength / Content-Length values describe
-        // the decoded bytes, so the request the harness sends and the response it serves must be those bytes
-        // (Java v2 measures the same sizes). Sending the base64 text produced a 341,336-byte body behind a
-        // 256,000-byte Content-Length, which real fixture servers rejected.
+        // The model stores object bodies as base64. Content-Length must match the decoded bytes.
         var put = BenchmarkCases.build("restXml_PutObject_L");
         var client = new BenchmarkClient(put.protocol(), new MockHttpTransport(), BenchmarkProtocol.ENDPOINT);
         var call = client.prepare(put);
@@ -101,8 +94,6 @@ class BenchmarkCasesTest {
         client.transport().resetCounters();
 
         var output = call.invoke();
-        // What the harness checks before timing anything: expected status, body length, and a request whose body
-        // matches its own Content-Length (the stub would otherwise accept a request a real server rejects).
         client.transport().validateLast(benchmarkCase);
 
         assertThat(output).as("%s produced an output", id).isNotNull();
@@ -110,7 +101,6 @@ class BenchmarkCasesTest {
         var request = client.transport().lastRequest();
         assertThat(request.uri().toString()).as("%s used the static endpoint", id)
                 .startsWith(BenchmarkProtocol.ENDPOINT);
-        // Signed with the harness's static credentials, never with ambient credentials from the host.
         assertThat(request.headers().firstValue("authorization")).as("%s was SigV4-signed", id)
                 .startsWith("AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/")
                 .doesNotContain("x-amz-security-token");
@@ -118,8 +108,7 @@ class BenchmarkCasesTest {
         if (sendsABody(id)) {
             assertThat(client.transport().requestBodyBytes()).as("%s serialized a request body", id).isPositive();
         }
-        // Baseline/Example response cases model the smallest possible response, which may carry no body at all
-        // and leave every output member unset. Payload-bearing cases must actually populate the output.
+        // Baseline and Example responses may leave all output members unset.
         boolean minimalResponse = id.endsWith("_Baseline") || id.endsWith("_Example");
         if (benchmarkCase.source() == BenchmarkCase.Source.RESPONSE && !minimalResponse) {
             assertThat(benchmarkCase.response().bodyLength()).as("%s has a canned response body", id).isPositive();

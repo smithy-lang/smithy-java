@@ -15,15 +15,8 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.infra.Blackhole;
 
 /**
- * JMH view of the same end-to-end benchmarks: the same generated clients, inputs and mock transport as the
- * CPU-time runner, driven by JMH for latency percentiles (sample mode) plus {@code ops_per_cpu_sec} from the
- * shared {@code OpsPerCpuSecondProfiler}.
- *
- * <p>Use this for local regression work and profiling. The number submitted to the cross-SDK results comes from
- * {@link E2eBenchmark}, whose loop and stop rule are what the other SDKs run.
- *
- * <p>{@code testCaseId} values are supplied by the Gradle {@code jmh} task from {@code canonical-benchmarks.txt}
- * (override with {@code -Pjmh.testCaseId=a,b,c}).
+ * Measures latency and operations per CPU-second with JMH.
+ * Use E2eBenchmark for cross-SDK submissions.
  */
 @State(Scope.Benchmark)
 public class E2eClientBenchmark {

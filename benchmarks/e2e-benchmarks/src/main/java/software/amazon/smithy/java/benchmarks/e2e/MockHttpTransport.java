@@ -16,13 +16,8 @@ import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
- * In-process HTTP transport that returns a canned response. No sockets, no localhost server.
- *
- * <p>The request body is fully read and the streaming response payload is drained to the end, as a real
- * transport writing bytes and a client consuming them do, so payload-movement cost is included in the
- * measurement (ocs counts reading a streaming payload to the end).
- *
- * <p>Not thread-safe: a benchmark drives one request at a time from one thread.
+ * Returns canned responses and consumes request bodies in process.
+ * Supports one request at a time on one thread.
  */
 final class MockHttpTransport implements CountingTransport {
 
@@ -92,11 +87,7 @@ final class MockHttpTransport implements CountingTransport {
         return response.newHttpResponse();
     }
 
-    /**
-     * The stub accepts whatever the client sends, so it is the one transport that cannot notice a request whose
-     * body disagrees with its own {@code Content-Length}; a real server rejects such a request mid-body. Check
-     * it here, where every benchmark passes once before it is timed.
-     */
+    /** Reject body lengths that a real server would reject before measurement. */
     @Override
     public void validateLast(BenchmarkCase benchmarkCase) {
         CountingTransport.super.validateLast(benchmarkCase);
@@ -108,15 +99,9 @@ final class MockHttpTransport implements CountingTransport {
         }
     }
 
-    /** Consumes a body the way a transport would and returns the number of bytes it held. */
-    // Move the bytes into a reused scratch buffer. transferTo(nullOutputStream()) was wrong: a
-    // ByteArrayInputStream hands its backing array straight to the no-op sink without reading it, so a large
-    // in-memory body measured near-zero. read(buf) / ByteBuffer.get(buf) perform a real copy (and the scratch is
-    // reachable via the ThreadLocal, so the copy is not dead code), which is what a client reading the payload to
-    // the end actually pays. No per-byte checksum: folding every byte would add cost the real path does not have.
+    // Copy bytes into a reusable buffer. A null output stream can skip reading an in-memory body.
     private static final ThreadLocal<byte[]> SCRATCH = ThreadLocal.withInitial(() -> new byte[8192]);
 
-    /** Reads a body to the end, copying every byte, and returns the number of bytes read. */
     static long drain(DataStream body) {
         if (body == null) {
             return 0;
@@ -134,7 +119,6 @@ final class MockHttpTransport implements CountingTransport {
         return total;
     }
 
-    /** Reads every byte of an in-memory payload buffer (heap, direct, or read-only) via a real copy. */
     static long consume(ByteBuffer payload) {
         ByteBuffer b = payload.duplicate();
         byte[] buf = SCRATCH.get();

@@ -61,7 +61,6 @@ class CompareRunsTest {
         var benchmarks = json.expectArrayMember("benchmarks").getElements();
         assertThat(benchmarks).hasSize(3);
         var first = benchmarks.get(0).expectObjectNode();
-        // Canonical order puts the PutItem request after the GetItem outputs.
         assertThat(first.expectStringMember("id").getValue()).isEqualTo("awsJson1_0_GetItemOutput_S");
         assertThat(first.expectNumberMember("baseline").getValue().longValue()).isEqualTo(10_000);
         assertThat(first.expectNumberMember("current").getValue().longValue()).isEqualTo(12_500);
@@ -224,7 +223,7 @@ class CompareRunsTest {
                 .expectObjectMember("uncertainty");
         var current = uncertainty.expectObjectMember("current");
         assertThat(current.expectNumberMember("n").getValue().intValue()).isEqualTo(3);
-        // mean 1400, sample stddev 435.889..., so CV% = 31.13.
+        // The sample mean is 1400 and standard deviation is about 435.889, giving a CV of 31.13%.
         assertThat(current.expectNumberMember("cv_pct").getValue().doubleValue()).isCloseTo(31.13, within(0.05));
         assertThat(current.getNumberMember("ci95_low")).isPresent();
         assertThat(uncertainty.expectObjectMember("improvement_ratio")
@@ -278,7 +277,6 @@ class CompareRunsTest {
         return report(BenchmarkOptions.parse(new String[] {"--instance-type", "test-instance"}), values, commit);
     }
 
-    /** A single-run results file with the shape RunReport writes, without running anything. */
     private static ObjectNode report(BenchmarkOptions options, Map<String, Double> values, String commit) {
         List<ObjectNode> benchmarks = new ArrayList<>();
         for (var entry : values.entrySet()) {
