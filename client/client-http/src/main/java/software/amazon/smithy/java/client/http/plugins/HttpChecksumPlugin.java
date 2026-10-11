@@ -16,7 +16,6 @@ import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.http.api.HeaderName;
 import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.HttpChecksumRequiredTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -50,11 +49,10 @@ public final class HttpChecksumPlugin implements AutoClientPlugin {
         static HttpRequest addContentMd5Header(HttpRequest request) {
             var body = request.body();
             if (body != null) {
-                var buffer = body.asByteBuffer();
-                var bytes = ByteBufferUtils.getBytes(buffer);
                 try {
-                    byte[] hash = MessageDigest.getInstance("MD5").digest(bytes);
-                    String base64Hash = Base64.getEncoder().encodeToString(hash);
+                    var md5 = MessageDigest.getInstance("MD5");
+                    body.forEachBuffer(md5::update);
+                    String base64Hash = Base64.getEncoder().encodeToString(md5.digest());
                     var modifiable = request.toModifiable();
                     modifiable.headers().setHeader(HeaderName.CONTENT_MD5, base64Hash);
                     return modifiable;

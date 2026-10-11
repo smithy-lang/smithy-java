@@ -13,28 +13,34 @@ import java.time.Instant;
 import java.util.Arrays;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.json.JsonSettings;
 
 final class JsonCodegenWriter {
     private static final int DEFAULT_CAPACITY = 8192;
-    private static final int MAX_CACHEABLE_CAPACITY = DEFAULT_CAPACITY * 16;
+    private static final int MAX_CACHEABLE_SCRATCH = DEFAULT_CAPACITY * 16;
     private static final int MAX_DEPTH = 64;
     private static final StripedPool<JsonCodegenWriter, JsonSettings> POOL = new WriterPool();
 
-    private byte[] bytes = new byte[DEFAULT_CAPACITY];
+    private byte[] bytes;
     private int position;
+    private int sizeHint = DEFAULT_CAPACITY;
     private int depth;
     private final boolean[] needsComma = new boolean[MAX_DEPTH];
     private JsonSettings settings;
     private OutputStream sink;
+    private OutputBuffers pool;
 
     private JsonCodegenWriter(JsonSettings settings) {
         this.settings = settings;
+        this.pool = settings.outputBuffers();
+        this.bytes = pool.acquire(DEFAULT_CAPACITY);
     }
 
     static JsonCodegenWriter acquire(JsonSettings settings) {
@@ -50,7 +56,24 @@ final class JsonCodegenWriter {
     }
 
     ByteBuffer detach() {
+        sizeHint = OutputBuffers.nextSizeHint(sizeHint, position);
         return ByteBuffer.wrap(Arrays.copyOf(bytes, position));
+    }
+
+    DataStream detachLeased(String contentType) {
+        byte[] detached = bytes;
+        int length = position;
+        sizeHint = OutputBuffers.nextSizeHint(sizeHint, length);
+        bytes = null;
+        position = 0;
+        return DataStream.ofLeasedBytes(detached, 0, length, contentType, pool.recycler());
+    }
+
+    private void releaseBuffer() {
+        if (bytes != null) {
+            pool.release(bytes);
+            bytes = null;
+        }
     }
 
     int size() {
@@ -358,7 +381,7 @@ final class JsonCodegenWriter {
     }
 
     private void grow(int needed) {
-        bytes = Arrays.copyOf(bytes, Math.max(bytes.length * 2, position + needed));
+        bytes = pool.grow(bytes, position, position + needed);
     }
 
     private static final class WriterPool extends StripedPool<JsonCodegenWriter, JsonSettings> {
@@ -372,19 +395,20 @@ final class JsonCodegenWriter {
             writer.sink = null;
             writer.position = 0;
             writer.depth = 0;
+            writer.releaseBuffer();
+            // Clear client settings and pool references because idle writers remain in a JVM-wide pool.
+            writer.settings = null;
+            writer.pool = null;
         }
 
         @Override
         protected boolean canPool(JsonCodegenWriter writer) {
-            return writer.bytes != null;
+            return true;
         }
 
         @Override
         protected void prepareForPool(JsonCodegenWriter writer) {
-            if (writer.bytes.length > MAX_CACHEABLE_CAPACITY) {
-                writer.bytes = new byte[DEFAULT_CAPACITY];
-            }
-            if (writer.base64Scratch != null && writer.base64Scratch.length > MAX_CACHEABLE_CAPACITY) {
+            if (writer.base64Scratch != null && writer.base64Scratch.length > MAX_CACHEABLE_SCRATCH) {
                 writer.base64Scratch = null;
             }
         }
@@ -392,6 +416,8 @@ final class JsonCodegenWriter {
         @Override
         protected boolean reset(JsonCodegenWriter writer, JsonSettings settings) {
             writer.settings = settings;
+            writer.pool = settings.outputBuffers();
+            writer.bytes = writer.pool.acquire(writer.sizeHint);
             return true;
         }
     }

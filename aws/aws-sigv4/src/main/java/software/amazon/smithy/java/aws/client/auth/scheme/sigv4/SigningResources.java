@@ -21,6 +21,7 @@ import javax.crypto.ShortBufferException;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * Canonical requests use ASCII except for header values, which use UTF-8.
@@ -269,7 +270,19 @@ final class SigningResources {
     /** Hashes the remaining bytes without changing the buffer position. */
     byte[] hash(ByteBuffer data, byte[] output) {
         try {
-            updateFromBuffer(data.duplicate());
+            updateFromView(data);
+            sha256Digest.digest(output, 0, output.length);
+            return output;
+        } catch (DigestException | RuntimeException e) {
+            sha256Digest.reset();
+            throw e instanceof RuntimeException re ? re : new RuntimeException(e);
+        }
+    }
+
+    /** Hashes each buffer view in turn so a pooled body is never copied into one contiguous buffer. */
+    byte[] hash(DataStream body, byte[] output) {
+        try {
+            body.forEachBuffer(this::updateFromView);
             sha256Digest.digest(output, 0, output.length);
             return output;
         } catch (DigestException | RuntimeException e) {
@@ -280,21 +293,21 @@ final class SigningResources {
 
     /**
      * Copy non-array buffers through scratch to avoid retained JDK buffers that each digest clone would copy.
-     * This method consumes the buffer.
+     * Leaves the view's position unchanged.
      */
-    private void updateFromBuffer(ByteBuffer data) {
+    private void updateFromView(ByteBuffer data) {
         if (data.hasArray()) {
             sha256Digest.update(data.array(), data.arrayOffset() + data.position(), data.remaining());
-            data.position(data.limit());
             return;
         }
         byte[] tmp = scratch;
         if (tmp == null) {
             tmp = scratch = new byte[SCRATCH_SIZE];
         }
-        while (data.hasRemaining()) {
-            int n = Math.min(data.remaining(), tmp.length);
-            data.get(tmp, 0, n);
+        ByteBuffer copy = data.duplicate();
+        while (copy.hasRemaining()) {
+            int n = Math.min(copy.remaining(), tmp.length);
+            copy.get(tmp, 0, n);
             sha256Digest.update(tmp, 0, n);
         }
     }

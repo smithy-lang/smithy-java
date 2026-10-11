@@ -12,9 +12,9 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -27,6 +27,7 @@ import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 
@@ -34,16 +35,18 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
 
     private static final TimestampFormatTrait.Format DEFAULT_FORMAT = TimestampFormatTrait.Format.DATE_TIME;
     private static final int DEFAULT_BUF_SIZE = 4096;
-    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
+    private static final int MAX_CACHEABLE_SCRATCH = DEFAULT_BUF_SIZE * 4;
 
-    record AcquireContext(XmlNamespaceTrait defaultNamespace, XmlInfo xmlInfo, OutputStream sink) {}
+    record AcquireContext(XmlNamespaceTrait defaultNamespace, XmlInfo xmlInfo, OutputStream sink, OutputBuffers pool) {}
 
     private static final StripedPool<SmithyXmlSerializer, AcquireContext> POOL = new XmlStripedPool();
 
     private byte[] buf;
     private byte[] base64Scratch;
     private int pos;
+    private int sizeHint = DEFAULT_BUF_SIZE;
     private OutputStream sink;
+    private OutputBuffers pool;
     private XmlNamespaceTrait defaultNamespace;
     private XmlInfo xmlInfo;
 
@@ -59,19 +62,41 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
     // writeStruct will close it after writing attributes; scalar writes close it immediately.
     private boolean pendingClose;
 
-    private SmithyXmlSerializer(XmlNamespaceTrait defaultNamespace, XmlInfo xmlInfo) {
+    private SmithyXmlSerializer(XmlNamespaceTrait defaultNamespace, XmlInfo xmlInfo, OutputBuffers pool) {
         this.defaultNamespace = defaultNamespace;
         this.xmlInfo = xmlInfo;
-        this.buf = new byte[DEFAULT_BUF_SIZE];
+        this.pool = pool;
+        this.buf = pool.acquire(DEFAULT_BUF_SIZE);
         this.pos = 0;
     }
 
-    static SmithyXmlSerializer acquire(XmlNamespaceTrait defaultNamespace, XmlInfo xmlInfo, OutputStream sink) {
-        return POOL.acquire(new AcquireContext(defaultNamespace, xmlInfo, sink));
+    static SmithyXmlSerializer acquire(
+            XmlNamespaceTrait defaultNamespace,
+            XmlInfo xmlInfo,
+            OutputStream sink,
+            OutputBuffers pool
+    ) {
+        return POOL.acquire(new AcquireContext(defaultNamespace, xmlInfo, sink, pool));
     }
 
     static void release(SmithyXmlSerializer serializer) {
         POOL.release(serializer);
+    }
+
+    DataStream detach(String contentType) {
+        byte[] detached = buf;
+        int length = pos;
+        sizeHint = OutputBuffers.nextSizeHint(sizeHint, length);
+        buf = null;
+        pos = 0;
+        return DataStream.ofLeasedBytes(detached, 0, length, contentType, pool.recycler());
+    }
+
+    private void releaseBuffer() {
+        if (buf != null) {
+            pool.release(buf);
+            buf = null;
+        }
     }
 
     @Override
@@ -108,7 +133,7 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
     }
 
     private void grow(int needed) {
-        buf = Arrays.copyOf(buf, Math.max(buf.length * 2, pos + needed));
+        buf = pool.grow(buf, pos, pos + needed);
     }
 
     private byte[] base64Scratch(int dataLen) {
@@ -256,7 +281,7 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
     private static class XmlStripedPool extends StripedPool<SmithyXmlSerializer, AcquireContext> {
         @Override
         protected SmithyXmlSerializer create(AcquireContext ctx) {
-            var s = new SmithyXmlSerializer(ctx.defaultNamespace(), ctx.xmlInfo());
+            var s = new SmithyXmlSerializer(ctx.defaultNamespace(), ctx.xmlInfo(), ctx.pool());
             s.sink = ctx.sink();
             return s;
         }
@@ -264,19 +289,19 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
         @Override
         protected void cleanup(SmithyXmlSerializer s) {
             s.sink = null;
+            s.releaseBuffer();
+            // Clear the client pool reference because idle serializers remain in a JVM-wide pool.
+            s.pool = null;
         }
 
         @Override
         protected boolean canPool(SmithyXmlSerializer s) {
-            return s.buf != null;
+            return true;
         }
 
         @Override
         protected void prepareForPool(SmithyXmlSerializer s) {
-            if (s.buf.length > MAX_CACHEABLE_BUF) {
-                s.buf = new byte[DEFAULT_BUF_SIZE];
-            }
-            if (s.base64Scratch != null && s.base64Scratch.length > MAX_CACHEABLE_BUF) {
+            if (s.base64Scratch != null && s.base64Scratch.length > MAX_CACHEABLE_SCRATCH) {
                 s.base64Scratch = null;
             }
         }
@@ -284,12 +309,16 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
         @Override
         protected boolean reset(SmithyXmlSerializer s, AcquireContext ctx) {
             s.pos = 0;
+            // A failed write can leave a pending '>'. Clear it before the next document.
+            s.pendingClose = false;
             s.sink = ctx.sink();
             s.defaultNamespace = ctx.defaultNamespace();
             s.xmlInfo = ctx.xmlInfo();
             s.currentNameTable = null;
             s.currentIsAttributeTable = null;
             s.currentIsFlattenedTable = null;
+            s.pool = ctx.pool();
+            s.buf = s.pool.acquire(s.sizeHint);
             return true;
         }
     }

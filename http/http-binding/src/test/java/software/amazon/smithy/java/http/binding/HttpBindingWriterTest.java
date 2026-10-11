@@ -9,11 +9,14 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URLDecoder;
@@ -49,6 +52,7 @@ import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.pattern.UriPattern;
@@ -402,6 +406,34 @@ public class HttpBindingWriterTest {
                 .qtime(WHEN)
                 .note("hi");
         return customize.apply(builder).build();
+    }
+
+    @Test
+    public void clientRequestBodiesComeFromPooledMemory() throws Exception {
+        for (boolean codegen : new boolean[] {true, false}) {
+            var body = request(Bound.OPERATION, fullyPopulated(), codegen).body();
+            assertThat("codegen=" + codegen, body, instanceOf(PooledDataStream.class));
+            var pooled = (PooledDataStream) body;
+            assertThat(pooled.contentType(), equalTo("application/json"));
+
+            var out = new ByteArrayOutputStream();
+            pooled.writeTo(out);
+            assertThat(out.toString(StandardCharsets.UTF_8), equalTo("{\"note\":\"hi\"}"));
+            assertThat(pooled.escaped(), equalTo(false));
+
+            pooled.release();
+            assertThat(pooled.isReleased(), equalTo(true));
+            assertThrows(IllegalStateException.class, pooled::asByteBuffer);
+        }
+    }
+
+    @Test
+    public void serverResponseBodiesAreNotPooled() {
+        for (boolean codegen : new boolean[] {true, false}) {
+            var body = response(new Status(204, "hi"), codegen).body();
+            assertThat("codegen=" + codegen, body, not(instanceOf(PooledDataStream.class)));
+            assertThat(utf8(body.asByteBuffer()), equalTo("{\"note\":\"hi\"}"));
+        }
     }
 
     private static HttpRequest generated(SerializableStruct input) {

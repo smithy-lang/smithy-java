@@ -159,7 +159,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
     }
 
     private DataStream getBody(SerializableStruct input) {
-        return DataStream.ofByteBuffer(codec().serialize(input), payloadMediaType);
+        return codec().serializeToDataStream(input, payloadMediaType);
     }
 
     private EventEncoderFactory<AwsEventFrame> getEventEncoderFactory(ApiOperation<?, ?> operation) {

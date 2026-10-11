@@ -76,8 +76,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     // Initialized in writeStruct. Empty until writeStruct is called.
     private Set<String> namesFromHttpHeader = Set.of();
 
-    // Body bytes from the pooled codec.serialize() path.
-    private ByteBuffer shapeBodyBuffer;
+    private DataStream shapeBody;
     private DataStream httpPayload;
     private EventStream<? extends SerializableStruct> eventStream;
     private Schema payloadMember;
@@ -150,7 +149,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             writeBody = allowEmptyStructPayload || resp.writeBody(omitEmptyPayload);
             if (writeBody && !hasBodyMembers) {
                 // No body members: fixed empty struct bytes, cached on the binding.
-                shapeBodyBuffer = resp.emptyBody(payloadCodec, schema);
+                shapeBody = DataStream.ofByteBuffer(resp.emptyBody(payloadCodec, schema), payloadMediaType);
             }
         } else {
             var req = bindings.request();
@@ -165,7 +164,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             pathSerializer = req.pathSerializer(operationBinding.httpTrait(), schema);
             writeBody = allowEmptyStructPayload || req.writeBody(omitEmptyPayload);
             if (writeBody && !hasBodyMembers) {
-                shapeBodyBuffer = req.emptyBody(payloadCodec, schema);
+                shapeBody = DataStream.ofByteBuffer(req.emptyBody(payloadCodec, schema), payloadMediaType);
             }
         }
 
@@ -183,9 +182,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
         if (writeBody) {
             if (hasBodyMembers) {
-                shapeBodyBuffer = serializeBody(schema, struct);
+                shapeBody = serializeBody(schema, struct);
             }
-            // Empty-body case (shapeBodyBuffer was set above from the cached empty bytes).
             headers.setHeader(HeaderName.CONTENT_TYPE, payloadMediaType);
         }
 
@@ -295,9 +293,24 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         throw new IllegalStateException("Unexpected null value written for an HTTP binding");
     }
 
-    private ByteBuffer serializeBody(Schema schema, SerializableStruct struct) {
+    private DataStream serializeBody(Schema schema, SerializableStruct struct) {
+        if (isResponse) {
+            // Server response bodies have no lease owner. Return an unpooled copy.
+            return DataStream.ofByteBuffer(serializeBodyBuffer(schema, struct), payloadMediaType);
+        }
         if (subsetCodec != null && struct.schema() == schema) {
-            ByteBuffer body = subsetCodec.serialize(struct, BodyMemberSubset.of(isResponse));
+            DataStream body =
+                    subsetCodec.serializeToDataStream(struct, BodyMemberSubset.of(false), payloadMediaType);
+            if (body != null) {
+                return body;
+            }
+        }
+        return payloadCodec.serializeToDataStream(new StructBodyProxy(struct, activeBindings), payloadMediaType);
+    }
+
+    private ByteBuffer serializeBodyBuffer(Schema schema, SerializableStruct struct) {
+        if (subsetCodec != null && struct.schema() == schema) {
+            ByteBuffer body = subsetCodec.serialize(struct, BodyMemberSubset.of(true));
             if (body != null) {
                 return body;
             }
@@ -365,14 +378,14 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     }
 
     boolean hasBody() {
-        return shapeBodyBuffer != null || httpPayload != null;
+        return shapeBody != null || httpPayload != null;
     }
 
     DataStream getBody() {
         if (httpPayload != null) {
             return httpPayload;
-        } else if (shapeBodyBuffer != null) {
-            return DataStream.ofByteBuffer(shapeBodyBuffer, payloadMediaType);
+        } else if (shapeBody != null) {
+            return shapeBody;
         } else {
             return DataStream.ofEmpty();
         }

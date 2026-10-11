@@ -10,6 +10,7 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 
 @State(Scope.Thread)
 public class CborStringWriteBenchmark {
@@ -35,7 +36,7 @@ public class CborStringWriteBenchmark {
     @Setup
     public void setup() {
         value = StringWriteTestCases.value(testCaseId);
-        serializer = new CborSerializer();
+        serializer = new CborSerializer(null, OutputBuffers.shared());
     }
 
     @Benchmark

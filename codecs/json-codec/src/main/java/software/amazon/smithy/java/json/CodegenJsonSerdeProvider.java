@@ -14,6 +14,7 @@ import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.json.smithy.SmithyGeneratedJsonSerde;
 
 final class CodegenJsonSerdeProvider implements JsonSerdeProvider {
@@ -53,12 +54,36 @@ final class CodegenJsonSerdeProvider implements JsonSerdeProvider {
         return delegate.serialize(shape, settings);
     }
 
+    @Override
+    public DataStream serializeToDataStream(SerializableShape shape, JsonSettings settings, String contentType) {
+        if (shape instanceof SerializableStruct struct) {
+            DataStream result = generated.serializeToDataStream(struct, settings, null, contentType);
+            if (result != null) {
+                return result;
+            }
+        } else if (settings.strictRuntimeCodegen()) {
+            throw new IllegalStateException(
+                    "Strict JSON runtime codegen requires a structure or union root, found "
+                            + shape.getClass().getName());
+        }
+        return delegate.serializeToDataStream(shape, settings, contentType);
+    }
+
     ByteBuffer serializeMemberSubset(
             SerializableStruct struct,
             MemberSubsetCodec.MemberSubset subset,
             JsonSettings settings
     ) {
         return generated.serialize(struct, settings, subset);
+    }
+
+    DataStream serializeMemberSubsetToDataStream(
+            SerializableStruct struct,
+            MemberSubsetCodec.MemberSubset subset,
+            JsonSettings settings,
+            String contentType
+    ) {
+        return generated.serializeToDataStream(struct, settings, subset, contentType);
     }
 
     boolean deserializeMemberSubset(

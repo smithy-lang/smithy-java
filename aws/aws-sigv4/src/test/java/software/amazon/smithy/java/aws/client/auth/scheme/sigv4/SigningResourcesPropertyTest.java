@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 class SigningResourcesPropertyTest {
 
@@ -145,6 +146,15 @@ class SigningResourcesPropertyTest {
         r.hash(buffer, viaBuffer);
         assertThat(viaBuffer).as("hash via buffer kind %d size %d", kind, data.length).isEqualTo(expected);
         assertThat(buffer.position()).as("buffer position must be untouched").isEqualTo(position);
+
+        int split = data.length / 2;
+        var first = buffer.duplicate().limit(position + split);
+        var second = buffer.duplicate().position(position + split);
+        var stream = DataStream.ofByteBuffers(List.of(first, second), data.length, "application/octet-stream");
+        byte[] viaStream = new byte[32];
+        r.hash(stream, viaStream);
+        assertThat(viaStream).as("hash via stream kind %d size %d", kind, data.length).isEqualTo(expected);
+        assertThat(first.position()).as("stream view position must be untouched").isEqualTo(position);
     }
 
     @Test

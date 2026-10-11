@@ -38,6 +38,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -46,6 +47,7 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class CborSerializer implements ShapeSerializer {
@@ -58,14 +60,15 @@ final class CborSerializer implements ShapeSerializer {
     private static final int ARRAY_STREAM = TYPE_ARRAY | INDEFINITE;
 
     private static final int DEFAULT_BUF_SIZE = 4096;
-    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
 
-    private static final StripedPool<CborSerializer, Void> POOL = new CborStripedPool();
+    private static final StripedPool<CborSerializer, OutputBuffers> POOL = new CborStripedPool();
 
     byte[] buf;
     int pos;
+    private int sizeHint = DEFAULT_BUF_SIZE;
 
     private final OutputStream sink;
+    private OutputBuffers pool;
 
     // Bit i of collectionMask records whether level i was opened as indefinite-length.
     private long collectionMask = 0L;
@@ -78,20 +81,15 @@ final class CborSerializer implements ShapeSerializer {
     private final CborMapSerializer mapSerializer = new CborMapSerializer();
     private SerializeDocumentContents serializeDocumentContents;
 
-    CborSerializer() {
-        this.sink = null;
-        this.buf = new byte[DEFAULT_BUF_SIZE];
-        this.pos = 0;
-    }
-
-    CborSerializer(OutputStream sink) {
+    CborSerializer(OutputStream sink, OutputBuffers pool) {
         this.sink = sink;
-        this.buf = new byte[DEFAULT_BUF_SIZE];
+        this.pool = pool;
+        this.buf = pool.acquire(DEFAULT_BUF_SIZE);
         this.pos = 0;
     }
 
-    static CborSerializer acquire() {
-        return POOL.acquire(null);
+    static CborSerializer acquire(OutputBuffers pool) {
+        return POOL.acquire(pool);
     }
 
     static void release(CborSerializer serializer, boolean exception) {
@@ -99,7 +97,24 @@ final class CborSerializer implements ShapeSerializer {
     }
 
     ByteBuffer extractResult() {
+        sizeHint = OutputBuffers.nextSizeHint(sizeHint, pos);
         return ByteBuffer.wrap(Arrays.copyOf(buf, pos));
+    }
+
+    DataStream detach(String contentType) {
+        byte[] detached = buf;
+        int length = pos;
+        sizeHint = OutputBuffers.nextSizeHint(sizeHint, length);
+        buf = null;
+        pos = 0;
+        return DataStream.ofLeasedBytes(detached, 0, length, contentType, pool.recycler());
+    }
+
+    private void releaseBuffer() {
+        if (buf != null) {
+            pool.release(buf);
+            buf = null;
+        }
     }
 
     private void ensureCapacity(int needed) {
@@ -109,7 +124,7 @@ final class CborSerializer implements ShapeSerializer {
     }
 
     private void grow(int needed) {
-        buf = Arrays.copyOf(buf, Math.max(buf.length * 2, pos + needed));
+        buf = pool.grow(buf, pos, pos + needed);
     }
 
     @Override
@@ -134,6 +149,8 @@ final class CborSerializer implements ShapeSerializer {
             }
         } catch (Exception e) {
             throw new SerializationException(e);
+        } finally {
+            releaseBuffer();
         }
     }
 
@@ -618,30 +635,32 @@ final class CborSerializer implements ShapeSerializer {
         return result;
     }
 
-    private static class CborStripedPool extends StripedPool<CborSerializer, Void> {
+    private static class CborStripedPool extends StripedPool<CborSerializer, OutputBuffers> {
         @Override
-        protected CborSerializer create(Void ctx) {
-            return new CborSerializer();
+        protected CborSerializer create(OutputBuffers pool) {
+            return new CborSerializer(null, pool);
+        }
+
+        @Override
+        protected void cleanup(CborSerializer s) {
+            s.releaseBuffer();
+            // Clear the client pool reference because idle serializers remain in a JVM-wide pool.
+            s.pool = null;
         }
 
         @Override
         protected boolean canPool(CborSerializer s) {
-            return s.buf != null && s.sink == null;
+            return s.sink == null;
         }
 
         @Override
-        protected void prepareForPool(CborSerializer s) {
-            if (s.buf.length > MAX_CACHEABLE_BUF) {
-                s.buf = new byte[DEFAULT_BUF_SIZE];
-            }
-        }
-
-        @Override
-        protected boolean reset(CborSerializer s, Void ctx) {
+        protected boolean reset(CborSerializer s, OutputBuffers pool) {
             s.pos = 0;
             s.collectionMask = 0L;
             s.collectionDepth = 0;
             s.currentFieldNameTable = null;
+            s.pool = pool;
+            s.buf = pool.acquire(s.sizeHint);
             return true;
         }
     }

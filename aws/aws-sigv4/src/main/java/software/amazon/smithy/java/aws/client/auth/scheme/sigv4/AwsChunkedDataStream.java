@@ -111,19 +111,11 @@ public final class AwsChunkedDataStream implements DataStream {
 
     @Override
     public void writeTo(OutputStream out) throws IOException {
-        var buf = inner.asByteBuffer();
-        long size = buf.remaining();
         var crc = new CRC32();
-        crc.update(buf.duplicate());
-        out.write(hexBytes(size));
+        inner.forEachBuffer(crc::update);
+        out.write(hexBytes(decodedLength));
         out.write(CRLF);
-        if (buf.hasArray()) {
-            out.write(buf.array(), buf.arrayOffset() + buf.position(), buf.remaining());
-        } else {
-            byte[] tmp = new byte[buf.remaining()];
-            buf.duplicate().get(tmp);
-            out.write(tmp);
-        }
+        inner.writeTo(out);
         out.write(CRLF);
         out.write(TERMINATOR);
         out.write(TRAILER_NAME);

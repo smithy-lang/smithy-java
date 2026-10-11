@@ -10,11 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -23,10 +25,12 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -36,9 +40,46 @@ import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 class CborCodecTest {
+
+    @Test
+    void idleSerializersDoNotPinACodecsPool() throws Exception {
+        WeakReference<OutputBuffers> pool = serializeWithADedicatedPoolThenDropIt();
+        for (int i = 0; i < 50 && pool.get() != null; i++) {
+            System.gc();
+            Thread.sleep(20);
+        }
+        Assertions.assertNull(pool.get(),
+                "a codec's pool must be collectible once the codec is gone");
+    }
+
+    private static WeakReference<OutputBuffers> serializeWithADedicatedPoolThenDropIt() {
+        var pool = OutputBuffers.create();
+        var bird = new SerializableStruct() {
+            @Override
+            public Schema schema() {
+                return CborTestData.BIRD;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                serializer.writeString(CborTestData.BIRD_NAME, "tweety");
+            }
+
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                return null;
+            }
+        };
+        try (var codec = Rpcv2CborCodec.builder().outputBuffers(pool).build()) {
+            ((PooledDataStream) codec.serializeToDataStream(bird, "application/cbor")).release();
+            codec.serialize(bird);
+        }
+        return new WeakReference<>(pool);
+    }
 
     private static final CborSettings SETTINGS = CborSettings.defaultSettings();
     private static final DefaultCborSerdeProvider CODEC = new DefaultCborSerdeProvider();
@@ -51,10 +92,10 @@ class CborCodecTest {
     class SerializerPoolTest {
         @Test
         void acquireAndReleaseReturnsToPool() {
-            var s1 = CborSerializer.acquire();
+            var s1 = CborSerializer.acquire(OutputBuffers.shared());
             CborSerializer.release(s1, false);
 
-            var s2 = CborSerializer.acquire();
+            var s2 = CborSerializer.acquire(OutputBuffers.shared());
             // Pool may or may not return the same instance depending on thread,
             // but it should not throw.
             assertNotNull(s2);
@@ -63,30 +104,32 @@ class CborCodecTest {
 
         @Test
         void acquireProducesCleanState() {
-            var s = CborSerializer.acquire();
+            var s = CborSerializer.acquire(OutputBuffers.shared());
             assertEquals(0, s.pos);
             CborSerializer.release(s, false);
         }
 
         @Test
-        void largeBufferIsDownsizedOnRelease() {
-            var s = CborSerializer.acquire();
-            s.buf = new byte[1024 * 1024];
+        void releaseReturnsTheWorkingBufferToTheSerializersPool() {
+            var pool = OutputBuffers.create();
+            var s = CborSerializer.acquire(pool);
+            s.writeString(PreludeSchemas.STRING, "x".repeat(100_000));
+            byte[] buf = s.buf;
+            assertNotNull(buf);
+            assertTrue(buf.length >= 100_000);
+
             CborSerializer.release(s, false);
 
-            var s2 = CborSerializer.acquire();
-            // If we got back the same pooled instance, its buffer should have been downsized
-            // If we got a new instance, it has the default buffer size. Either way, not 1MB.
-            assertNotNull(s2);
-            CborSerializer.release(s2, false);
+            assertNull(s.buf);
+            assertSame(buf, pool.acquire(buf.length));
         }
 
         @Test
         void streamingSerializerNotPooled() {
-            var s = new CborSerializer(OutputStream.nullOutputStream());
+            var s = new CborSerializer(OutputStream.nullOutputStream(), OutputBuffers.shared());
             CborSerializer.release(s, false);
             // Should not throw, and the streaming serializer should not be returned from acquire
-            var s2 = CborSerializer.acquire();
+            var s2 = CborSerializer.acquire(OutputBuffers.shared());
             assertNotSame(s, s2);
             CborSerializer.release(s2, false);
         }
@@ -141,7 +184,7 @@ class CborCodecTest {
         }
 
         private byte[] serializeString(String value) {
-            var s = CborSerializer.acquire();
+            var s = CborSerializer.acquire(OutputBuffers.shared());
             try {
                 s.writeString(PreludeSchemas.STRING, value);
                 return Arrays.copyOf(s.buf, s.pos);
@@ -156,7 +199,7 @@ class CborCodecTest {
         @Test
         void deeplyNestedCollections() {
             int depth = 100;
-            var s = CborSerializer.acquire();
+            var s = CborSerializer.acquire(OutputBuffers.shared());
             try {
                 for (int i = 0; i < depth; i++) {
                     s.writeList(PreludeSchemas.DOCUMENT, null, -1, ($, inner) -> {});
@@ -169,7 +212,7 @@ class CborCodecTest {
         @Test
         void collectionDepthExceeds64() {
             int depth = 70;
-            var s = CborSerializer.acquire();
+            var s = CborSerializer.acquire(OutputBuffers.shared());
             try {
                 for (int i = 0; i < depth; i++) {
                     boolean indefinite = i % 2 == 0;
@@ -680,7 +723,7 @@ class CborCodecTest {
     private static byte[] write(Consumer<CborSerializer> consumer) {
         try (
                 var stream = new ByteBufferOutputStream();
-                var ser = new CborSerializer(stream)) {
+                var ser = new CborSerializer(stream, OutputBuffers.shared())) {
             try {
                 consumer.accept(ser);
             } catch (StopWritingException ignored) {}

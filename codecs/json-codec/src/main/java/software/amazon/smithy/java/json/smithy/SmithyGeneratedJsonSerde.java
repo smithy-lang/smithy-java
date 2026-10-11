@@ -18,6 +18,7 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -63,6 +64,39 @@ public final class SmithyGeneratedJsonSerde {
         try {
             codec.write(value, writer);
             return writer.detach();
+        } finally {
+            JsonCodegenWriter.release(writer);
+        }
+    }
+
+    /**
+     * Returns pooled serialization output, or null if generated code cannot handle the value.
+     *
+     * @see #serialize(SerializableStruct, JsonSettings, MemberSubsetCodec.MemberSubset)
+     */
+    public DataStream serializeToDataStream(
+            SerializableStruct value,
+            JsonSettings settings,
+            MemberSubsetCodec.MemberSubset subset,
+            String contentType
+    ) {
+        if (settings.prettyPrint()) {
+            rejectStrictFallback(settings, "pretty-printed JSON is not supported");
+            return null;
+        }
+        if (!generatable(value)) {
+            rejectStrictFallback(settings, "the value is not the generated class for " + value.schema().id());
+            return null;
+        }
+        GeneratedJsonCodec codec = codec(value.schema(), settings, subset);
+        if (codec == null) {
+            rejectStrictFallback(settings, "no generated codec is available for " + value.schema().id());
+            return null;
+        }
+        JsonCodegenWriter writer = JsonCodegenWriter.acquire(settings);
+        try {
+            codec.write(value, writer);
+            return writer.detachLeased(contentType);
         } finally {
             JsonCodegenWriter.release(writer);
         }

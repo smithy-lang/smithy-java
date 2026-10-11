@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * Generic shape serialization and deserialization.
@@ -68,6 +69,21 @@ public interface Codec extends AutoCloseable {
             shape.serialize(serializer);
         }
         return baos.toByteBuffer();
+    }
+
+    /**
+     * Serializes a shape into a request or response body.
+     *
+     * <p>Codecs can return a {@link software.amazon.smithy.java.io.datastream.PooledDataStream}.
+     * The caller must release a pooled stream after all reads complete.
+     * The client pipeline releases request bodies after the call completes, including retries.
+     *
+     * @param shape shape to serialize
+     * @param contentType content type, or null
+     * @return a replayable stream containing the serialized shape
+     */
+    default DataStream serializeToDataStream(SerializableShape shape, String contentType) {
+        return DataStream.ofByteBuffer(serialize(shape), contentType);
     }
 
     /**

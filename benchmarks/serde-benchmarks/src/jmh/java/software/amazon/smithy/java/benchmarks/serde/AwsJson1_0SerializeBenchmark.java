@@ -72,7 +72,11 @@ public class AwsJson1_0SerializeBenchmark {
 
     @Benchmark
     public void serialize(Blackhole bh) {
-        bh.consume(protocol.createRequest(operation(), state.input, state.context, state.endpoint));
+        var request = protocol.createRequest(operation(), state.input, state.context, state.endpoint);
+        bh.consume(request);
+        if (SerializeState.RELEASE_REQUESTS) {
+            SerializeState.releasePooledBody(protocol, request);
+        }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

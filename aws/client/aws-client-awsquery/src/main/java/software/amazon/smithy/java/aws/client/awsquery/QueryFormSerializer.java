@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -25,6 +26,7 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
@@ -72,18 +74,24 @@ final class QueryFormSerializer implements ShapeSerializer {
     }
 
     private static final int DEFAULT_BUF_SIZE = 1024;
-    private static final int MAX_CACHEABLE_BUF = DEFAULT_BUF_SIZE * 4;
 
     private static final int MAX_BYTES_PER_CHAR = 9;
     private static final int MAX_BYTES_PER_LATIN1_BYTE = 6;
 
-    record AcquireContext(QueryVariant variant, String action, String version) {}
+    record AcquireContext(QueryVariant variant, String action, String version, OutputBuffers pool) {}
 
     private static final StripedPool<QueryFormSerializer, AcquireContext> POOL =
             new StripedPool<>() {
                 @Override
                 protected QueryFormSerializer create(AcquireContext ctx) {
-                    return new QueryFormSerializer();
+                    return new QueryFormSerializer(ctx.pool());
+                }
+
+                @Override
+                protected void cleanup(QueryFormSerializer s) {
+                    s.releaseBuffer();
+                    // Clear the client pool reference because idle serializers remain in a JVM-wide pool.
+                    s.pool = null;
                 }
 
                 @Override
@@ -92,23 +100,20 @@ final class QueryFormSerializer implements ShapeSerializer {
                 }
 
                 @Override
-                protected void prepareForPool(QueryFormSerializer s) {
-                    if (s.buf.length > MAX_CACHEABLE_BUF) {
-                        s.buf = new byte[DEFAULT_BUF_SIZE];
-                    }
-                }
-
-                @Override
                 protected boolean reset(QueryFormSerializer s, AcquireContext ctx) {
                     s.prefixLen = 0;
                     s.prefixDepth = 0;
                     s.pos = 0;
+                    s.pool = ctx.pool();
+                    s.buf = s.pool.acquire(s.sizeHint);
                     return true;
                 }
             };
 
     private byte[] buf;
     private int pos;
+    private int sizeHint = DEFAULT_BUF_SIZE;
+    private OutputBuffers pool;
     private QueryVariant variant;
 
     private byte[] prefixBuf = new byte[128];
@@ -120,13 +125,21 @@ final class QueryFormSerializer implements ShapeSerializer {
     private final QueryMapSerializer mapSerializer = new QueryMapSerializer();
     private final MapValueSerializer mapValueSerializer = new MapValueSerializer();
 
-    private QueryFormSerializer() {
-        this.buf = new byte[DEFAULT_BUF_SIZE];
+    private QueryFormSerializer(OutputBuffers pool) {
+        this.pool = pool;
+        this.buf = pool.acquire(DEFAULT_BUF_SIZE);
+    }
+
+    private void releaseBuffer() {
+        if (buf != null) {
+            pool.release(buf);
+            buf = null;
+        }
     }
 
     @SuppressWarnings("deprecation")
-    static QueryFormSerializer acquire(QueryVariant variant, String action, String version) {
-        QueryFormSerializer s = POOL.acquire(new AcquireContext(variant, action, version));
+    static QueryFormSerializer acquire(QueryVariant variant, String action, String version, OutputBuffers pool) {
+        QueryFormSerializer s = POOL.acquire(new AcquireContext(variant, action, version, pool));
         s.variant = variant;
 
         int headerLen = ACTION_PREFIX.length + action.length() + VERSION_PREFIX.length + version.length();
@@ -143,22 +156,27 @@ final class QueryFormSerializer implements ShapeSerializer {
     }
 
     ByteBuffer finish() {
-        ByteBuffer result;
-        if (buf.length > MAX_CACHEABLE_BUF) {
-            byte[] resultBuf = buf;
-            buf = new byte[DEFAULT_BUF_SIZE];
-            result = ByteBuffer.wrap(resultBuf, 0, pos).slice();
-        } else {
-            result = ByteBuffer.wrap(Arrays.copyOf(buf, pos));
-        }
+        sizeHint = OutputBuffers.nextSizeHint(sizeHint, pos);
+        ByteBuffer result = ByteBuffer.wrap(Arrays.copyOf(buf, pos));
         POOL.release(this);
         return result;
+    }
+
+    DataStream finishLeased(String contentType) {
+        byte[] detached = buf;
+        int length = pos;
+        var recycler = pool.recycler();
+        sizeHint = OutputBuffers.nextSizeHint(sizeHint, length);
+        buf = null;
+        pos = 0;
+        POOL.release(this);
+        return DataStream.ofLeasedBytes(detached, 0, length, contentType, recycler);
     }
 
     private void ensureCapacity(int needed) {
         int required = pos + needed;
         if (required > buf.length) {
-            buf = Arrays.copyOf(buf, Math.max(required, buf.length + (buf.length >> 1)));
+            buf = pool.grow(buf, pos, required);
         }
     }
 

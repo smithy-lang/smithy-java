@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -524,10 +525,10 @@ class QueryFormSerializerTest {
         @Test
         void finishDoesNotAliasThePooledBuffer() {
             ByteBuffer first = QueryFormSerializer
-                    .acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A1", "V1")
+                    .acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A1", "V1", OutputBuffers.shared())
                     .finish();
             ByteBuffer second = QueryFormSerializer
-                    .acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A2", "V2")
+                    .acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A2", "V2", OutputBuffers.shared())
                     .finish();
             assertThat(first.array(), not(sameInstance(second.array())));
         }
@@ -535,23 +536,22 @@ class QueryFormSerializerTest {
         @Test
         void finishedBodyIsUnaffectedByTheNextSerializer() {
             ByteBuffer first = QueryFormSerializer
-                    .acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A1", "V1")
+                    .acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A1", "V1", OutputBuffers.shared())
                     .finish();
             QueryFormSerializer
-                    .acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A2", "V2")
+                    .acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A2", "V2", OutputBuffers.shared())
                     .finish();
             assertThat(StandardCharsets.UTF_8.decode(first).toString(), equalTo("Action=A1&Version=V1"));
         }
 
         @Test
-        void finishTransfersOversizedBuffer() {
+        void finishReturnsAnExactCopyAndReusesThePooledBuffer() {
             String value = "a".repeat(8192);
             ByteBuffer body = serializeStringBuffer(value);
 
-            // The returned view has an exact limit, but keeps the oversized backing array rather than
-            // copying it immediately before the pool would discard it.
-            assertThat(body.array().length > body.remaining(), equalTo(true));
-            QueryFormSerializer.acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A2", "V2").finish();
+            assertThat(body.array().length, equalTo(body.remaining()));
+            QueryFormSerializer.acquire(QueryFormSerializer.QueryVariant.AWS_QUERY, "A2", "V2", OutputBuffers.shared())
+                    .finish();
             assertThat(StandardCharsets.UTF_8.decode(body).toString(),
                     equalTo(header() + "&String=" + value));
         }
@@ -575,7 +575,8 @@ class QueryFormSerializerTest {
             QueryFormSerializer serializer = QueryFormSerializer.acquire(
                     QueryFormSerializer.QueryVariant.AWS_QUERY,
                     "TestAction",
-                    "2020-01-01");
+                    "2020-01-01",
+                    OutputBuffers.shared());
             serializer.writeString(struct.member("String"), value);
             return serializer.finish();
         }
@@ -619,7 +620,8 @@ class QueryFormSerializerTest {
             }
         };
 
-        QueryFormSerializer s = QueryFormSerializer.acquire(variant, "TestAction", "2020-01-01");
+        QueryFormSerializer s =
+                QueryFormSerializer.acquire(variant, "TestAction", "2020-01-01", OutputBuffers.shared());
         s.writeStruct(structSchema, struct);
         return StandardCharsets.UTF_8.decode(s.finish()).toString();
     }

@@ -10,6 +10,7 @@ import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -31,6 +32,25 @@ public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, 
     @Override
     public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
         return HttpMessageExchange.INSTANCE;
+    }
+
+    @Override
+    public PooledDataStream pooledRequestBody(HttpRequest request) {
+        return request.body() instanceof PooledDataStream pooled ? pooled : null;
+    }
+
+    /**
+     * Copies a pooled request body so the request remains readable after the call completes.
+     *
+     * <p>Call this before the pipeline releases the body.
+     *
+     * @return an unmodifiable request whose body outlives the call
+     */
+    public static HttpRequest retainRequest(HttpRequest request) {
+        if (request.body() instanceof PooledDataStream pooled) {
+            return request.toModifiableCopy().setBody(pooled.copy()).toUnmodifiable();
+        }
+        return request.toUnmodifiable();
     }
 
     @Override

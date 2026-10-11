@@ -110,7 +110,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                     "Cannot SigV4-sign a body whose length is unknown without UNSIGNED-PAYLOAD "
                             + "or chunked signing, neither of which is implemented yet.");
         }
-        r.hash(dataStream.asByteBuffer(), r.hashBytes);
+        r.hash(dataStream, r.hashBytes);
         SigningResources.writeHex(r.hashBytes, r.payloadHashHex, 0);
     }
 

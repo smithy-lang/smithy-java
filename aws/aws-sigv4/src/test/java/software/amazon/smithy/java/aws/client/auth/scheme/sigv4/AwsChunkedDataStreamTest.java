@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.CRC32;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 
 class AwsChunkedDataStreamTest {
 
@@ -193,5 +194,23 @@ class AwsChunkedDataStreamTest {
         });
         // Frames: header + body + footer + complete = 3 onNext + 1 onComplete.
         assertThat(calls.get(), equalTo(List.of("next", "next", "next", "complete")));
+    }
+
+    @Test
+    public void writeToDoesNotAliasAPooledBody() throws Exception {
+        byte[] payload = "hello chunked world".getBytes(StandardCharsets.UTF_8);
+        var recycled = new AtomicReference<byte[]>();
+        PooledDataStream pooled = DataStream.ofLeasedBytes(payload, 0, payload.length, "text/plain", recycled::set);
+
+        var encoded = new ByteArrayOutputStream();
+        new AwsChunkedDataStream(pooled).writeTo(encoded);
+
+        var expected = new ByteArrayOutputStream();
+        new AwsChunkedDataStream(DataStream.ofBytes(payload)).writeTo(expected);
+        assertArrayEquals(expected.toByteArray(), encoded.toByteArray());
+
+        assertThat(pooled.escaped(), is(false));
+        pooled.release();
+        assertThat(recycled.get(), is(payload));
     }
 }

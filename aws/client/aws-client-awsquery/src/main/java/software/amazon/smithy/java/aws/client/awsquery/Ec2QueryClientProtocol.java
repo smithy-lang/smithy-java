@@ -15,6 +15,7 @@ import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
@@ -43,7 +44,10 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
 
     private final String version;
     private final HttpErrorDeserializer errorDeserializer;
-    private final XmlCodec codec = XmlCodec.builder().strictRootElement(false).build();
+    private final XmlCodec codec = XmlCodec.builder()
+            .strictRootElement(false)
+            .outputBuffers(OutputBuffers.create())
+            .build();
 
     public Ec2QueryClientProtocol(ShapeId service, String version) {
         super(Ec2QueryTrait.ID);
@@ -70,22 +74,22 @@ public final class Ec2QueryClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
-        QueryFormSerializer serializer = QueryFormSerializer.acquire(
-                QueryFormSerializer.QueryVariant.EC2_QUERY,
+        QueryFormSerializer serializer = QueryFormSerializer.acquire(QueryFormSerializer.QueryVariant.EC2_QUERY,
                 operationName,
-                version);
+                version,
+                codec.outputBuffers());
 
         if (!operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
             input.serializeMembers(serializer);
         }
 
-        ByteBuffer body = serializer.finish();
+        DataStream body = serializer.finishLeased(CONTENT_TYPE);
 
         return HttpRequest.create()
                 .setMethod("POST")
                 .setUri(endpoint)
                 .setHeader(HeaderName.CONTENT_TYPE, CONTENT_TYPE)
-                .setBody(DataStream.ofByteBuffer(body, CONTENT_TYPE));
+                .setBody(body);
     }
 
     @Override

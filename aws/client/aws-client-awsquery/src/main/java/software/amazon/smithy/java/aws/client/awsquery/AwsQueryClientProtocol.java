@@ -16,6 +16,7 @@ import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
@@ -43,7 +44,10 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
     private final ShapeId service;
     private final String version;
     private final HttpErrorDeserializer errorDeserializer;
-    private final XmlCodec codec = XmlCodec.builder().strictRootElement(false).build();
+    private final XmlCodec codec = XmlCodec.builder()
+            .strictRootElement(false)
+            .outputBuffers(OutputBuffers.create())
+            .build();
 
     public AwsQueryClientProtocol(ShapeId service, String version) {
         super(AwsQueryTrait.ID);
@@ -70,22 +74,22 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
             SmithyUri endpoint
     ) {
         String operationName = operation.schema().id().getName();
-        QueryFormSerializer serializer = QueryFormSerializer.acquire(
-                QueryFormSerializer.QueryVariant.AWS_QUERY,
+        QueryFormSerializer serializer = QueryFormSerializer.acquire(QueryFormSerializer.QueryVariant.AWS_QUERY,
                 operationName,
-                version);
+                version,
+                codec.outputBuffers());
 
         if (!operation.inputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
             input.serializeMembers(serializer);
         }
 
-        ByteBuffer body = serializer.finish();
+        DataStream body = serializer.finishLeased(CONTENT_TYPE);
 
         return HttpRequest.create()
                 .setMethod("POST")
                 .setUri(endpoint)
                 .setHeader(HeaderName.CONTENT_TYPE, CONTENT_TYPE)
-                .setBody(DataStream.ofByteBuffer(body, CONTENT_TYPE));
+                .setBody(body);
     }
 
     @Override

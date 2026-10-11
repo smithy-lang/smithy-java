@@ -13,6 +13,7 @@ import software.amazon.smithy.java.aws.events.RpcEventStreamsUtil;
 import software.amazon.smithy.java.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -54,6 +55,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
         this.codec = JsonCodec.builder()
                 .defaultNamespace(service.getNamespace())
                 .useTimestampFormat(true)
+                .outputBuffers(OutputBuffers.create())
                 .build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()
@@ -94,7 +96,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             builder.addHeader(HeaderName.X_AMZ_TARGET, target)
                     .addHeader(HeaderName.CONTENT_TYPE, contentType());
         }
-        return builder.setBody(DataStream.ofByteBuffer(codec.serialize(input), contentType()));
+        return builder.setBody(codec.serializeToDataStream(input, contentType()));
     }
 
     @Override
