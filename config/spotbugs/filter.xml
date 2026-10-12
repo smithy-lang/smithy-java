@@ -87,6 +87,17 @@
     </Match>
 
     <!--
+    ~ Booleans in the rules engine are always the canonical Boolean.TRUE/FALSE, either from the
+    ~ constant pool or from a register fill, so the compiled condition and result nodes compare them
+    ~ by reference exactly as the bytecode interpreter does. Using equals() here would both cost more
+    ~ and let a non-canonical Boolean compare equal on the compiled path but not the interpreted one.
+    -->
+    <Match>
+        <Class name="~software\.amazon\.smithy\.java\.rulesengine\.CompiledNode(\$.*)?" />
+        <Bug pattern="RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN" />
+    </Match>
+
+    <!--
     ~ signal() intentionally calls notifyAll() with no state change of its own: the queue state was
     ~ already mutated under the same monitor by a preceding burst of offer(..., signal=false) calls,
     ~ and signal() just flushes the deferred consumer wake. The naked-notify heuristic can't see the

@@ -18,9 +18,9 @@ import software.amazon.smithy.rulesengine.logic.bdd.BddNodeConsumer;
 /**
  * Compiled bytecode representation of endpoint rules.
  *
- * <p>This class represents a compiled rules program that can be efficiently evaluated
- * by a bytecode interpreter. The bytecode format is designed for fast loading and
- * minimal memory allocation during evaluation.
+ * <p>This class represents a compiled rules program. The bytecode is the serialization format, designed
+ * for fast loading and minimal memory allocation; it is decoded into {@link CompiledNode} trees by
+ * {@link NodeCompiler} to be evaluated.
  *
  * <h2>Binary Format</h2>
  *
@@ -189,6 +189,25 @@ public final class Bytecode {
     final byte[] conditionTypes;
     final int[] conditionOperands;
 
+    /**
+     * Conditions and results compiled out of the stack bytecode into node trees. These are how a program
+     * is evaluated: the bytecode is the serialization format, not the execution format.
+     *
+     * <p>Filled lazily by {@link #conditionNode} and {@link #resultNode}, where a null entry means "not
+     * compiled yet". Compiling eagerly would decode every condition and result in the program, but a
+     * resolution only walks one path through the BDD and returns one result — for S3 that is 15 to 30 of
+     * 76 conditions and 1 of 116 results — so most of that work would be thrown away. Since
+     * {@code Bytecode} is built per client, not per JVM, it is work that would be paid repeatedly.
+     *
+     * <p>Entries are published by a plain array write and may be computed twice under a race. That is
+     * safe and deliberate: every field of every {@link CompiledNode} is final and no array reachable from
+     * one is mutated after construction, so the JMM's final-field freeze guarantees a thread that reads a
+     * reference — even through a data race — sees a fully initialized tree. Two threads racing produce
+     * equivalent trees, so whichever write lands is correct.
+     */
+    private final CompiledNode[] compiledConditions;
+    private final CompiledNode[] compiledResults;
+
     private Bdd bdd;
 
     Bytecode(
@@ -246,6 +265,61 @@ public final class Bytecode {
         this.conditionTypes = new byte[conditionOffsets.length];
         this.conditionOperands = new int[conditionOffsets.length];
         classifyConditions();
+
+        this.compiledConditions = new CompiledNode[conditionOffsets.length];
+        this.compiledResults = new CompiledNode[resultOffsets.length];
+    }
+
+    /**
+     * Gets the compiled tree for a condition, decoding it on first use.
+     *
+     * @param conditionIndex the condition index.
+     * @return the node, never null.
+     */
+    CompiledNode conditionNode(int conditionIndex) {
+        CompiledNode node = compiledConditions[conditionIndex];
+        return node != null ? node : compileInto(compiledConditions, conditionIndex, conditionOffsets);
+    }
+
+    /**
+     * Gets the compiled tree for a result, decoding it on first use.
+     *
+     * @param resultIndex the result index.
+     * @return the node, never null.
+     */
+    CompiledNode resultNode(int resultIndex) {
+        CompiledNode node = compiledResults[resultIndex];
+        return node != null ? node : compileInto(compiledResults, resultIndex, resultOffsets);
+    }
+
+    private CompiledNode compileInto(CompiledNode[] cache, int index, int[] offsets) {
+        int offset = offsets[index];
+        // A fresh compiler per call: NodeCompiler carries decode state across its recursion and so is
+        // not reentrant, and lazy compilation can run on any thread.
+        CompiledNode node = new NodeCompiler(bytecode, constantPool, functions).compile(offset);
+        cache[index] = node;
+        return node;
+    }
+
+    /**
+     * Counts the conditions and results compiled into node trees <em>so far</em>. Compilation is lazy, so
+     * this starts at zero for a freshly loaded program and grows as resolutions exercise it; tests and
+     * tests use it to see how much of a ruleset a workload actually touches.
+     *
+     * @return the number of conditions and results compiled to node trees.
+     */
+    int getCompiledNodeCount() {
+        return countCompiled(compiledConditions) + countCompiled(compiledResults);
+    }
+
+    private static int countCompiled(CompiledNode[] nodes) {
+        int count = 0;
+        for (CompiledNode node : nodes) {
+            if (node != null) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private void classifyConditions() {
