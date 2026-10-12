@@ -30,10 +30,11 @@ set is checked in as `src/main/resources/.../canonical-benchmarks.txt` and valid
 Each request case uses its `params` and receives a minimal valid response: `{}` for JSON, an empty
 map for CBOR, no body for REST-XML, or an `<OpResponse><OpResult/></OpResponse>` wrapper for Query.
 Each response case uses its fixture and sends an input containing only required members and URI
-labels. CBOR bodies and `@httpPayload` blob fixtures are base64 in this model; the harness decodes
-them so `Content-Length` describes the bytes sent. The first call of every case checks that the
-request body length matches `Content-Length` and that the response deserialized into the expected
-output members.
+labels. Response fixtures use the same wire bytes as the serde benchmarks. The harness decodes CBOR
+bodies and `@httpPayload` blobs from base64 and removes JSON whitespace outside strings.
+XML bodies remain unchanged. `Content-Length` describes the bytes served.
+The first call of every case checks that the request body length matches `Content-Length` and that
+the response deserialized into the expected output members.
 
 ## Run
 
@@ -81,8 +82,9 @@ arrives it answers 503.
 ## Measurement
 
 ```text
-warm up: 2,000-call chunks until JIT compilation stays below 2% of chunk wall time
-         for five consecutive chunks and at least one second (floor 20,000 calls, cap 2,000,000)
+warm up: 2,000-call chunks for at least 100,000 calls and 20 seconds, whichever comes later,
+         then until JIT compilation stays below 2% of chunk wall time for five consecutive
+         chunks and at least one second (give up at twice the floor)
 System.gc()
 cpuBefore = process CPU time
 repeat:

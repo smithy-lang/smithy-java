@@ -148,9 +148,11 @@ final class BenchmarkOptions {
                   java -Xbatch -jar smithy-java-e2e-benchmark.jar [options]
 
                 Runs complete generated-client calls in this JVM and reports operations per process
-                CPU-second. Each case gets one checked call, automatic warmup, System.gc(), and measurement.
-                Measurement stops at 50,000 iterations or 5 seconds of CPU time, whichever comes first,
-                with a minimum of 1 second of CPU time. Run with -Xbatch to disable background JIT compilation.
+                CPU-second. Each case gets one checked call, warmup, System.gc(), and measurement.
+                Warmup runs at least 100,000 calls and 20 seconds, whichever comes later, then until JIT
+                compilation goes quiet. Measurement stops at 50,000 iterations or 5 seconds of CPU time,
+                whichever comes first, with a minimum of 1 second of CPU time. Run with -Xbatch to disable
+                background JIT compilation.
 
                   --mode MODE              stub (default): in-process canned responses, the cross-SDK configuration
                                            https: smithy-java's HTTP client over TLS (BoringSSL) to a fixture

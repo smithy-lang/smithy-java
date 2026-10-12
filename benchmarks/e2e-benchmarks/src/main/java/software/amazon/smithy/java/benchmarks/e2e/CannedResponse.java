@@ -29,7 +29,11 @@ record CannedResponse(
         headers.put("content-type", List.of(defaultContentType));
         headers.put("content-length", List.of(Integer.toString(body.length)));
         for (var entry : caseHeaders.entrySet()) {
-            headers.put(entry.getKey().toLowerCase(Locale.ROOT), List.of(entry.getValue()));
+            String name = entry.getKey().toLowerCase(Locale.ROOT);
+            // Use the served body's length because normalization can change the fixture's byte count.
+            if (!name.equals("content-length")) {
+                headers.put(name, List.of(entry.getValue()));
+            }
         }
         String contentType = headers.get("content-type").get(0);
         return new CannedResponse(

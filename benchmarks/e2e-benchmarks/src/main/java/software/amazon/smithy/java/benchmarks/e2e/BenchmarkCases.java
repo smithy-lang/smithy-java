@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import software.amazon.smithy.java.benchmarks.WireBodyNormalizer;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -106,14 +107,11 @@ final class BenchmarkCases {
         if (response != null) {
             var operation = resolveOperation(protocol, response.operation());
             var input = buildInput(operation, MinimalInput.forOperation(MODEL, response.operation()));
-            // Content-Length describes decoded bytes for base64 fixtures.
-            boolean blobPayload = blobPayloadMember(operation.outputSchema()) != null;
-            byte[] body = response.testCase()
-                    .getBody()
-                    .map(s -> protocol.base64Bodies() || blobPayload
-                            ? Base64.getMimeDecoder().decode(s)
-                            : s.getBytes(StandardCharsets.UTF_8))
-                    .orElse(protocol.emptyResponseBody());
+            byte[] body = WireBodyNormalizer.wireBody(
+                    response.testCase(),
+                    operation.outputSchema(),
+                    protocol.contentType(),
+                    protocol.emptyResponseBody());
             var canned = CannedResponse.of(
                     response.testCase().getCode(),
                     response.testCase().getHeaders(),

@@ -5,8 +5,8 @@ plugins {
 description = "Shared, non-published utilities for smithy-java benchmarks."
 
 dependencies {
+    api(project(":core"))
+    api(libs.smithy.protocol.test.traits)
     compileOnly(libs.jmh.core)
     testImplementation(libs.jmh.core)
 }
-
-// Keep Java 21 compatibility for the e2e and live runners.
