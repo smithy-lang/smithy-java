@@ -16,6 +16,7 @@ final class DeferredMemberSchema extends Schema {
     private final SchemaBuilder target;
     private final TraitMap directTraits;
     private final long requiredByValidationBitmask;
+    private Schema resolvedTarget;
 
     DeferredMemberSchema(MemberSchemaBuilder builder) {
         super(builder);
@@ -26,7 +27,15 @@ final class DeferredMemberSchema extends Schema {
 
     @Override
     public Schema memberTarget() {
-        return target.build();
+        Schema resolved = resolvedTarget;
+        if (resolved == null) {
+            resolved = target.build();
+            // SchemaBuilder.resolve() replaces deferred targets. Cache only resolved schemas.
+            if (!(resolved instanceof DeferredRootSchema)) {
+                resolvedTarget = resolved;
+            }
+        }
+        return resolved;
     }
 
     @Override

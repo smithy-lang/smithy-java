@@ -10,6 +10,8 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.sameInstance;
 
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -62,6 +64,23 @@ public class SchemaTest {
         assertThat(mutuallyRecursiveB.members(), hasSize(1));
         assertThat(mutuallyRecursiveA.member("b").memberTarget(), equalTo(mutuallyRecursiveB));
         assertThat(mutuallyRecursiveB.member("a").memberTarget(), equalTo(mutuallyRecursiveA));
+    }
+
+    @Test
+    public void memberTargetTracksResolutionOfTarget() {
+        var aBuilder = Schema.structureBuilder(ShapeId.from("smithy.example#A"));
+        var bBuilder = Schema.structureBuilder(ShapeId.from("smithy.example#B"));
+        aBuilder.putMember("b", bBuilder);
+        bBuilder.putMember("a", aBuilder);
+
+        var a = aBuilder.build().resolve();
+        var unresolvedB = a.member("b").memberTarget();
+        var b = bBuilder.build().resolve();
+
+        assertThat(unresolvedB, not(sameInstance(b)));
+        assertThat(a.member("b").memberTarget(), sameInstance(b));
+        assertThat(a.member("b").assertMemberTargetIs(b), sameInstance(a.member("b")));
+        assertThat(b.member("a").memberTarget(), sameInstance(a));
     }
 
     @Test
