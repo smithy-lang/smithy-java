@@ -18,6 +18,8 @@ dependencies {
 
     // Protocol test dependencies
     testImplementation(libs.smithy.aws.protocol.tests)
+    testImplementation(project(":client:dynamic-client"))
+    testImplementation(project(":client:client-mock-plugin"))
 }
 
 protocolTestRuns {

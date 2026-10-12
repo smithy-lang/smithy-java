@@ -155,6 +155,12 @@ class SigningResourcesPropertyTest {
         r.hash(stream, viaStream);
         assertThat(viaStream).as("hash via stream kind %d size %d", kind, data.length).isEqualTo(expected);
         assertThat(first.position()).as("stream view position must be untouched").isEqualTo(position);
+
+        var leased = DataStream.ofLeasedBytes(padded, pad, data.length, null, array -> {});
+        byte[] viaLease = new byte[32];
+        r.hash(leased, viaLease);
+        assertThat(viaLease).as("hash via lease size %d", data.length).isEqualTo(expected);
+        assertThat(leased.escaped()).as("hashing must not alias the lease").isFalse();
     }
 
     @Test

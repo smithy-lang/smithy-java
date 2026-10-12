@@ -8,20 +8,28 @@ package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.sameInstance;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 
 class SigV4SignerTest {
 
@@ -91,5 +99,45 @@ class SigV4SignerTest {
         // A stale Authorization header must not change SignedHeaders or the resulting signature.
         assertThat(staleAuth, not(containsString("authorization")));
         assertThat(staleAuth, equalTo(cleanAuth));
+    }
+
+    @Test
+    void signingReadsAPooledBodyWithoutAliasingIt() throws Exception {
+        byte[] payload = "{\"hello\":\"world\"}".getBytes(StandardCharsets.UTF_8);
+        var recycled = new AtomicReference<byte[]>();
+        PooledDataStream pooled =
+                DataStream.ofLeasedBytes(payload, 0, payload.length, "application/json", recycled::set);
+        var context = Context.create()
+                .put(SigV4Settings.REGION, "us-east-1")
+                .put(SigV4Settings.SIGNING_NAME, "s3")
+                .put(SigV4Settings.CLOCK, Clock.fixed(Instant.parse("2026-06-01T23:59:59Z"), ZoneOffset.UTC));
+        var identity = AwsCredentialsIdentity.create("AKID", "secret");
+
+        HttpRequest signedPooled;
+        HttpRequest signedPlain;
+        try (var signer = SigV4Signer.create()) {
+            signedPooled = signer.sign(bodyRequest(pooled), identity, context).signedRequest();
+            signedPlain = signer.sign(bodyRequest(DataStream.ofBytes(payload, "application/json")), identity, context)
+                    .signedRequest();
+        }
+
+        assertThat(pooled.escaped(), is(false));
+        assertThat(pooled.isReleased(), is(false));
+        assertThat(recycled.get(), is((byte[]) null));
+        assertThat(signedPooled.body(), sameInstance(pooled));
+        var sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(payload));
+        assertThat(signedPooled.headers().firstValue("x-amz-content-sha256"), equalTo(sha256));
+        assertThat(signedPooled.headers().firstValue("authorization"),
+                equalTo(signedPlain.headers().firstValue("authorization")));
+    }
+
+    private static HttpRequest bodyRequest(DataStream body) {
+        return HttpRequest.create()
+                .setMethod("PUT")
+                .setHttpVersion(HttpVersion.HTTP_1_1)
+                .setUri(URI.create("https://bucket.s3.amazonaws.com/key"))
+                .setHeaders(HttpHeaders.of(Map.of("Host", List.of("bucket.s3.amazonaws.com"))))
+                .setBody(body)
+                .toUnmodifiable();
     }
 }

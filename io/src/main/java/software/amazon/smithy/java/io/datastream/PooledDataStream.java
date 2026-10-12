@@ -23,7 +23,8 @@ package software.amazon.smithy.java.io.datastream;
  * <p>Pooled streams are not thread-safe.
  * Complete all reads before release. If a reader can continue after the transport returns, call {@link #abandon()}.
  *
- * <p>Wrappers that read pooled storage must implement this interface and forward its lifecycle methods.
+ * <p>Wrappers that read pooled storage must implement this interface. {@link ForwardingPooledDataStream}
+ * forwards the lifecycle methods to the wrapped lease.
  */
 public interface PooledDataStream extends DataStream {
     /**

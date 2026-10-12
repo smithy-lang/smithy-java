@@ -145,6 +145,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
         var builder = operation.outputBuilder();
         var content = response.body();
         if (content.contentLength() == 0) {
+            discardBody(response);
             return builder.build();
         }
 

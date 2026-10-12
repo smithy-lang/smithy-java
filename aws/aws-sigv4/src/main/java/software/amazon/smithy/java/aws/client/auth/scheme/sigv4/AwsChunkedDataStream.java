@@ -6,18 +6,20 @@
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.zip.CRC32;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.datastream.ForwardingPooledDataStream;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 
 /**
  * Wraps a {@link DataStream} so its bytes are emitted in {@code aws-chunked} content-encoding
@@ -38,36 +40,43 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * the body when {@code Content-Encoding: aws-chunked} and {@code x-amz-trailer: x-amz-checksum-*}
  * are set on the request.
  *
- * <p>This implementation only supports replayable, in-memory bodies (single-buffer). Streaming
- * bodies would emit multiple chunks; we punt on that until needed.
+ * <p>Supports only replayable, in-memory bodies encoded as one chunk.
+ * A {@link PooledDataStream} wrapper forwards lifecycle methods to the lease.
+ * {@code writeTo} and {@link #forEachBuffer} read leased storage directly.
+ * Reads after release throw before emitting bytes.
  */
-public final class AwsChunkedDataStream implements DataStream {
+public sealed class AwsChunkedDataStream implements DataStream {
 
     private static final byte[] CRLF = {'\r', '\n'};
     private static final byte[] TERMINATOR = {'0', '\r', '\n'};
     private static final byte[] TRAILER_NAME = "x-amz-checksum-crc32:".getBytes(StandardCharsets.US_ASCII);
+    // CRC32 is 4 bytes, so its base64 form is always 8 chars.
+    private static final int FOOTER_LENGTH = CRLF.length + TERMINATOR.length
+            + TRAILER_NAME.length
+            + 8
+            + CRLF.length
+            + CRLF.length;
 
     private final DataStream inner;
+    private final byte[] header;
     private final long encodedLength;
     private final long decodedLength;
+    private byte[] footer;
+    private byte[] encoded;
 
-    public AwsChunkedDataStream(DataStream inner) {
+    public static AwsChunkedDataStream of(DataStream inner) {
+        return inner instanceof PooledDataStream pooled ? new Pooled(pooled) : new AwsChunkedDataStream(inner);
+    }
+
+    private AwsChunkedDataStream(DataStream inner) {
         if (!inner.isReplayable() || !inner.hasByteBuffer()) {
             throw new IllegalArgumentException("AwsChunkedDataStream requires a replayable, "
                     + "byte-buffer-backed inner stream; got " + inner.getClass().getSimpleName());
         }
         this.inner = inner;
         this.decodedLength = inner.contentLength();
-        // Single chunk: <hexsize>\r\n<bytes>\r\n + 0\r\n + trailer-line\r\n + \r\n
-        // CRC32 is 4 bytes → base64 is always 8 chars (with padding) for any 4-byte input.
-        int hexSizeLen = hexLen(decodedLength);
-        int trailerLineLen = TRAILER_NAME.length + 8 /* base64(crc32) */ + CRLF.length;
-        this.encodedLength = (long) hexSizeLen + CRLF.length
-                + decodedLength
-                + CRLF.length
-                + TERMINATOR.length
-                + trailerLineLen
-                + CRLF.length;
+        this.header = header(decodedLength);
+        this.encodedLength = header.length + decodedLength + FOOTER_LENGTH;
     }
 
     public long decodedLength() {
@@ -96,127 +105,147 @@ public final class AwsChunkedDataStream implements DataStream {
     }
 
     @Override
-    public InputStream asInputStream() {
-        // Materialize the encoded bytes once. Used by tests / sync transports; the publisher path
-        // (subscribe) is what JavaHttpClientTransport uses on the hot benchmark path and avoids
-        // this allocation.
-        var out = new ByteArrayOutputStream((int) encodedLength);
-        try {
-            writeTo(out);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        return new ByteArrayInputStream(out.toByteArray());
+    public void writeTo(OutputStream out) throws IOException {
+        checkAvailable();
+        byte[] footer = footer();
+        out.write(header);
+        inner.writeTo(out);
+        out.write(footer);
     }
 
     @Override
-    public void writeTo(OutputStream out) throws IOException {
-        var crc = new CRC32();
-        inner.forEachBuffer(crc::update);
-        out.write(hexBytes(decodedLength));
-        out.write(CRLF);
-        inner.writeTo(out);
-        out.write(CRLF);
-        out.write(TERMINATOR);
-        out.write(TRAILER_NAME);
-        out.write(crc32Base64(crc));
-        out.write(CRLF);
-        out.write(CRLF);
+    public void writeTo(WritableByteChannel channel) throws IOException {
+        checkAvailable();
+        byte[] footer = footer();
+        writeFully(channel, ByteBuffer.wrap(header));
+        inner.writeTo(channel);
+        writeFully(channel, ByteBuffer.wrap(footer));
     }
 
+    @Override
+    public void forEachBuffer(Consumer<ByteBuffer> action) {
+        checkAvailable();
+        byte[] footer = footer();
+        action.accept(ByteBuffer.wrap(header));
+        inner.forEachBuffer(action);
+        action.accept(ByteBuffer.wrap(footer));
+    }
+
+    @Override
+    public ByteBuffer asByteBuffer() {
+        checkAvailable();
+        return ByteBuffer.wrap(encoded());
+    }
+
+    @Override
+    public InputStream asInputStream() {
+        checkAvailable();
+        return new ByteArrayInputStream(encoded());
+    }
+
+    /** Published buffers share storage with the cached encoded body or the wrapped stream. */
     @Override
     public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-        subscriber.onSubscribe(new Subscription(subscriber));
-    }
-
-    private final class Subscription implements Flow.Subscription {
-        private final AtomicBoolean done = new AtomicBoolean();
-        private final Flow.Subscriber<? super ByteBuffer> subscriber;
-
-        Subscription(Flow.Subscriber<? super ByteBuffer> subscriber) {
-            this.subscriber = subscriber;
+        checkAvailable();
+        byte[] encoded = this.encoded;
+        if (encoded != null) {
+            DataStream.ofByteBuffer(ByteBuffer.wrap(encoded), contentType()).subscribe(subscriber);
+            return;
         }
-
-        @Override
-        public void request(long n) {
-            if (n <= 0 || !done.compareAndSet(false, true)) {
-                return;
-            }
-            try {
-                var body = inner.asByteBuffer();
-                var crc = new CRC32();
-                crc.update(body.duplicate());
-
-                // Frame: <hex-size>\r\n
-                ByteBuffer header = ByteBuffer.wrap(joinHeader(body.remaining()));
-                subscriber.onNext(header);
-
-                // Frame: <chunk bytes>
-                subscriber.onNext(body.duplicate());
-
-                // Frame: \r\n then 0\r\n then trailer line then \r\n
-                subscriber.onNext(ByteBuffer.wrap(joinFooter(crc)));
-
-                subscriber.onComplete();
-            } catch (RuntimeException e) {
-                subscriber.onError(e);
-            }
-        }
-
-        @Override
-        public void cancel() {
-            done.set(true);
-        }
-    }
-
-    private static byte[] joinHeader(int chunkSize) {
-        byte[] hex = hexBytes(chunkSize);
-        byte[] out = new byte[hex.length + CRLF.length];
-        System.arraycopy(hex, 0, out, 0, hex.length);
-        System.arraycopy(CRLF, 0, out, hex.length, CRLF.length);
-        return out;
-    }
-
-    private static byte[] joinFooter(CRC32 crc) {
-        byte[] crcB64 = crc32Base64(crc);
-        // \r\n + 0\r\n + trailer-name + base64-crc + \r\n + \r\n
-        int len = CRLF.length + TERMINATOR.length + TRAILER_NAME.length + crcB64.length + CRLF.length + CRLF.length;
-        byte[] out = new byte[len];
-        int p = 0;
-        System.arraycopy(CRLF, 0, out, p, CRLF.length);
-        p += CRLF.length;
-        System.arraycopy(TERMINATOR, 0, out, p, TERMINATOR.length);
-        p += TERMINATOR.length;
-        System.arraycopy(TRAILER_NAME, 0, out, p, TRAILER_NAME.length);
-        p += TRAILER_NAME.length;
-        System.arraycopy(crcB64, 0, out, p, crcB64.length);
-        p += crcB64.length;
-        System.arraycopy(CRLF, 0, out, p, CRLF.length);
-        p += CRLF.length;
-        System.arraycopy(CRLF, 0, out, p, CRLF.length);
-        return out;
-    }
-
-    private static byte[] crc32Base64(CRC32 crc) {
-        long value = crc.getValue();
-        byte[] crcBytes = {
-                (byte) ((value >>> 24) & 0xff),
-                (byte) ((value >>> 16) & 0xff),
-                (byte) ((value >>> 8) & 0xff),
-                (byte) (value & 0xff)};
-        return Base64.getEncoder().encode(crcBytes);
-    }
-
-    private static byte[] hexBytes(long size) {
-        return Long.toHexString(size).getBytes(StandardCharsets.US_ASCII);
-    }
-
-    private static int hexLen(long size) {
-        return Long.toHexString(size).length();
+        byte[] footer = footer();
+        var frames = List.of(ByteBuffer.wrap(header), inner.asByteBuffer(), ByteBuffer.wrap(footer));
+        DataStream.ofByteBuffers(frames, encodedLength, contentType()).subscribe(subscriber);
     }
 
     @Override
     public void close() {
         inner.close();
+    }
+
+    // Check availability before every read, including cached reads, to prevent output after release.
+    private void checkAvailable() {
+        if (!inner.isAvailable()) {
+            throw new IllegalStateException("This aws-chunked body wraps a pooled request body that was released "
+                    + "when its call completed and cannot be read again.");
+        }
+    }
+
+    private byte[] footer() {
+        byte[] bytes = footer;
+        if (bytes == null) {
+            var crc = new CRC32();
+            inner.forEachBuffer(crc::update);
+            bytes = footer = footer(crc);
+        }
+        return bytes;
+    }
+
+    private byte[] encoded() {
+        byte[] bytes = encoded;
+        if (bytes == null) {
+            bytes = encoded = encode();
+        }
+        return bytes;
+    }
+
+    private byte[] encode() {
+        byte[] footer = footer();
+        ByteBuffer dst = ByteBuffer.allocate((int) encodedLength);
+        dst.put(header);
+        inner.forEachBuffer(dst::put);
+        dst.put(footer);
+        return dst.array();
+    }
+
+    private static void writeFully(WritableByteChannel channel, ByteBuffer buffer) throws IOException {
+        while (buffer.hasRemaining()) {
+            channel.write(buffer);
+        }
+    }
+
+    private static byte[] header(long size) {
+        byte[] hex = Long.toHexString(size).getBytes(StandardCharsets.US_ASCII);
+        return ByteBuffer.allocate(hex.length + CRLF.length).put(hex).put(CRLF).array();
+    }
+
+    private static byte[] footer(CRC32 crc) {
+        byte[] crcB64 = Base64.getEncoder().encode(ByteBuffer.allocate(4).putInt((int) crc.getValue()).array());
+        return ByteBuffer.allocate(FOOTER_LENGTH)
+                .put(CRLF)
+                .put(TERMINATOR)
+                .put(TRAILER_NAME)
+                .put(crcB64)
+                .put(CRLF)
+                .put(CRLF)
+                .array();
+    }
+
+    private static final class Pooled extends AwsChunkedDataStream implements ForwardingPooledDataStream {
+        Pooled(PooledDataStream lease) {
+            super(lease);
+        }
+
+        @Override
+        public PooledDataStream lease() {
+            return (PooledDataStream) super.inner;
+        }
+
+        @Override
+        public boolean escaped() {
+            return lease().escaped() || super.encoded != null;
+        }
+
+        // A publisher can outlive the lease. Publish a private copy to keep its buffers valid after release.
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            DataStream.ofByteBuffer(asByteBuffer(), contentType()).subscribe(subscriber);
+        }
+
+        @Override
+        public DataStream copy() {
+            super.checkAvailable();
+            byte[] encoded = super.encoded;
+            return DataStream.ofBytes(encoded != null ? encoded : super.encode(), contentType());
+        }
     }
 }

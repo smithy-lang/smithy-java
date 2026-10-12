@@ -122,6 +122,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
 
         // If the payload is empty, then use "{}" as the default empty payload.
         if (content.contentLength() == 0) {
+            discardBody(response);
             return codec.deserializeShape(EMPTY_PAYLOAD, builder);
         }
 

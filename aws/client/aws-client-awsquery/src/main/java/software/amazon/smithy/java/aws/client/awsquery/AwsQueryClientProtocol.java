@@ -108,6 +108,7 @@ public final class AwsQueryClientProtocol extends HttpClientProtocol {
         var content = response.body();
 
         if (content.contentLength() == 0 || operation.outputSchema().hasTrait(TraitKey.UNIT_TYPE_TRAIT)) {
+            discardBody(response);
             return builder.build();
         }
 

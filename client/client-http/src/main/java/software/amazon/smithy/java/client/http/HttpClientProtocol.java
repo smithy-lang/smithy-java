@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.client.http;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.endpoints.Endpoint;
@@ -32,6 +34,19 @@ public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, 
     @Override
     public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
         return HttpMessageExchange.INSTANCE;
+    }
+
+    /**
+     * Releases a response body that will not be read, so a pooled connection returns to its pool.
+     *
+     * <p>Call this on every path that completes deserialization without consuming the body.
+     */
+    protected static void discardBody(HttpResponse response) {
+        try {
+            response.body().discard();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override
