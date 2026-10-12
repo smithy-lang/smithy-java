@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.http.plugins;
 
+import java.util.List;
 import java.util.Locale;
 import software.amazon.smithy.java.client.core.AutoClientPlugin;
 import software.amazon.smithy.java.client.core.CallContext;
@@ -25,28 +26,48 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  *
  * <p>This plugin is applied by default by {@link HttpMessageExchange} and {@link ClientTransport}s that call it by
  * default.
+ *
+ * <p>Clients resolve a default {@link ClientContext#APPLICATION_ID} once per build. They use the first non-blank value
+ * from the {@code aws.userAgentAppId} and {@code sdk.ua.appId} system properties, in that order. The
+ * {@code AWS_SDK_UA_APP_ID} environment variable is the final source. Builder settings and per-request overrides take
+ * precedence. See <a href="https://docs.aws.amazon.com/sdkref/latest/guide/feature-appid.html">Application ID</a>.
  */
 @SmithyInternalApi
 public final class UserAgentPlugin implements AutoClientPlugin {
+
+    private static final List<String> APP_ID_SYSTEM_PROPERTIES = List.of("aws.userAgentAppId", "sdk.ua.appId");
+    private static final String APP_ID_ENV_VAR = "AWS_SDK_UA_APP_ID";
+
     @Override
     public void configureClient(ClientConfig.Builder config) {
         // We can conditionally add the interceptor here because client transport can't change after construction.
         if (config.isUsingMessageExchange(HttpMessageExchange.INSTANCE)) {
+            var appId = resolveDefaultAppId();
+            if (appId != null) {
+                config.putConfigIfAbsent(ClientContext.APPLICATION_ID, appId);
+            }
             config.addInterceptor(UserAgentInterceptor.INSTANCE);
         }
     }
 
-    /**
-     * Adds a default User-Agent header if none is set.
-     *
-     * <p>The agent is in the form of {@code smithy-java/0.1 ua/2.1 os/macos#14.6.1Lang/java#21.0.12 m/a,b}, where
-     * "m/a,b" are feature IDs set via {@link CallContext#FEATURE_IDS}.
-     *
-     * <p>A pair of "app/{id}" is added if {@link ClientContext#APPLICATION_ID} is set, or a value is set in the
-     * "aws.userAgentAppId" system property, or the value set in the "AWS_SDK_UA_APP_ID" environment variable.
-     * See <a href="https://docs.aws.amazon.com/sdkref/latest/guide/feature-appid.html">Application ID</a> for more
-     * information.
-     */
+    static String resolveDefaultAppId() {
+        for (var property : APP_ID_SYSTEM_PROPERTIES) {
+            var value = normalizeAppId(System.getProperty(property));
+            if (value != null) {
+                return value;
+            }
+        }
+        return normalizeAppId(System.getenv(APP_ID_ENV_VAR));
+    }
+
+    private static String normalizeAppId(String value) {
+        if (value == null) {
+            return null;
+        }
+        var stripped = value.strip();
+        return stripped.isEmpty() ? null : stripped;
+    }
+
     static final class UserAgentInterceptor implements ClientInterceptor {
 
         private static final UserAgentInterceptor INSTANCE = new UserAgentInterceptor();
@@ -59,10 +80,6 @@ public final class UserAgentPlugin implements AutoClientPlugin {
         // byte[]/String allocator), reserving the builder path for requests that actually carry an
         // app-id or feature IDs.
         private static final String DEFAULT_UA;
-
-        private static final String ENV_APP_ID = "AWS_SDK_UA_APP_ID";
-        private static final String SYSTEM_APP_ID = "aws.userAgentAppId";
-        private static final String ENV_APPLICATION_ID = System.getenv(ENV_APP_ID);
 
         private static final String UA_DENYLIST_CHARS = "[() ,/:;<=>?@[]{}\\]";
         private static final char REPLACEMENT = '_';
@@ -97,7 +114,10 @@ public final class UserAgentPlugin implements AutoClientPlugin {
         }
 
         private static String createUa(Context context) {
-            var appId = resolveAppId(context);
+            var appId = context.get(ClientContext.APPLICATION_ID);
+            if (appId != null && appId.isEmpty()) {
+                appId = null;
+            }
             var features = context.get(CallContext.FEATURE_IDS);
             // Common case — neither app-id nor feature IDs — is a constant; skip the builder.
             if (appId == null && (features == null || features.isEmpty())) {
@@ -115,24 +135,11 @@ public final class UserAgentPlugin implements AutoClientPlugin {
                 for (var feature : features) {
                     b.append(sanitizeValue(feature.getShortName())).append(',');
                 }
-                b.deleteCharAt(b.length() - 1);
-            } else {
-                // Trim the last trailing character.
-                b.deleteCharAt(STATIC_SEGMENT.length() - 1);
             }
 
+            // Every segment must end with a space or comma.
+            b.setLength(b.length() - 1);
             return b.toString();
-        }
-
-        private static String resolveAppId(Context context) {
-            var appId = context.get(ClientContext.APPLICATION_ID);
-            if (appId == null) {
-                appId = System.getenv(SYSTEM_APP_ID);
-            }
-            if (appId == null) {
-                appId = ENV_APPLICATION_ID;
-            }
-            return appId;
         }
 
         private static String getOsFamily() {
