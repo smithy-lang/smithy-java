@@ -12,6 +12,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.sameInstance;
+import static org.hamcrest.Matchers.startsWith;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -95,5 +97,36 @@ public class SchemaTest {
         assertThat(
                 structWithMember.member("member").expectTrait(TraitKey.get(DocumentationTrait.class)).getValue(),
                 equalTo("Member"));
+    }
+
+    @Test
+    public void assertMemberTargetIsReturnsMemberWhenTargetMatches() {
+        var struct = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
+                .putMember("bar", PreludeSchemas.STRING)
+                .build();
+        var member = struct.member("bar");
+
+        assertThat(member.assertMemberTargetIs(PreludeSchemas.STRING), is(member));
+    }
+
+    @Test
+    public void assertMemberTargetIsThrowsOnMismatchedTarget() {
+        var struct = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
+                .putMember("bar", PreludeSchemas.STRING)
+                .build();
+        var member = struct.member("bar");
+
+        var e = assertThrows(IllegalStateException.class, () -> member.assertMemberTargetIs(PreludeSchemas.INTEGER));
+
+        assertThat(e.getMessage(), startsWith("Expected a member schema that targets smithy.api#Integer, found "));
+    }
+
+    @Test
+    public void assertMemberTargetIsThrowsOnNonMemberSchema() {
+        var e = assertThrows(
+                IllegalStateException.class,
+                () -> PreludeSchemas.STRING.assertMemberTargetIs(PreludeSchemas.INTEGER));
+
+        assertThat(e.getMessage(), startsWith("Expected a member schema that targets smithy.api#Integer, found "));
     }
 }

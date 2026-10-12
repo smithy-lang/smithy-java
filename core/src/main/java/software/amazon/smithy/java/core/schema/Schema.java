@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -392,15 +393,21 @@ public abstract sealed class Schema implements MemberLookup
      *
      * <p>This is mostly used during shape deserialization in {@link ShapeBuilder#deserializeMember}.
      *
-     * @param target Schema that this Schema must target.
+     * @param target Schema that this Schema must target. Must not be null.
      * @return the current Schema.
+     * @throws IllegalStateException if this Schema is not a member or does not target {@code target}.
      */
-    public Schema assertMemberTargetIs(Schema target) {
-        var memberTarget = memberTarget();
-        if (target == memberTarget) {
+    public final Schema assertMemberTargetIs(Schema target) {
+        if (target == memberTarget()) {
             return this;
         }
-        throw new IllegalStateException("Expected a member schema that targets " + target.id + ", found " + this);
+        throw memberTargetMismatch(target, this);
+    }
+
+    // Keep error construction here so assertMemberTargetIs stays below C2's default 35-bytecode inlining limit.
+    private static IllegalStateException memberTargetMismatch(Schema target, Schema found) {
+        Objects.requireNonNull(target, "target");
+        return new IllegalStateException("Expected a member schema that targets " + target.id + ", found " + found);
     }
 
     /**
