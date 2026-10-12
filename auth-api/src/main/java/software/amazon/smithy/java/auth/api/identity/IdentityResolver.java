@@ -18,6 +18,9 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * <p>Expected errors like missing environment variables are expected to return a result that contains an
      * error string. Unexpected errors like malformed input or networking errors are allowed to throw exceptions.
      *
+     * <p>Implementations must treat the request properties as read-only because the context may be unmodifiable or
+     * shared with other components of the call.
+     *
      * @param requestProperties The request properties used to resolve an Identity.
      * @return the resolved identity result.
      */

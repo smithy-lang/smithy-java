@@ -279,13 +279,21 @@ final class ClientPipeline<RequestT, ResponseT> {
         if (identityResolver == null) {
             return null;
         }
-        var identityProperties = authScheme.getIdentityProperties(context).merge(option.identityPropertyOverrides());
-        var signerProperties = authScheme.getSignerProperties(context).merge(option.signerPropertyOverrides());
+        var identityProperties = withOverrides(
+                authScheme.getIdentityProperties(context),
+                option.identityPropertyOverrides());
+        var signerProperties = withOverrides(
+                authScheme.getSignerProperties(context),
+                option.signerPropertyOverrides());
         return new ResolvedScheme<>(
                 signerProperties,
                 authScheme,
                 identityResolver,
                 identityResolver.resolveIdentity(identityProperties));
+    }
+
+    private static Context withOverrides(Context base, Context overrides) {
+        return overrides == Context.empty() ? base : base.merge(overrides);
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(

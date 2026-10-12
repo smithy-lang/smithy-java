@@ -19,6 +19,10 @@ public interface Signer<RequestT, IdentityT extends Identity> extends AutoClosea
     /**
      * Sign the given request.
      *
+     * <p>Implementations must treat the properties as read-only because the context may be unmodifiable or shared
+     * with other components of the call. Use {@link Context#modifiableCopy(Context)} before adding or overriding
+     * a property.
+     *
      * @param request    Request to sign.
      * @param identity  Identity used to sign the request.
      * @param properties Signing properties.

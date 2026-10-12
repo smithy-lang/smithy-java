@@ -72,7 +72,11 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
     /**
      * Gets the default signer properties from the context.
      *
+     * <p>If the selected {@link AuthSchemeOption} has no signer property overrides, the {@link Signer} and event signer
+     * receive the returned context directly. Implementations must not mutate that context after this method returns.
+     *
      * @param context request context
+     * @return the signer properties, never null.
      */
     default Context getSignerProperties(Context context) {
         return Context.empty();
@@ -81,7 +85,11 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
     /**
      * Gets the default identity properties from the context.
      *
+     * <p>If the selected {@link AuthSchemeOption} has no identity property overrides, the {@link IdentityResolver}
+     * receives the returned context directly. Implementations must not mutate that context after this method returns.
+     *
      * @param context request context
+     * @return the identity properties, never null.
      */
     default Context getIdentityProperties(Context context) {
         return Context.empty();

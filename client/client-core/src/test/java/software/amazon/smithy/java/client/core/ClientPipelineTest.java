@@ -260,6 +260,93 @@ public class ClientPipelineTest {
     }
 
     @Test
+    public void authSchemeOptionOverridesAreMergedOverSchemeProperties() {
+        var service = ShapeId.from("smithy.example#Sprockets");
+        var schemeId = ShapeId.from("smithy.test#propertiesAuth");
+        var BASE_KEY = Context.<String>key("scheme-only");
+        var SHARED_KEY = Context.<String>key("scheme-and-option");
+        var IDENTITY_KEY = Context.<String>key("identity-option-only");
+        var SIGNER_KEY = Context.<String>key("signer-option-only");
+
+        var capturedIdentityProperties = new AtomicReference<Context>();
+        var capturedSignerProperties = new AtomicReference<Context>();
+        var scheme = new PropertiesAuthScheme(schemeId, BASE_KEY, SHARED_KEY, capturedSignerProperties);
+
+        var identityOverrides = Context.create()
+                .put(SHARED_KEY, "identity-override")
+                .put(IDENTITY_KEY, "identity-only");
+        var signerOverrides = Context.create()
+                .put(SHARED_KEY, "signer-override")
+                .put(SIGNER_KEY, "signer-only");
+
+        var mockQueue = new MockQueue()
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable());
+        var client = DynamicClient.builder()
+                .serviceId(service)
+                .model(MODEL)
+                .addPlugin(MockPlugin.builder().addQueue(mockQueue).build())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://example.com"))
+                .authSchemeResolver(
+                        params -> List.of(new AuthSchemeOption(schemeId, identityOverrides, signerOverrides)))
+                .putSupportedAuthSchemes(scheme)
+                .addIdentityResolver(capturingIdentityResolver(capturedIdentityProperties))
+                .build();
+
+        client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
+
+        var identityProperties = capturedIdentityProperties.get();
+        assertThat(identityProperties.get(BASE_KEY), equalTo("scheme"));
+        assertThat(identityProperties.get(SHARED_KEY), equalTo("identity-override"));
+        assertThat(identityProperties.get(IDENTITY_KEY), equalTo("identity-only"));
+        Assertions.assertNull(identityProperties.get(SIGNER_KEY));
+
+        var signerProperties = capturedSignerProperties.get();
+        assertThat(signerProperties.get(BASE_KEY), equalTo("scheme"));
+        assertThat(signerProperties.get(SHARED_KEY), equalTo("signer-override"));
+        assertThat(signerProperties.get(SIGNER_KEY), equalTo("signer-only"));
+        Assertions.assertNull(signerProperties.get(IDENTITY_KEY));
+    }
+
+    @Test
+    public void authSchemeOptionWithoutOverridesPassesSchemePropertiesThrough() {
+        var service = ShapeId.from("smithy.example#Sprockets");
+        var schemeId = ShapeId.from("smithy.test#propertiesAuth");
+        var BASE_KEY = Context.<String>key("scheme-only");
+        var SHARED_KEY = Context.<String>key("scheme-and-option");
+
+        var capturedIdentityProperties = new AtomicReference<Context>();
+        var capturedSignerProperties = new AtomicReference<Context>();
+        var scheme = new PropertiesAuthScheme(schemeId, BASE_KEY, SHARED_KEY, capturedSignerProperties);
+
+        var mockQueue = new MockQueue()
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .setBody(DataStream.ofString("{\"id\":\"1\"}"))
+                        .toUnmodifiable());
+        var client = DynamicClient.builder()
+                .serviceId(service)
+                .model(MODEL)
+                .addPlugin(MockPlugin.builder().addQueue(mockQueue).build())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://example.com"))
+                .authSchemeResolver(params -> List.of(new AuthSchemeOption(schemeId)))
+                .putSupportedAuthSchemes(scheme)
+                .addIdentityResolver(capturingIdentityResolver(capturedIdentityProperties))
+                .build();
+
+        client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
+
+        Assertions.assertSame(scheme.lastIdentityProperties, capturedIdentityProperties.get());
+        Assertions.assertSame(scheme.lastSignerProperties, capturedSignerProperties.get());
+        assertThat(capturedIdentityProperties.get().get(BASE_KEY), equalTo("scheme"));
+        assertThat(capturedIdentityProperties.get().get(SHARED_KEY), equalTo("scheme"));
+        assertThat(capturedSignerProperties.get().get(BASE_KEY), equalTo("scheme"));
+        assertThat(capturedSignerProperties.get().get(SHARED_KEY), equalTo("scheme"));
+    }
+
+    @Test
     public void laterAuthSchemeRegistrationReplacesEarlierRegistration() {
         var service = ShapeId.from("smithy.example#Sprockets");
         var schemeId = ShapeId.from("smithy.test#replaceableAuth");
@@ -577,6 +664,79 @@ public class ClientPipelineTest {
                 return Identity.class;
             }
         };
+    }
+
+    private static IdentityResolver<Identity> capturingIdentityResolver(AtomicReference<Context> captured) {
+        return new IdentityResolver<>() {
+            @Override
+            public IdentityResult<Identity> resolveIdentity(Context requestProperties) {
+                captured.set(requestProperties);
+                return IdentityResult.of(new Identity() {});
+            }
+
+            @Override
+            public Class<Identity> identityType() {
+                return Identity.class;
+            }
+        };
+    }
+
+    private static final class PropertiesAuthScheme implements AuthScheme<HttpRequest, Identity> {
+        private final ShapeId schemeId;
+        private final Context.Key<String> baseKey;
+        private final Context.Key<String> sharedKey;
+        private final AtomicReference<Context> capturedSignerProperties;
+        volatile Context lastIdentityProperties;
+        volatile Context lastSignerProperties;
+
+        PropertiesAuthScheme(
+                ShapeId schemeId,
+                Context.Key<String> baseKey,
+                Context.Key<String> sharedKey,
+                AtomicReference<Context> capturedSignerProperties
+        ) {
+            this.schemeId = schemeId;
+            this.baseKey = baseKey;
+            this.sharedKey = sharedKey;
+            this.capturedSignerProperties = capturedSignerProperties;
+        }
+
+        @Override
+        public ShapeId schemeId() {
+            return schemeId;
+        }
+
+        @Override
+        public Class<HttpRequest> requestClass() {
+            return HttpRequest.class;
+        }
+
+        @Override
+        public Class<Identity> identityClass() {
+            return Identity.class;
+        }
+
+        @Override
+        public Context getIdentityProperties(Context context) {
+            lastIdentityProperties = Context.unmodifiableView(
+                    Context.create().put(baseKey, "scheme").put(sharedKey, "scheme"));
+            return lastIdentityProperties;
+        }
+
+        @Override
+        public Context getSignerProperties(Context context) {
+            lastSignerProperties = Context.unmodifiableView(
+                    Context.create().put(baseKey, "scheme").put(sharedKey, "scheme"));
+            return lastSignerProperties;
+        }
+
+        @Override
+        public Signer<HttpRequest, Identity> signer() {
+            return (request, identity, properties) -> {
+                capturedSignerProperties.set(properties);
+                return new SignResult<>(request);
+            };
+        }
     }
 
     private static final class PropertiesFailingAuthScheme implements AuthScheme<HttpRequest, TokenIdentity> {
