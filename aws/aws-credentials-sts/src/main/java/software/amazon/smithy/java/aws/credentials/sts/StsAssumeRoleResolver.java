@@ -126,19 +126,21 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
         // Per the Assume Role SEP: terminate at static credentials
         for (AwsConfigCredentialSource src : sourceProfile.credentialSources()) {
             if (src instanceof AwsConfigCredentialSource.StaticKeys(String accessKeyId, String secretAccessKey, String accountId)) {
-                return IdentityResolver.of(AwsCredentialsIdentity.create(
-                        accessKeyId,
-                        secretAccessKey,
-                        null,
-                        null,
-                        accountId));
+                return IdentityResolver.of(AwsCredentialsIdentity.class,
+                        AwsCredentialsIdentity.create(
+                                accessKeyId,
+                                secretAccessKey,
+                                null,
+                                null,
+                                accountId));
             } else if (src instanceof AwsConfigCredentialSource.SessionKeys(String accessKeyId, String secretAccessKey, String sessionToken, String accountId)) {
-                return IdentityResolver.of(AwsCredentialsIdentity.create(
-                        accessKeyId,
-                        secretAccessKey,
-                        sessionToken,
-                        null,
-                        accountId));
+                return IdentityResolver.of(AwsCredentialsIdentity.class,
+                        AwsCredentialsIdentity.create(
+                                accessKeyId,
+                                secretAccessKey,
+                                sessionToken,
+                                null,
+                                accountId));
             } else if (src instanceof AwsConfigCredentialSource.AssumeRole nested) {
                 var nestedResolver =
                         new StsAssumeRoleResolver(nested, profileFile, endpoint, executor, visited, environment);
@@ -156,6 +158,7 @@ final class StsAssumeRoleResolver implements IdentityResolver<AwsCredentialsIden
                 String sk = getRequireEnv("AWS_SECRET_ACCESS_KEY");
                 String st = environment.apply("AWS_SESSION_TOKEN");
                 yield IdentityResolver.of(
+                        AwsCredentialsIdentity.class,
                         AwsCredentialsIdentity.create(ak, sk, st, null, environment.apply("AWS_ACCOUNT_ID")));
             }
             case "Ec2InstanceMetadata" -> {

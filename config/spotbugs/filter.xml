@@ -162,8 +162,13 @@
     </Match>
     <Match>
         <Class name="software.amazon.smithy.java.http.api.ArrayHttpHeaders"/>
-        <Method name="setHeaderCanonical"/>
         <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+    <!-- Equal names with distinct instances cause a cache miss and a fresh sort. -->
+    <Match>
+        <Class name="software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigningResources"/>
+        <Method name="sameNames"/>
+        <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ"/>
     </Match>
 
     <Match>

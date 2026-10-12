@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.SerializationException;
@@ -164,7 +165,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         }
         if (len > 8) {
             return ascii
-                    ? new String(buf, start, len, StandardCharsets.ISO_8859_1)
+                    ? CompactStringAccess.asciiString(buf, start, len)
                     : new String(buf, start, len, StandardCharsets.UTF_8);
         }
         // Pack bytes into a long. Every content byte is >= 0x20 here (the no-escape fast
@@ -187,7 +188,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             return vals[slot];
         }
         String s = ascii
-                ? new String(buf, start, len, StandardCharsets.ISO_8859_1)
+                ? CompactStringAccess.asciiString(buf, start, len)
                 : new String(buf, start, len, StandardCharsets.UTF_8);
         keys[slot] = key;
         vals[slot] = s;

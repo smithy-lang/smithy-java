@@ -35,7 +35,12 @@ final class TokenBucketStore {
         Objects.requireNonNull(scope, "scope");
         lock.lock();
         try {
-            return scopeToTokenBucket.computeIfAbsent(scope, s -> new TokenBucket(initialRetryTokens));
+            TokenBucket bucket = scopeToTokenBucket.get(scope);
+            if (bucket == null) {
+                bucket = new TokenBucket(initialRetryTokens);
+                scopeToTokenBucket.put(scope, bucket);
+            }
+            return bucket;
         } finally {
             lock.unlock();
         }

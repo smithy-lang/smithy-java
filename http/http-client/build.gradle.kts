@@ -57,6 +57,8 @@ dependencies {
     // Netty for raw HTTP/2 benchmarking
     jmh("io.netty:netty-all:4.2.18.Final")
 
+    jmh(project(":benchmarks:benchmark-commons"))
+
     // Productionized smithy transports for benchmarking
     jmh(project(":client:client-http"))
     jmh(project(":client:client-http-boringssl"))
@@ -76,6 +78,13 @@ val benchmarkPidFile = layout.buildDirectory.file("benchmark-server.pid")
 
 // Capture classpath at configuration time for config cache compatibility
 val jmhServerClasspath = sourceSets["jmhServer"].runtimeClasspath
+
+// Run this server jar with the JMH jar on the classpath for its dependencies.
+val jmhServerJar by tasks.registering(Jar::class) {
+    from(sourceSets["jmhServer"].output)
+    archiveClassifier.set("jmh-server")
+    manifest { attributes("Main-Class" to "software.amazon.smithy.java.http.client.BenchmarkServer") }
+}
 
 // Task to start the benchmark server in a background process
 val startBenchmarkServer by tasks.registering {
@@ -169,9 +178,6 @@ val externalBenchHost =
     (project.findProperty("jmh.bench.host") as String?)?.takeIf { it.isNotBlank() }
         ?: System.getenv("BENCH_HOST")?.takeIf { it.isNotBlank() }
 
-// Configure JMH
-// Run with: ./gradlew :http:http-client:jmh -Pjmh.includes="H2cScalingBenchmark.smithy"
-// To customize params, edit @Param annotations in benchmark source files
 jmh {
     val includesProp = project.findProperty("jmh.includes")?.toString()
     val jvmArgsProp = project.findProperty("jmh.jvmArgsAppend")?.toString()

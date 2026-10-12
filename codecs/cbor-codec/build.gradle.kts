@@ -1,6 +1,7 @@
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.fuzz-test")
+    id("smithy-java.jmh-conventions")
     `java-test-fixtures`
 }
 

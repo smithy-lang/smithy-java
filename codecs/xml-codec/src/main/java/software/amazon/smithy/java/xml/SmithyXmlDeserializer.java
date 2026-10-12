@@ -17,6 +17,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -675,9 +676,7 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                 }
             }
             if (clean) {
-                @SuppressWarnings("deprecation")
-                String s = new String(buf, 0, start, len);
-                return s;
+                return CompactStringAccess.asciiString(buf, start, len);
             }
             return readTextContentSlow(start, len);
         }
@@ -799,9 +798,7 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                         }
                     }
                     if (clean) {
-                        @SuppressWarnings("deprecation")
-                        String s = new String(buf, 0, start, textLen);
-                        return s;
+                        return CompactStringAccess.asciiString(buf, start, textLen);
                     }
                     return readTextContentSlow(start, textLen);
                 }

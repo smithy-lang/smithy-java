@@ -372,15 +372,14 @@ final class CborSerializer implements ShapeSerializer {
         int headerStart = pos;
         byte[] latin1 = CompactStringAccess.latin1Bytes(value);
         if (latin1 != null) {
-            for (byte current : latin1) {
-                if (current < 0) {
-                    encodeLatin1TextStringRewind(latin1, headerStart);
-                    return;
-                }
+            int ascii = CompactStringAccess.countPositives(latin1, 0, charLen);
+            if (ascii == charLen) {
+                tagAndLengthUnchecked(TYPE_TEXTSTRING, charLen);
+                System.arraycopy(latin1, 0, buf, pos, charLen);
+                pos += charLen;
+            } else {
+                encodeLatin1TextStringRewind(latin1, ascii, headerStart);
             }
-            tagAndLengthUnchecked(TYPE_TEXTSTRING, charLen);
-            System.arraycopy(latin1, 0, buf, pos, charLen);
-            pos += charLen;
             return;
         }
         //Don't scan if the string is too long.
@@ -399,13 +398,14 @@ final class CborSerializer implements ShapeSerializer {
         encodeUtf8TextStringRewind(value, charLen, headerStart);
     }
 
-    private void encodeLatin1TextStringRewind(byte[] value, int headerStart) {
+    private void encodeLatin1TextStringRewind(byte[] value, int asciiPrefix, int headerStart) {
         int writeStart = headerStart + 5;
-        int p = writeStart;
-        for (byte current : value) {
-            int c = current & 0xff;
+        System.arraycopy(value, 0, buf, writeStart, asciiPrefix);
+        int p = writeStart + asciiPrefix;
+        for (int i = asciiPrefix; i < value.length; i++) {
+            int c = value[i] & 0xff;
             if (c < 0x80) {
-                buf[p++] = current;
+                buf[p++] = (byte) c;
             } else {
                 buf[p++] = (byte) (0xC0 | (c >> 6));
                 buf[p++] = (byte) (0x80 | (c & 0x3F));

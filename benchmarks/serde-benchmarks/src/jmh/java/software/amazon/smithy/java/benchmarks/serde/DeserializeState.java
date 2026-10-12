@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.benchmarks.serde;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
+import software.amazon.smithy.java.benchmarks.WireBodyNormalizer;
 import software.amazon.smithy.java.benchmarks.serde.BenchmarkTestCases.ResponseEntry;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -67,9 +67,7 @@ final class DeserializeState {
     /**
      * Build the deserialize state from a response test case.
      *
-     * <p>JSON formatting whitespace is removed based on the test case's body media
-     * type, then its Content-Type header, then the protocol's default content type.
-     * Trait response headers override defaults so HTTP header bindings see the
+     * <p>Trait response headers override defaults so HTTP header bindings see the
      * values specified by the test case.
      *
      * @param testCaseId benchmark test case id
@@ -79,39 +77,29 @@ final class DeserializeState {
      *        Pass {@code null} for an XML-style default derived from the output
      *        shape's {@code @xmlName}, or its simple name if that trait is absent.
      * @param contentType default content-type header value (e.g. {@code "application/json"})
-     * @param base64DecodeBody whether the body string in the test trait is
-     *        base64-encoded and should be decoded before being placed in the response,
-     *        regardless of protocol. Decoded bodies are not minified.
      */
     static DeserializeState forTestCase(
             String testCaseId,
             String generatedPackage,
             ShapeId serviceId,
             byte[] emptyBody,
-            String contentType,
-            boolean base64DecodeBody
+            String contentType
     ) {
         ResponseEntry entry = BenchmarkTestCases.response(testCaseId);
         OperationShape opShape = entry.operation();
 
         ApiOperation<? extends SerializableStruct, ? extends SerializableStruct> operation =
                 BenchmarkOperations.resolve(opShape, generatedPackage, serviceId);
+        var outputSchema = operation.outputSchema();
 
         byte[] resolvedEmpty = emptyBody;
         if (resolvedEmpty == null) {
             // Header-only XML responses still need the output shape's wire name as the root element.
-            var schema = operation.outputSchema();
-            var xmlName = schema.getTrait(TraitKey.XML_NAME_TRAIT);
-            String rootName = xmlName != null ? xmlName.getValue() : schema.id().getName();
+            var xmlName = outputSchema.getTrait(TraitKey.XML_NAME_TRAIT);
+            String rootName = xmlName != null ? xmlName.getValue() : outputSchema.id().getName();
             resolvedEmpty = ("<" + rootName + "/>").getBytes(StandardCharsets.UTF_8);
         }
-        byte[] body = entry.testCase()
-                .getBody()
-                .map(s -> base64DecodeBody
-                        ? Base64.getMimeDecoder().decode(s)
-                        : WireBodyNormalizer
-                                .normalize(s.getBytes(StandardCharsets.UTF_8), entry.testCase(), contentType))
-                .orElse(resolvedEmpty);
+        byte[] body = WireBodyNormalizer.wireBody(entry.testCase(), outputSchema, contentType, resolvedEmpty);
         int statusCode = entry.testCase().getCode();
 
         ModifiableHttpResponse response = HttpResponse.create()

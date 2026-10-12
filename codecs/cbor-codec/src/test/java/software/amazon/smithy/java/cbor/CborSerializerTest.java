@@ -16,8 +16,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 
@@ -125,6 +127,62 @@ public class CborSerializerTest {
             var de = new CborTestData.BirdBuilder().deserialize(CODEC.newDeserializer(ser, SETTINGS)).build();
             assertEquals(new BigDecimal(input.getValue()), de.wingspan);
         }
+    }
+
+    @ParameterizedTest(name = "{index}")
+    @MethodSource("textStrings")
+    void stringsEncodeAsUtf8(String value) {
+        assertTextStringEncoding(value);
+    }
+
+    static Stream<String> textStrings() {
+        return Stream.of(
+                "",
+                "a",
+                "a".repeat(23),
+                "a".repeat(24),
+                "a".repeat(255),
+                "a".repeat(256),
+                "é",
+                "é".repeat(12),
+                "é".repeat(128),
+                "é" + "a".repeat(299),
+                "a".repeat(150) + "é" + "a".repeat(149),
+                "a".repeat(299) + "é",
+                "café ".repeat(50),
+                "é" + "a".repeat(70000),
+                "a".repeat(70000) + "é",
+                "€".repeat(40) + "a".repeat(40));
+    }
+
+    private static void assertTextStringEncoding(String value) {
+        byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
+        byte[] expected;
+        if (utf8.length < 24) {
+            expected = new byte[1 + utf8.length];
+            expected[0] = (byte) (0x60 | utf8.length);
+        } else if (utf8.length <= 0xFF) {
+            expected = new byte[2 + utf8.length];
+            expected[0] = (byte) 0x78;
+            expected[1] = (byte) utf8.length;
+        } else if (utf8.length <= 0xFFFF) {
+            expected = new byte[3 + utf8.length];
+            expected[0] = (byte) 0x79;
+            expected[1] = (byte) (utf8.length >> 8);
+            expected[2] = (byte) utf8.length;
+        } else {
+            expected = new byte[5 + utf8.length];
+            expected[0] = (byte) 0x7A;
+            expected[1] = (byte) (utf8.length >> 24);
+            expected[2] = (byte) (utf8.length >> 16);
+            expected[3] = (byte) (utf8.length >> 8);
+            expected[4] = (byte) utf8.length;
+        }
+        System.arraycopy(utf8, 0, expected, expected.length - utf8.length, utf8.length);
+
+        var serializer = new CborSerializer();
+        serializer.writeString(null, value);
+        assertArrayEquals(expected, ByteBufferUtils.getBytes(serializer.extractResult()), value);
     }
 
     private static void assertBuffersEqual(ByteBuffer expected, ByteBuffer actual) {

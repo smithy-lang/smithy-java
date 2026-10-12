@@ -131,6 +131,40 @@ final class XmlWriteUtils {
     }
 
     private static int writeEscapedLatin1(byte[] buf, int pos, byte[] value, boolean attribute) {
+        int len = value.length;
+        if (CompactStringAccess.countPositives(value, 0, len) == len) {
+            return writeEscapedAscii(buf, pos, value, attribute);
+        }
+        return writeEscapedLatin1Slow(buf, pos, value, attribute);
+    }
+
+    private static int writeEscapedAscii(byte[] buf, int pos, byte[] value, boolean attribute) {
+        int copyStart = 0;
+        for (int i = 0; i < value.length; i++) {
+            byte current = value[i];
+            byte[] escape;
+            if (current == '&') {
+                escape = AMP_ESC;
+            } else if (current == '<') {
+                escape = LT_ESC;
+            } else if (current == '>') {
+                escape = GT_ESC;
+            } else if (attribute && current == '"') {
+                escape = QUOT_ESC;
+            } else if (attribute && current == '\'') {
+                escape = APOS_ESC;
+            } else {
+                continue;
+            }
+            pos = copyAscii(value, copyStart, i, buf, pos);
+            System.arraycopy(escape, 0, buf, pos, escape.length);
+            pos += escape.length;
+            copyStart = i + 1;
+        }
+        return copyAscii(value, copyStart, value.length, buf, pos);
+    }
+
+    private static int writeEscapedLatin1Slow(byte[] buf, int pos, byte[] value, boolean attribute) {
         int copyStart = 0;
         for (int i = 0; i < value.length; i++) {
             byte current = value[i];

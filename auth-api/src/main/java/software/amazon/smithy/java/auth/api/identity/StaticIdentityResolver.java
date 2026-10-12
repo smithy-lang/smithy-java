@@ -10,12 +10,27 @@ import software.amazon.smithy.java.context.Context;
 
 final class StaticIdentityResolver<IdentityT extends Identity> implements IdentityResolver<IdentityT> {
 
-    private final IdentityT identity;
+    private final Class<IdentityT> identityType;
     private final IdentityResult<IdentityT> result;
 
-    public StaticIdentityResolver(IdentityT identity) {
-        this.identity = Objects.requireNonNull(identity);
+    StaticIdentityResolver(IdentityT identity) {
+        this(runtimeType(identity), identity);
+    }
+
+    StaticIdentityResolver(Class<IdentityT> identityType, IdentityT identity) {
+        this.identityType = Objects.requireNonNull(identityType, "identityType is null");
+        Objects.requireNonNull(identity, "identity is null");
+        if (!identityType.isInstance(identity)) {
+            throw new IllegalArgumentException(
+                    "Identity of type " + identity.getClass().getName() + " is not an instance of "
+                            + identityType.getName());
+        }
         this.result = IdentityResult.of(identity);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <I extends Identity> Class<I> runtimeType(I identity) {
+        return (Class<I>) Objects.requireNonNull(identity, "identity is null").getClass();
     }
 
     @Override
@@ -23,9 +38,8 @@ final class StaticIdentityResolver<IdentityT extends Identity> implements Identi
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public Class<IdentityT> identityType() {
-        return (Class<IdentityT>) identity.getClass();
+        return identityType;
     }
 }

@@ -64,6 +64,11 @@ The JMH JSON output is written to:
 benchmarks/serde-benchmarks/build/results/jmh/results.json
 ```
 
+## Running on a metal host
+
+Run the JMH commands above on the metal host. Use `convertJmhResults` below to convert the
+resulting JMH JSON to the shared schema.
+
 ## Producing the cross-language schema
 
 After running the benchmarks, convert the JMH JSON into the shared output
