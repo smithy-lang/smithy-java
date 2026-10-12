@@ -23,9 +23,16 @@ final class EndpointImpl implements Endpoint {
 
     private EndpointImpl(Builder builder) {
         this.uri = Objects.requireNonNull(builder.uri);
-        this.authSchemes = builder.authSchemes == null ? List.of() : Collections.unmodifiableList(builder.authSchemes);
+        if (builder.authSchemes != null) {
+            this.authSchemes = Collections.unmodifiableList(builder.authSchemes);
+        } else if (builder.authScheme != null) {
+            this.authSchemes = List.of(builder.authScheme);
+        } else {
+            this.authSchemes = List.of();
+        }
         this.properties = builder.properties == null ? Map.of() : Collections.unmodifiableMap(builder.properties);
         // Clear out the builder, making this class immutable and the builder still reusable.
+        builder.authScheme = null;
         builder.authSchemes = null;
         builder.properties = null;
     }
@@ -77,6 +84,15 @@ final class EndpointImpl implements Endpoint {
     static final class Builder implements Endpoint.Builder {
 
         private SmithyUri uri;
+        /**
+         * The single auth scheme an endpoint almost always has, held without a list.
+         *
+         * <p>Going straight to {@code new ArrayList<>()} cost three objects for one element: the list,
+         * the capacity-10 {@code Object[]} its first {@code add} grows into, and the unmodifiable wrapper.
+         * That was ~31% of the allocation an S3 endpoint resolution did. {@code authSchemes} is only
+         * allocated once a second scheme actually arrives.
+         */
+        private EndpointAuthScheme authScheme;
         private List<EndpointAuthScheme> authSchemes;
         private Map<Context.Key<?>, Object> properties;
 
@@ -88,10 +104,16 @@ final class EndpointImpl implements Endpoint {
 
         @Override
         public Builder addAuthScheme(EndpointAuthScheme authScheme) {
-            if (this.authSchemes == null) {
-                this.authSchemes = new ArrayList<>();
+            if (this.authSchemes != null) {
+                this.authSchemes.add(authScheme);
+            } else if (this.authScheme == null) {
+                this.authScheme = authScheme;
+            } else {
+                this.authSchemes = new ArrayList<>(4);
+                this.authSchemes.add(this.authScheme);
+                this.authSchemes.add(authScheme);
+                this.authScheme = null;
             }
-            this.authSchemes.add(authScheme);
             return this;
         }
 
