@@ -313,6 +313,9 @@ abstract class BaseRetryStrategy implements RetryStrategy, Claimable {
     }
 
     private void logAcquireInitialToken(AcquireInitialTokenRequest request) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
         var tokenBucket = tokenBucketStore.tokenBucketForScope(request.scope());
         log.debug("Request attempt 1 token acquired "
                 + "(backoff: 0ms, cost: 0, capacity: {}/{})",
@@ -321,6 +324,9 @@ abstract class BaseRetryStrategy implements RetryStrategy, Claimable {
     }
 
     private void logRefreshTokenSuccess(DefaultRetryToken token, AcquireResponse acquireResponse, Duration delay) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
         log.debug("Request attempt {} token acquired "
                 + "(backoff: {}ms, cost: {}, capacity: {}/{})",
                 token.attempt(),
@@ -331,6 +337,9 @@ abstract class BaseRetryStrategy implements RetryStrategy, Claimable {
     }
 
     private void logRecordSuccess(DefaultRetryToken token, ReleaseResponse release) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
         log.debug("Request attempt {} succeeded (cost: -{}, capacity: {}/{})",
                 token.attempt(),
                 release.capacityReleased(),
