@@ -25,36 +25,31 @@ enum BenchmarkProtocol {
             "AwsJson10",
             "awsjson10",
             "application/x-amz-json-1.0",
-            bytes("{}"),
-            false),
+            bytes("{}")),
     RPC_V2_CBOR(
             "rpcv2Cbor",
             "RpcV2Cbor",
             "rpcv2cbor",
             "application/cbor",
-            new byte[] {(byte) 0xa0},
-            true),
+            new byte[] {(byte) 0xa0}),
     AWS_QUERY(
             "awsQuery",
             "AwsQuery",
             "awsquery",
             "text/xml",
-            new byte[0],
-            false),
+            new byte[0]),
     REST_JSON_1(
             "restJson1",
             "RestJson1",
             "restjson",
             "application/json",
-            bytes("{}"),
-            false),
+            bytes("{}")),
     REST_XML(
             "restXml",
             "RestXml",
             "restxml",
             "application/xml",
-            new byte[0],
-            false);
+            new byte[0]);
 
     static final String ENDPOINT = "https://example.com";
     static final String REGION = "us-east-1";
@@ -87,22 +82,19 @@ enum BenchmarkProtocol {
     private final String generatedPackage;
     private final String contentType;
     private final byte[] emptyResponseBody;
-    private final boolean base64Bodies;
 
     BenchmarkProtocol(
             String idPrefix,
             String summaryName,
             String packageSuffix,
             String contentType,
-            byte[] emptyResponseBody,
-            boolean base64Bodies
+            byte[] emptyResponseBody
     ) {
         this.idPrefix = idPrefix;
         this.summaryName = summaryName;
         this.generatedPackage = GENERATED_ROOT + packageSuffix;
         this.contentType = contentType;
         this.emptyResponseBody = emptyResponseBody;
-        this.base64Bodies = base64Bodies;
     }
 
     String idPrefix() {
@@ -131,10 +123,6 @@ enum BenchmarkProtocol {
 
     byte[] emptyResponseBody() {
         return emptyResponseBody.clone();
-    }
-
-    boolean base64Bodies() {
-        return base64Bodies;
     }
 
     Object newClient(ClientTransport<?, ?> transport, String endpoint) {

@@ -97,6 +97,19 @@ class BenchmarkCasesTest {
         assertThat(wire.length - text.indexOf("\r\n\r\n") - 4).isEqualTo(response.bodyLength());
     }
 
+    @Test
+    void jsonResponseFixturesAreServedMinified() {
+        for (String id : List.of("awsJson1_0_GetItemOutput_S", "restJson1_CopyObjectOutput_M")) {
+            var response = BenchmarkCases.build(id).response();
+            byte[] body = new byte[response.bodyLength()];
+            response.body().duplicate().get(body);
+            assertThat(new String(body, StandardCharsets.UTF_8)).as("%s is served as compact JSON", id)
+                    .startsWith("{\"")
+                    .doesNotContain("\n")
+                    .doesNotContain("\r");
+        }
+    }
+
     private static void runOnce(String id) throws Throwable {
         var benchmarkCase = BenchmarkCases.build(id);
         assertThat(benchmarkCase.id()).isEqualTo(id);

@@ -35,6 +35,7 @@ final class RunReport {
     static ObjectNode benchmark(BenchmarkCase benchmarkCase, Measurement m) {
         var warmup = Node.objectNodeBuilder()
                 .withMember("iterations", m.warmup().iterations())
+                .withMember("wall_seconds", round(m.warmup().wallNanos() / 1e9, 3))
                 .withMember("hit_cap", m.warmup().hitCap())
                 .withMember("final_chunk_jit_share", round(m.warmup().finalChunkJitShare(), 5))
                 .build();

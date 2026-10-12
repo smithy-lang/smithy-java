@@ -65,12 +65,22 @@ class CpuTimeRunnerTest {
     }
 
     @Test
-    void automaticWarmupRespectsTheFloor() throws Throwable {
-        var runner = new CpuTimeRunner(new Settings(100, 0, 100, 0, Warmup.auto()));
+    void automaticWarmupRunsBothFloorsWhicheverComesLater() throws Throwable {
+        var runner = new CpuTimeRunner(new Settings(100, 0, 100, 0, Warmup.auto(10_000, 0.2)));
         var m = runner.run(() -> {});
         assertThat(m.warmup().automatic()).isTrue();
-        assertThat(m.warmup().iterations()).isGreaterThanOrEqualTo(Warmup.AUTO_FLOOR);
-        assertThat(m.warmup().iterations()).isLessThanOrEqualTo(Warmup.AUTO_CAP);
+        assertThat(m.warmup().iterations()).isGreaterThanOrEqualTo(10_000);
+        assertThat(m.warmup().iterations() % Warmup.AUTO_CHUNK).isZero();
+        assertThat(m.warmup().wallNanos()).isGreaterThanOrEqualTo(200_000_000L);
+    }
+
+    @Test
+    void automaticWarmupGivesUpAtTwiceTheFloorWhenTheJitNeverGoesQuiet() throws Throwable {
+        var runner = new CpuTimeRunner(new Settings(100, 0, 100, 0, Warmup.auto(Warmup.AUTO_CHUNK, 0.1)));
+        var m = runner.run(() -> {});
+        assertThat(m.warmup().hitCap()).as("the one-second quiet window cannot fit under a 0.2 s cap").isTrue();
+        assertThat(m.warmup().wallNanos()).isGreaterThanOrEqualTo(200_000_000L);
+        assertThat(m.warmup().iterations()).isGreaterThanOrEqualTo(2L * Warmup.AUTO_CHUNK);
     }
 
     @Test
@@ -80,7 +90,11 @@ class CpuTimeRunnerTest {
         assertThat(standard.minCpuSeconds()).isEqualTo(5.0);
         assertThat(standard.checkInterval()).isEqualTo(100);
         assertThat(standard.minMeasureCpuSeconds()).isEqualTo(1.0);
-        assertThat(standard.warmup().automatic()).isTrue();
+        assertThat(standard.warmup()).isEqualTo(Warmup.auto(100_000, 20.0));
+        assertThat(standard.warmup().detail())
+                .isEqualTo("chunks of 2000 iterations; at least 100000 iterations and 20 second(s), whichever comes "
+                        + "later, then stop once JIT compilation stays below 2% of chunk wall time for 5 consecutive "
+                        + "chunks and 1 second(s); cap 2x the floor");
         assertThat(standard.stopCondition())
                 .isEqualTo(
                         "min 50000 iterations OR 5 seconds CPU time (first met wins) and at least 1 second(s) of CPU time");
@@ -99,5 +113,8 @@ class CpuTimeRunnerTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new Settings(10, 1, 0, 0, Warmup.auto()));
         assertThatIllegalArgumentException().isThrownBy(() -> new Settings(10, 1, 100, -1, Warmup.auto()));
         assertThatIllegalArgumentException().isThrownBy(() -> Warmup.fixed(-1));
+        assertThatIllegalArgumentException().isThrownBy(() -> Warmup.auto(-1, 1));
+        assertThatIllegalArgumentException().isThrownBy(() -> Warmup.auto(1, -1));
+        assertThatIllegalArgumentException().isThrownBy(() -> Warmup.auto(1, Double.NaN));
     }
 }

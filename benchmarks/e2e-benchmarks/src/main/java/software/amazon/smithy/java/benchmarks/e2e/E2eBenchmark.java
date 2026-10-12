@@ -95,12 +95,14 @@ public final class E2eBenchmark {
                     }
                     results.add(RunReport.benchmark(benchmarkCase, m));
                     System.err.printf(Locale.ROOT,
-                            "%s ops/CPU-sec  (%s iterations, %.2f s CPU, cpu/wall %.2f, warmup %s%s, jit %d ms%s)%n",
+                            "%s ops/CPU-sec  (%s iterations, %.2f s CPU, cpu/wall %.2f, warmup %s in %.1f s%s, "
+                                    + "jit %d ms%s)%n",
                             integers.format(Math.round(m.opsPerCpuSecond())),
                             integers.format(m.iterations()),
                             m.processCpuNanos() / 1e9,
                             m.cpuWallRatio(),
                             integers.format(m.warmup().iterations()),
+                            m.warmup().wallNanos() / 1e9,
                             m.warmup().hitCap() ? " (cap)" : "",
                             m.jitMillis(),
                             m.underWarmed() ? ", UNDER-WARMED" : "");

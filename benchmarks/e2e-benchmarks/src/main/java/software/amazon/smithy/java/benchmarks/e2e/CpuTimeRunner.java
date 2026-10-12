@@ -34,7 +34,7 @@ final class CpuTimeRunner {
 
     Measurement run(Invocation invocation) throws Throwable {
         WarmupOutcome warmup = settings.warmup().automatic()
-                ? warmupAutomatically(invocation)
+                ? warmupAutomatically(invocation, settings.warmup())
                 : warmupFixed(invocation, settings.warmup().iterations());
         System.gc();
 
@@ -75,26 +75,33 @@ final class CpuTimeRunner {
     }
 
     private static WarmupOutcome warmupFixed(Invocation invocation, long iterations) throws Throwable {
+        long start = System.nanoTime();
         for (long i = 0; i < iterations; i++) {
             invocation.run();
         }
-        return new WarmupOutcome(iterations, false, false, 0);
+        return new WarmupOutcome(iterations, System.nanoTime() - start, false, false, 0);
     }
 
     /** Uses compiler activity to detect steady state; throughput can look stable before C2 installs its code. */
-    private static WarmupOutcome warmupAutomatically(Invocation invocation) throws Throwable {
+    private static WarmupOutcome warmupAutomatically(Invocation invocation, Warmup warmup) throws Throwable {
+        long floorIterations = warmup.iterations();
+        long floorNanos = (long) (warmup.seconds() * 1_000_000_000L);
+        long capIterations = floorIterations * Warmup.AUTO_CAP_MULTIPLE;
+        long capNanos = floorNanos * Warmup.AUTO_CAP_MULTIPLE;
+        long quietNanosRequired = (long) (Warmup.AUTO_QUIET_SECONDS * 1_000_000_000L);
+        long start = System.nanoTime();
         long iterations = 0;
         int quietChunks = 0;
         long quietNanos = 0;
         double share = 0;
-        long quietNanosRequired = (long) (Warmup.AUTO_QUIET_SECONDS * 1_000_000_000L);
         while (true) {
             long jitBefore = jitMillis();
-            long wallBefore = System.nanoTime();
+            long chunkStart = System.nanoTime();
             for (int i = 0; i < Warmup.AUTO_CHUNK; i++) {
                 invocation.run();
             }
-            long wall = Math.max(1, System.nanoTime() - wallBefore);
+            long now = System.nanoTime();
+            long wall = Math.max(1, now - chunkStart);
             long jit = jitMillis() - jitBefore;
             iterations += Warmup.AUTO_CHUNK;
             share = jit * 1_000_000.0 / wall;
@@ -105,13 +112,15 @@ final class CpuTimeRunner {
                 quietChunks = 0;
                 quietNanos = 0;
             }
-            if (iterations >= Warmup.AUTO_FLOOR
-                    && quietChunks >= Warmup.AUTO_QUIET_CHUNKS
-                    && quietNanos >= quietNanosRequired) {
-                return new WarmupOutcome(iterations, true, false, share);
+            long elapsed = now - start;
+            if (iterations < floorIterations || elapsed < floorNanos) {
+                continue;
             }
-            if (iterations >= Warmup.AUTO_CAP) {
-                return new WarmupOutcome(iterations, true, true, share);
+            if (quietChunks >= Warmup.AUTO_QUIET_CHUNKS && quietNanos >= quietNanosRequired) {
+                return new WarmupOutcome(iterations, elapsed, true, false, share);
+            }
+            if (iterations >= capIterations && elapsed >= capNanos) {
+                return new WarmupOutcome(iterations, elapsed, true, true, share);
             }
         }
     }
@@ -206,30 +215,42 @@ final class CpuTimeRunner {
             }
             return base;
         }
-
-        private static String formatSeconds(double seconds) {
-            return seconds == Math.rint(seconds) ? Long.toString((long) seconds) : Double.toString(seconds);
-        }
     }
 
-    record Warmup(boolean automatic, long iterations) {
+    private static String formatSeconds(double seconds) {
+        return seconds == Math.rint(seconds) ? Long.toString((long) seconds) : Double.toString(seconds);
+    }
+
+    /** Fixed runs exactly {@code iterations}; automatic treats {@code iterations} and {@code seconds} as floors. */
+    record Warmup(boolean automatic, long iterations, double seconds) {
 
         static final int AUTO_CHUNK = 2_000;
-        static final long AUTO_FLOOR = 20_000;
-        static final long AUTO_CAP = 2_000_000;
+        static final long AUTO_FLOOR = 100_000;
+        static final double AUTO_FLOOR_SECONDS = 20.0;
+        static final int AUTO_CAP_MULTIPLE = 2;
         static final int AUTO_QUIET_CHUNKS = 5;
         static final double AUTO_QUIET_JIT_SHARE = 0.02;
         static final double AUTO_QUIET_SECONDS = 1.0;
 
-        static Warmup auto() {
-            return new Warmup(true, 0);
-        }
-
-        static Warmup fixed(long iterations) {
+        Warmup {
             if (iterations < 0) {
                 throw new IllegalArgumentException("warmup iterations must not be negative");
             }
-            return new Warmup(false, iterations);
+            if (!Double.isFinite(seconds) || seconds < 0) {
+                throw new IllegalArgumentException("warmup seconds must be finite and non-negative");
+            }
+        }
+
+        static Warmup auto() {
+            return auto(AUTO_FLOOR, AUTO_FLOOR_SECONDS);
+        }
+
+        static Warmup auto(long floorIterations, double floorSeconds) {
+            return new Warmup(true, floorIterations, floorSeconds);
+        }
+
+        static Warmup fixed(long iterations) {
+            return new Warmup(false, iterations, 0);
         }
 
         String policy() {
@@ -240,20 +261,27 @@ final class CpuTimeRunner {
             if (automatic) {
                 return String.format(
                         Locale.ROOT,
-                        "chunks of %d iterations; stop once JIT compilation stays below %.0f%% of chunk wall time "
-                                + "for %d consecutive chunks and %.0f second(s); floor %d, cap %d iterations",
+                        "chunks of %d iterations; at least %d iterations and %s second(s), whichever comes later, "
+                                + "then stop once JIT compilation stays below %.0f%% of chunk wall time "
+                                + "for %d consecutive chunks and %.0f second(s); cap %dx the floor",
                         AUTO_CHUNK,
+                        iterations,
+                        formatSeconds(seconds),
                         AUTO_QUIET_JIT_SHARE * 100,
                         AUTO_QUIET_CHUNKS,
                         AUTO_QUIET_SECONDS,
-                        AUTO_FLOOR,
-                        AUTO_CAP);
+                        AUTO_CAP_MULTIPLE);
             }
             return "fixed " + iterations + " iterations";
         }
     }
 
-    record WarmupOutcome(long iterations, boolean automatic, boolean hitCap, double finalChunkJitShare) {}
+    record WarmupOutcome(
+            long iterations,
+            long wallNanos,
+            boolean automatic,
+            boolean hitCap,
+            double finalChunkJitShare) {}
 
     record Measurement(
             long iterations,
