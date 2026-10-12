@@ -2,6 +2,7 @@ import com.google.gradle.osdetector.OsDetector
 
 plugins {
     id("smithy-java.module-conventions")
+    id("smithy-java.fuzz-test")
     id("smithy-java.jmh-conventions")
     alias(libs.plugins.osdetector)
 }
@@ -17,12 +18,19 @@ dependencies {
     api(project(":aws:aws-event-streams"))
     implementation(project(":http:http-api"))
     implementation(project(":io"))
+    implementation(project(":codecs:codec-commons", configuration = "shadow"))
     implementation(project(":logging"))
     implementation(libs.smithy.aws.traits)
 
     testImplementation(project(":client:dynamic-client"))
     testImplementation(project(":client:client-mock-plugin"))
     testImplementation(project(":aws:client:aws-client-awsjson"))
+}
+
+sourceSets {
+    named("fuzz") {
+        compileClasspath += sourceSets["test"].output
+    }
 }
 
 afterEvaluate {

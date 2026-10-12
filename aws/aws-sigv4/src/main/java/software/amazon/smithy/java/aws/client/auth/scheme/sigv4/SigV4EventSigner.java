@@ -6,14 +6,12 @@
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import javax.crypto.spec.SecretKeySpec;
 import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
@@ -37,7 +35,6 @@ import software.amazon.smithy.java.io.ByteBufferUtils;
  */
 final class SigV4EventSigner implements FrameProcessor<AwsEventFrame> {
     private static final String ALGORITHM = "AWS4-HMAC-SHA256-PAYLOAD";
-    private static final String HMAC_SHA_256 = "HmacSHA256";
     private static final String TERMINATOR = "aws4_request";
     private static final byte[] EMPTY_PAYLOAD = new byte[0];
     private final AwsCredentialsIdentity identity;
@@ -173,22 +170,13 @@ final class SigV4EventSigner implements FrameProcessor<AwsEventFrame> {
         return sign(TERMINATOR, kService, resources);
     }
 
+    // Use SigningResources for HMAC operations to keep its cached Mac key consistent with the shared Mac.
     private byte[] sign(String data, byte[] key, SigningResources resources) {
-        try {
-            var mac = resources.sha256Mac;
-            mac.reset();
-            mac.init(new SecretKeySpec(key, HMAC_SHA_256));
-            return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-        } catch (InvalidKeyException e) {
-            throw new RuntimeException("Invalid signing key", e);
-        }
+        return resources.hmac(key, data.getBytes(StandardCharsets.UTF_8));
     }
 
     private byte[] hash(byte[] data, SigningResources resources) {
-        var digest = resources.sha256Digest;
-        digest.reset();
-        digest.update(data);
-        return digest.digest();
+        return resources.hash(data);
     }
 
     private Message buildSignedMessage(

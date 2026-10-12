@@ -5,16 +5,8 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.DigestException;
-import java.security.InvalidKeyException;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import javax.crypto.ShortBufferException;
-import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
@@ -35,41 +27,49 @@ import software.amazon.smithy.java.logging.InternalLogger;
 final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SigV4Signer.class);
-    private static final String ALGORITHM = "AWS4-HMAC-SHA256";
     private static final String TERMINATOR = "aws4_request";
-    private static final String HMAC_SHA_256 = "HmacSHA256";
+    private static final byte[] ALGORITHM = "AWS4-HMAC-SHA256".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] TERMINATOR_BYTES = TERMINATOR.getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] CREDENTIAL_PREFIX = "AWS4-HMAC-SHA256 Credential=".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] SIGNED_HEADERS_PREFIX = ", SignedHeaders=".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] SIGNATURE_PREFIX = ", Signature=".getBytes(StandardCharsets.US_ASCII);
     private static final SigningCache SIGNER_CACHE = new SigningCache(300);
-    private static final String EMPTY_BODY_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-    private static final byte[] HEX_DIGITS = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] EMPTY_BODY_HASH =
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".getBytes(StandardCharsets.US_ASCII);
 
-    private final SigningResources signingResources;
+    private final SigningResources r;
 
     public static SigV4Signer create() {
         return new SigV4Signer();
     }
 
     private SigV4Signer() {
-        this.signingResources = SigningResources.get();
-        signingResources.reset();
+        this.r = SigningResources.get();
     }
 
     @Override
     public void close() {
-        SigningResources.release(signingResources);
+        SigningResources.release(r);
     }
 
     @Override
     public SignResult<HttpRequest> sign(HttpRequest request, AwsCredentialsIdentity identity, Context properties) {
         // Endpoint-emitted authSchemes property overrides the scheme-level signingName/signingRegion
         // when present (per the Endpoints 2.0 implementation SEP §"Endpoint Properties (authSchemes)").
-        var name = properties.getOrDefault(EndpointAuthSchemeSettings.SIGNING_NAME,
-                properties.expect(SigV4Settings.SIGNING_NAME));
-        var region = properties.getOrDefault(EndpointAuthSchemeSettings.SIGNING_REGION,
-                properties.expect(RegionSetting.REGION));
+        var name = properties.get(EndpointAuthSchemeSettings.SIGNING_NAME);
+        if (name == null) {
+            name = properties.expect(SigV4Settings.SIGNING_NAME);
+        }
+        var region = properties.get(EndpointAuthSchemeSettings.SIGNING_REGION);
+        if (region == null) {
+            region = properties.expect(RegionSetting.REGION);
+        }
         var clock = properties.getOrDefault(SigV4Settings.CLOCK, Clock.systemUTC());
         boolean omitSecurityToken = properties.getOrDefault(SigV4Settings.OMIT_SECURITY_TOKEN, false);
 
         // TODO: Add support for query signing?
+
+        r.timestamp(Math.floorDiv(clock.millis(), 1000L));
 
         // Caller can short-circuit the body SHA-256 by either:
         //   (a) stamping a sentinel string on SigV4Settings.PAYLOAD_HASH_OVERRIDE in the signer
@@ -78,21 +78,20 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         // Both are used by aws-chunked + trailer-checksum requests where the body SHA-256 is
         // unnecessary. The expected sentinel values are defined by the AWS sigv4-streaming spec:
         // "STREAMING-UNSIGNED-PAYLOAD-TRAILER", "UNSIGNED-PAYLOAD", etc.
-        String payloadHash;
-        var hashOverride = properties.get(SigV4Settings.PAYLOAD_HASH_OVERRIDE);
-        if (hashOverride != null) {
-            payloadHash = hashOverride;
-        } else {
-            String existing = request.headers().firstValue(HeaderName.X_AMZ_CONTENT_SHA256);
-            payloadHash = existing != null ? existing : getPayloadHash(request.body());
+        String payloadHash = properties.get(SigV4Settings.PAYLOAD_HASH_OVERRIDE);
+        if (payloadHash == null) {
+            payloadHash = request.headers().firstValue(HeaderName.X_AMZ_CONTENT_SHA256);
+            if (payloadHash == null) {
+                computePayloadHash(request.body());
+            }
         }
+
         var mod = request.toModifiable();
         var signature = signInPlace(
                 mod,
                 payloadHash,
                 region,
                 name,
-                clock.instant(),
                 identity.accessKeyId(),
                 identity.secretAccessKey(),
                 identity.sessionToken(),
@@ -101,25 +100,18 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return new SignResult<>(mod, signature);
     }
 
-    private String getPayloadHash(DataStream dataStream) {
+    private void computePayloadHash(DataStream dataStream) {
         if (dataStream == null || dataStream.contentLength() == 0) {
-            return EMPTY_BODY_HASH;
+            System.arraycopy(EMPTY_BODY_HASH, 0, r.payloadHashHex, 0, 64);
+            return;
         }
-
         if (!dataStream.hasKnownLength()) {
             throw new UnsupportedOperationException(
                     "Cannot SigV4-sign a body whose length is unknown without UNSIGNED-PAYLOAD "
                             + "or chunked signing, neither of which is implemented yet.");
         }
-
-        return hexHash(dataStream.asByteBuffer());
-    }
-
-    private String hexHash(ByteBuffer bytes) {
-        byte[] hash = hash(bytes, signingResources.hashBytes);
-        byte[] hex = signingResources.signatureHexBytes;
-        writeHex(hash, hex, 0);
-        return new String(hex, 0, hex.length, StandardCharsets.US_ASCII);
+        r.hash(dataStream.asByteBuffer(), r.hashBytes);
+        SigningResources.writeHex(r.hashBytes, r.payloadHashHex, 0);
     }
 
     private String signInPlace(
@@ -127,7 +119,6 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             String payloadHash,
             String regionName,
             String serviceName,
-            Instant signingTimestamp,
             String accessKeyId,
             String secretAccessKey,
             String sessionToken,
@@ -137,55 +128,49 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         var method = request.method();
 
         // Collect every header into the reusable strided buffer.
-        signingResources.headerCount = 0;
-        request.headers().forEachEntry(signingResources, SigV4Signer::addExistingHeaderForSigning);
+        r.headerCount = 0;
+        request.headers().forEachEntry(r, SigV4Signer::addExistingHeaderForSigning);
 
         // Append the port only for non-default, explicitly-set ports.
         var existingHeaders = request.headers();
         if (!existingHeaders.hasHeader(HeaderName.HOST)) {
             var hostHeader = uriUsesDefaultPort(uri) ? uri.getHost() : uri.getHost() + ':' + uri.getPort();
-            signingResources.addHeaderCanonical(HeaderName.HOST.name(), hostHeader);
+            r.addHeaderCanonical(HeaderName.HOST.name(), hostHeader);
         }
 
-        var sb = signingResources.sb;
-        var signingDate = signingTimestamp.atOffset(ZoneOffset.UTC).toLocalDateTime();
-        var dateStamp = formatDate(signingDate, sb);
-        var requestTime = formatRfc3339(signingDate, dateStamp, sb);
-        signingResources.addHeaderCanonical(HeaderName.X_AMZ_DATE.name(), requestTime);
+        String requestTime = r.requestTime;
+        r.addHeaderCanonical(HeaderName.X_AMZ_DATE.name(), requestTime);
 
         if (!omitSecurityToken
                 && sessionToken != null
                 && !existingHeaders.hasHeader(HeaderName.X_AMZ_SECURITY_TOKEN)) {
-            signingResources.addHeaderCanonical(HeaderName.X_AMZ_SECURITY_TOKEN.name(), sessionToken);
+            r.addHeaderCanonical(HeaderName.X_AMZ_SECURITY_TOKEN.name(), sessionToken);
         }
 
         // S3 requires x-amz-content-sha256 on the wire (and in the signature) but other services don't accept it as
         // part of the signed-header set, so add it conditionally. The header is signature-relevant: if it's in the
         // canonical request, it must also be on the wire (and vice-versa).
         boolean isS3 = "s3".equals(serviceName) || "s3express".equals(serviceName);
-        if (isS3 && !existingHeaders.hasHeader(HeaderName.X_AMZ_CONTENT_SHA256)) {
-            signingResources.addHeaderCanonical(HeaderName.X_AMZ_CONTENT_SHA256.name(), payloadHash);
+        if (isS3) {
+            if (payloadHash == null) {
+                payloadHash = new String(r.payloadHashHex, 0, 64, StandardCharsets.ISO_8859_1);
+            }
+            if (!existingHeaders.hasHeader(HeaderName.X_AMZ_CONTENT_SHA256)) {
+                r.addHeaderCanonical(HeaderName.X_AMZ_CONTENT_SHA256.name(), payloadHash);
+            }
         }
 
-        signingResources.sortHeadersByName();
+        r.sortHeadersByName();
 
-        var signedHeaders = buildSignedHeadersString(signingResources, sb);
-        int canonicalLen = buildCanonicalRequest(
-                method,
-                uri,
-                signingResources,
-                signedHeaders,
-                payloadHash,
-                sb);
+        buildSignedHeaders(r);
+        buildCanonicalRequest(method, uri, r, payloadHash);
 
-        var signingKey = deriveSigningKey(secretAccessKey, dateStamp, regionName, serviceName, signingTimestamp);
-        var scope = createScope(dateStamp, regionName, serviceName, sb);
-        var signature = computeSignature(signingResources.canonicalRequestBytes,
-                canonicalLen,
-                scope,
-                requestTime,
-                signingKey);
-        var authorizationHeader = getAuthHeader(accessKeyId, scope, signedHeaders, signature, sb);
+        var signingKey = deriveSigningKey(secretAccessKey, regionName, serviceName);
+        int stringToSignLength = buildStringToSign(r, regionName, serviceName);
+        r.hmac(signingKey, r.stringToSignBytes, 0, stringToSignLength, r.signatureBytes);
+        SigningResources.writeHex(r.signatureBytes, r.signatureHexBytes, 0);
+        var signature = new String(r.signatureHexBytes, 0, 64, StandardCharsets.ISO_8859_1);
+        var authorizationHeader = buildAuthorization(r, accessKeyId, regionName, serviceName);
 
         // Now mutate the actual request. setHeader is a single-key operation per header; no wholesale map replacement.
         var headers = request.headers();
@@ -193,82 +178,66 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         if (!omitSecurityToken && sessionToken != null) {
             headers.setHeader(HeaderName.X_AMZ_SECURITY_TOKEN, sessionToken);
         }
-
         if (isS3) {
             headers.setHeader(HeaderName.X_AMZ_CONTENT_SHA256, payloadHash);
         }
-
         headers.setHeader("authorization", authorizationHeader);
         return signature;
     }
 
     private static void addExistingHeaderForSigning(SigningResources r, String name, String value) {
-        if (!HeaderName.X_AMZ_DATE.name().equalsIgnoreCase(name)) {
-            r.addHeader(name, value);
-        }
+        r.addHeaderForSigning(name, value);
     }
 
-    /**
-     * Emit the SignedHeaders semicolon-joined list directly from the sorted strided buffer.
-     * Skips ignored headers and dedupes consecutive duplicates produced by multi-valued headers.
-     */
-    private static String buildSignedHeadersString(SigningResources r, StringBuilder sb) {
-        sb.setLength(0);
+    private static void buildSignedHeaders(SigningResources r) {
+        int len = 0;
+        for (int i = 0; i < r.headerCount; i++) {
+            len += r.headers[i * 2].length() + 1;
+        }
+        if (r.signedHeadersBytes.length < len) {
+            r.signedHeadersBytes = new byte[Integer.highestOneBit(len) << 1];
+        }
+        byte[] dst = r.signedHeadersBytes;
+        int pos = 0;
         String previous = null;
-
         for (int i = 0; i < r.headerCount; i++) {
             String name = r.headers[i * 2];
-            if (name.equals(previous) || isIgnoredHeader(name)) {
+            if (name.equals(previous)) {
                 continue;
             }
-            if (!sb.isEmpty()) {
-                sb.append(';');
+            if (pos > 0) {
+                dst[pos++] = ';';
             }
-            sb.append(name);
+            pos = SigningResources.writeAscii(name, dst, pos);
             previous = name;
         }
-
-        return sb.toString();
+        r.signedHeadersLength = pos;
     }
 
-    /**
-     * Build the canonical request into the reusable byte buffer in {@link SigningResources}.
-     * Returns the number of bytes written. The canonical request is ASCII, so each char in
-     * the StringBuilder maps to one byte without UTF-8 encoding.
-     */
-    private static int buildCanonicalRequest(
-            String method,
-            SmithyUri uri,
-            SigningResources r,
-            String signedHeaders,
-            String payloadHash,
-            StringBuilder sb
-    ) {
-        sb.setLength(0);
-        sb.append(method).append('\n');
-        addCanonicalizedResourcePath(uri, sb);
-        sb.append('\n');
-        addCanonicalizedQueryString(uri, r, sb);
-        sb.append('\n');
-        addCanonicalizedHeaderString(r, sb);
-        sb.append('\n');
-        sb.append(signedHeaders).append('\n').append(payloadHash);
-
-        int len = sb.length();
-        byte[] dst = r.ensureCanonicalRequestCapacity(len);
-        for (int i = 0; i < len; i++) {
-            // Canonical request chars are ASCII (0x00-0x7F) by construction. Asserted-safe
-            // narrowing cast skips the UTF-8 encoder allocations String.getBytes would do.
-            dst[i] = (byte) sb.charAt(i);
+    private static void buildCanonicalRequest(String method, SmithyUri uri, SigningResources r, String payloadHash) {
+        r.beginOutput();
+        r.putAscii(method);
+        r.put((byte) '\n');
+        addCanonicalizedResourcePath(uri, r);
+        r.put((byte) '\n');
+        addCanonicalizedQueryString(uri, r);
+        r.put((byte) '\n');
+        addCanonicalizedHeaders(r);
+        r.put((byte) '\n');
+        r.put(r.signedHeadersBytes, 0, r.signedHeadersLength);
+        r.put((byte) '\n');
+        if (payloadHash != null) {
+            r.putAscii(payloadHash);
+        } else {
+            r.put(r.payloadHashHex, 0, 64);
         }
-        return len;
     }
 
     /**
      * Walk the sorted strided buffer, emitting one canonical-header line per distinct name,
      * comma-joining the values of multi-valued headers (which the sort placed consecutively).
      */
-    private static void addCanonicalizedHeaderString(SigningResources r, StringBuilder builder) {
+    private static void addCanonicalizedHeaders(SigningResources r) {
         int i = 0;
         while (i < r.headerCount) {
             String name = r.headers[i * 2];
@@ -276,57 +245,83 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             while (next < r.headerCount && name.equals(r.headers[next * 2])) {
                 next++;
             }
-            if (isIgnoredHeader(name)) {
-                i = next;
-                continue;
-            }
-            builder.append(name).append(':');
+            r.putAscii(name);
+            r.put((byte) ':');
             for (int j = i; j < next; j++) {
-                addAndTrim(builder, r.headers[j * 2 + 1]);
-                builder.append(',');
+                if (j > i) {
+                    r.put((byte) ',');
+                }
+                r.putHeaderValue(r.headers[j * 2 + 1]);
             }
-            // Trim trailing comma.
-            builder.setLength(builder.length() - 1);
-            builder.append('\n');
+            r.put((byte) '\n');
             i = next;
         }
     }
 
-    private static String createScope(String dateStamp, String regionName, String serviceName, StringBuilder sb) {
-        sb.setLength(0);
-        sb.append(dateStamp).append('/');
-        sb.append(regionName).append('/');
-        sb.append(serviceName).append('/');
-        sb.append(TERMINATOR);
-        return sb.toString();
-    }
-
-    // Formats the equivalent of "yyyyMMdd".
-    private static String formatDate(LocalDateTime date, StringBuilder sb) {
-        sb.setLength(0);
-        sb.append(date.getYear());
-        appendTwoDigits(date.getMonthValue(), sb);
-        appendTwoDigits(date.getDayOfMonth(), sb);
-        return sb.toString();
-    }
-
-    // Formats the equivalent of "yyyyMMdd'T'HHmmss'Z'".
-    private static String formatRfc3339(LocalDateTime localDate, String dateString, StringBuilder sb) {
-        sb.setLength(0);
-        sb.append(dateString);
-        sb.append('T');
-        appendTwoDigits(localDate.getHour(), sb);
-        appendTwoDigits(localDate.getMinute(), sb);
-        appendTwoDigits(localDate.getSecond(), sb);
-        sb.append('Z');
-        return sb.toString();
-    }
-
-    private static void appendTwoDigits(int value, StringBuilder sb) {
-        if (value < 10) {
-            sb.append('0');
+    private static int buildStringToSign(SigningResources r, String regionName, String serviceName) {
+        r.hash(r.out, 0, r.outLength, r.hashBytes);
+        int scopeLength = scopeLength(regionName, serviceName);
+        int needed = ALGORITHM.length + 1 + 16 + 1 + scopeLength + 1 + 64;
+        if (r.stringToSignBytes.length < needed) {
+            r.stringToSignBytes = new byte[Integer.highestOneBit(needed) << 1];
         }
-        sb.append(value);
+        byte[] dst = r.stringToSignBytes;
+        System.arraycopy(ALGORITHM, 0, dst, 0, ALGORITHM.length);
+        int pos = ALGORITHM.length;
+        dst[pos++] = '\n';
+        pos = SigningResources.writeAscii(r.requestTime, dst, pos);
+        dst[pos++] = '\n';
+        pos = writeScope(r, regionName, serviceName, dst, pos);
+        dst[pos++] = '\n';
+        return SigningResources.writeHex(r.hashBytes, dst, pos);
+    }
+
+    private static int scopeLength(String regionName, String serviceName) {
+        return 8 + 1 + regionName.length() + 1 + serviceName.length() + 1 + TERMINATOR_BYTES.length;
+    }
+
+    private static int writeScope(SigningResources r, String regionName, String serviceName, byte[] dst, int pos) {
+        pos = SigningResources.writeAscii(r.dateStamp, dst, pos);
+        dst[pos++] = '/';
+        pos = SigningResources.writeAscii(regionName, dst, pos);
+        dst[pos++] = '/';
+        pos = SigningResources.writeAscii(serviceName, dst, pos);
+        dst[pos++] = '/';
+        System.arraycopy(TERMINATOR_BYTES, 0, dst, pos, TERMINATOR_BYTES.length);
+        return pos + TERMINATOR_BYTES.length;
+    }
+
+    private static String buildAuthorization(
+            SigningResources r,
+            String accessKeyId,
+            String regionName,
+            String serviceName
+    ) {
+        int needed = CREDENTIAL_PREFIX.length + accessKeyId.length()
+                + 1
+                + scopeLength(regionName, serviceName)
+                + SIGNED_HEADERS_PREFIX.length
+                + r.signedHeadersLength
+                + SIGNATURE_PREFIX.length
+                + 64;
+        if (r.authorizationBytes.length < needed) {
+            r.authorizationBytes = new byte[Integer.highestOneBit(needed) << 1];
+        }
+        byte[] dst = r.authorizationBytes;
+        System.arraycopy(CREDENTIAL_PREFIX, 0, dst, 0, CREDENTIAL_PREFIX.length);
+        int pos = CREDENTIAL_PREFIX.length;
+        pos = SigningResources.writeAscii(accessKeyId, dst, pos);
+        dst[pos++] = '/';
+        pos = writeScope(r, regionName, serviceName, dst, pos);
+        System.arraycopy(SIGNED_HEADERS_PREFIX, 0, dst, pos, SIGNED_HEADERS_PREFIX.length);
+        pos += SIGNED_HEADERS_PREFIX.length;
+        System.arraycopy(r.signedHeadersBytes, 0, dst, pos, r.signedHeadersLength);
+        pos += r.signedHeadersLength;
+        System.arraycopy(SIGNATURE_PREFIX, 0, dst, pos, SIGNATURE_PREFIX.length);
+        pos += SIGNATURE_PREFIX.length;
+        System.arraycopy(r.signatureHexBytes, 0, dst, pos, 64);
+        pos += 64;
+        return new String(dst, 0, pos, StandardCharsets.ISO_8859_1);
     }
 
     private static boolean uriUsesDefaultPort(SmithyUri uri) {
@@ -342,36 +337,43 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         };
     }
 
-    private static String getAuthHeader(
-            String accessKeyId,
-            String scope,
-            String signedHeaderBuilder,
-            String signature,
-            StringBuilder sb
-    ) {
-        sb.setLength(0);
-        sb.append(ALGORITHM)
-                .append(" Credential=")
-                .append(accessKeyId)
-                .append('/')
-                .append(scope)
-                .append(", SignedHeaders=")
-                .append(signedHeaderBuilder)
-                .append(", Signature=")
-                .append(signature);
-        return sb.toString();
-    }
-
-    private static void addCanonicalizedResourcePath(SmithyUri uri, StringBuilder builder) {
-        String path = uri.getNormalizedPath();
-        if (path == null || path.isEmpty()) {
-            builder.append('/');
+    private static void addCanonicalizedResourcePath(SmithyUri uri, SigningResources r) {
+        String raw = uri.getPath();
+        if (raw != null && !raw.isEmpty() && isCanonicalPath(raw)) {
+            if (raw.charAt(0) != '/') {
+                r.put((byte) '/');
+            }
+            r.putAscii(raw);
             return;
         }
-        if (!path.startsWith("/")) {
-            builder.append('/');
+        String path = uri.getNormalizedPath();
+        if (path == null || path.isEmpty()) {
+            r.put((byte) '/');
+            return;
         }
-        URLEncoding.encodeUnreserved(path, builder, true);
+        if (path.charAt(0) != '/') {
+            r.put((byte) '/');
+        }
+        var sb = r.sb;
+        sb.setLength(0);
+        URLEncoding.encodeUnreserved(path, sb, true);
+        r.putAscii(sb);
+    }
+
+    private static boolean isCanonicalPath(String path) {
+        char previous = 0;
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == '/') {
+                if (previous == '/') {
+                    return false;
+                }
+            } else if (c == '.' || !URLEncoding.isUnreserved(c)) {
+                return false;
+            }
+            previous = c;
+        }
+        return true;
     }
 
     /**
@@ -386,7 +388,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
      * directly without decode+re-encode. smithy-java's own {@code QueryStringBuilder} produces
      * canonical output, so this is the typical case for codegen-generated requests.
      */
-    private static void addCanonicalizedQueryString(SmithyUri uri, SigningResources r, StringBuilder builder) {
+    private static void addCanonicalizedQueryString(SmithyUri uri, SigningResources r) {
         r.queryPairCount = 0;
 
         var query = uri.getQuery();
@@ -399,7 +401,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         if (canonical) {
             int amp = query.indexOf('&');
             if (amp == -1) {
-                appendSingleCanonicalQueryPair(query, builder);
+                appendSingleCanonicalQueryPair(query, r);
                 return;
             }
         }
@@ -441,21 +443,23 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
         for (int i = 0; i < r.queryPairCount; i++) {
             if (i > 0) {
-                builder.append('&');
+                r.put((byte) '&');
             }
-            builder.append(r.queryPairs[i * 2]).append('=').append(r.queryPairs[i * 2 + 1]);
+            r.putAscii(r.queryPairs[i * 2]);
+            r.put((byte) '=');
+            r.putAscii(r.queryPairs[i * 2 + 1]);
         }
     }
 
-    private static void appendSingleCanonicalQueryPair(String query, StringBuilder builder) {
+    private static void appendSingleCanonicalQueryPair(String query, SigningResources r) {
         int eq = query.indexOf('=');
         if (eq == 0) {
             return;
         }
 
-        builder.append(query);
+        r.putAscii(query);
         if (eq == -1) {
-            builder.append('=');
+            r.put((byte) '=');
         }
     }
 
@@ -485,186 +489,30 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
     }
 
-    private static void addAndTrim(StringBuilder result, String value) {
-        for (int position = 0; position < value.length(); position++) {
-            if (isWhiteSpace(value.charAt(position))) {
-                addAndTrimSlow(result, value);
-                return;
-            }
+    private byte[] deriveSigningKey(String secretKey, String regionName, String serviceName) {
+        byte[] memoized = r.memoizedSigningKey(secretKey, regionName, serviceName);
+        if (memoized != null) {
+            return memoized;
         }
-        result.append(value);
-    }
-
-    // Used when a header has any whitespace.
-    private static void addAndTrimSlow(StringBuilder result, String value) {
-        result.ensureCapacity(result.length() + value.length());
-
-        // Trim leading whitespace.
-        int position;
-        for (position = 0; position < value.length(); position++) {
-            if (!isWhiteSpace(value.charAt(position))) {
-                break;
-            }
-        }
-
-        // Convert "<WS><WS>" to "<SP>".
-        boolean previousIsWhiteSpace = false;
-        for (; position < value.length(); position++) {
-            char ch = value.charAt(position);
-            if (isWhiteSpace(ch)) {
-                if (previousIsWhiteSpace) {
-                    continue;
-                }
-                result.append(' ');
-                previousIsWhiteSpace = true;
-            } else {
-                result.append(ch);
-                previousIsWhiteSpace = false;
-            }
-        }
-
-        // Trim trailing WS.
-        if (!result.isEmpty() && result.charAt(result.length() - 1) == ' ') {
-            result.setLength(result.length() - 1);
-        }
-    }
-
-    // ws: ' ' | '\t' | '\n' | \u000b | \r | \f
-    private static boolean isWhiteSpace(char ch) {
-        return ch == ' ' || (ch >= '\t' && ch <= '\f');
-    }
-
-    private static boolean isIgnoredHeader(String name) {
-        return switch (name) {
-            // "authorization" is the output of signing; ignoring it keeps re-signing a reused request idempotent.
-            case "authorization", "connection", "content-length", "transfer-encoding", "x-amzn-trace-id",
-                    "user-agent", "expect" ->
-                true;
-            default -> false;
-        };
-    }
-
-    /**
-     * AWS4 uses a series of derived keys, formed by hashing different pieces of data
-     */
-    private byte[] deriveSigningKey(
-            String secretKey,
-            String dateStamp,
-            String regionName,
-            String serviceName,
-            Instant signingDate
-    ) {
         var cacheKey = new SigningCache.CacheKey(secretKey, regionName, serviceName);
         SigningKey signingKey = SIGNER_CACHE.get(cacheKey);
-        if (signingKey != null && signingKey.isValidFor(signingDate)) {
-            return signingKey.signingKey();
+        byte[] key;
+        if (signingKey != null && signingKey.isValidFor(r.cachedDays)) {
+            key = signingKey.signingKey();
+        } else {
+            LOGGER.trace("Generating new key as signing key could not be found in cache.");
+            key = newSigningKey(secretKey, regionName, serviceName);
+            SIGNER_CACHE.put(cacheKey, new SigningKey(key, r.cachedDays));
         }
-        LOGGER.trace("Generating new key as signing key could not be found in cache.");
-        byte[] key = newSigningKey(secretKey, dateStamp, regionName, serviceName);
-        SIGNER_CACHE.put(cacheKey, new SigningKey(key, signingDate));
+        r.memoizeSigningKey(secretKey, regionName, serviceName, key);
         return key;
     }
 
-    private byte[] newSigningKey(
-            String secretKey,
-            String dateStamp,
-            String regionName,
-            String serviceName
-    ) {
+    private byte[] newSigningKey(String secretKey, String regionName, String serviceName) {
         var kSecret = ("AWS4" + secretKey).getBytes(StandardCharsets.UTF_8);
-        var kDate = sign(dateStamp, kSecret);
-        var kRegion = sign(regionName, kDate);
-        var kService = sign(serviceName, kRegion);
-        return sign(TERMINATOR, kService);
-    }
-
-    private String computeSignature(
-            byte[] canonicalRequest,
-            int canonicalRequestLength,
-            String scope,
-            String requestTime,
-            byte[] signingKey
-    ) {
-        byte[] canonicalRequestHash = hash(canonicalRequest, 0, canonicalRequestLength, signingResources.hashBytes);
-        int stringToSignLength = ALGORITHM.length() + requestTime.length() + scope.length() + 67;
-        byte[] stringToSign = signingResources.ensureStringToSignCapacity(stringToSignLength);
-
-        int pos = writeAscii(ALGORITHM, stringToSign, 0);
-        stringToSign[pos++] = '\n';
-        pos = writeAscii(requestTime, stringToSign, pos);
-        stringToSign[pos++] = '\n';
-        pos = writeAscii(scope, stringToSign, pos);
-        stringToSign[pos++] = '\n';
-        pos = writeHex(canonicalRequestHash, stringToSign, pos);
-
-        byte[] signatureBytes = sign(stringToSign, 0, pos, signingKey, signingResources.signatureBytes);
-        byte[] signatureHex = signingResources.signatureHexBytes;
-        writeHex(signatureBytes, signatureHex, 0);
-        return new String(signatureHex, 0, signatureHex.length, StandardCharsets.US_ASCII);
-    }
-
-    private byte[] sign(String data, byte[] key) {
-        try {
-            var sha256Mac = signingResources.sha256Mac;
-            sha256Mac.reset();
-            sha256Mac.init(new SecretKeySpec(key, HMAC_SHA_256));
-            return sha256Mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-        } catch (InvalidKeyException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private byte[] sign(byte[] data, int offset, int length, byte[] key, byte[] output) {
-        try {
-            var sha256Mac = signingResources.sha256Mac;
-            sha256Mac.reset();
-            sha256Mac.init(new SecretKeySpec(key, HMAC_SHA_256));
-            sha256Mac.update(data, offset, length);
-            sha256Mac.doFinal(output, 0);
-            return output;
-        } catch (InvalidKeyException e) {
-            throw new RuntimeException(e);
-        } catch (ShortBufferException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static int writeAscii(String value, byte[] dst, int offset) {
-        for (int i = 0; i < value.length(); i++) {
-            dst[offset++] = (byte) value.charAt(i);
-        }
-        return offset;
-    }
-
-    private static int writeHex(byte[] bytes, byte[] dst, int offset) {
-        for (byte b : bytes) {
-            dst[offset++] = HEX_DIGITS[(b >>> 4) & 0x0F];
-            dst[offset++] = HEX_DIGITS[b & 0x0F];
-        }
-        return offset;
-    }
-
-    private byte[] hash(byte[] data, int offset, int length, byte[] output) {
-        try {
-            var sha256Digest = signingResources.sha256Digest;
-            sha256Digest.reset();
-            sha256Digest.update(data, offset, length);
-            sha256Digest.digest(output, 0, output.length);
-            return output;
-        } catch (DigestException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private byte[] hash(ByteBuffer data, byte[] output) {
-        try {
-            var sha256Digest = signingResources.sha256Digest;
-            sha256Digest.reset();
-            sha256Digest.update(data);
-            sha256Digest.digest(output, 0, output.length);
-            return output;
-        } catch (DigestException e) {
-            throw new RuntimeException(e);
-        }
+        var kDate = r.hmac(kSecret, r.dateStamp.getBytes(StandardCharsets.UTF_8));
+        var kRegion = r.hmac(kDate, regionName.getBytes(StandardCharsets.UTF_8));
+        var kService = r.hmac(kRegion, serviceName.getBytes(StandardCharsets.UTF_8));
+        return r.hmac(kService, TERMINATOR_BYTES);
     }
 }
