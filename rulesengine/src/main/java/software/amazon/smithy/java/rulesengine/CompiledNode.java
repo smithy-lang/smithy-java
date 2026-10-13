@@ -14,6 +14,7 @@ import java.util.Objects;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.io.uri.SmithyUri;
+import software.amazon.smithy.java.io.uri.SmithyUriTemplate;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Split;
 
@@ -894,6 +895,84 @@ abstract sealed class CompiledNode {
         }
     }
 
+    /**
+     * {@code BUILD_URI} where the host and path are known templates, so the constant parts are validated
+     * once at load and only the interpolated values are checked per resolution.
+     *
+     * <p>The hot slot is keyed on the values rather than on the assembled host and path, which means a
+     * repeat resolution skips assembling them at all; the {@link BuildUri} slot has to build both before
+     * it can tell whether they match.
+     */
+    static final class BuildUriTemplate extends CompiledNode {
+        private static final int CACHE_RECHECK_INTERVAL = 16;
+
+        private final SmithyUriTemplate template;
+        private final CompiledNode[] values;
+
+        BuildUriTemplate(SmithyUriTemplate template, CompiledNode[] values) {
+            this.template = template;
+            this.values = values;
+        }
+
+        @Override
+        Object eval(BytecodeEvaluator ev) {
+            // Values are staged on the operand stack rather than in a fresh array, the same way
+            // Template stages its parts: nodes are shared across threads so they hold no scratch.
+            Object[] stack = ev.stack;
+            int base = ev.stackPosition;
+            for (int i = 0; i < values.length; i++) {
+                stack[ev.stackPosition++] = values[i].eval(ev);
+            }
+            ev.stackPosition = base;
+
+            boolean sameNode = ev.templateUriNode == this;
+            if (sameNode
+                    && ev.templateUriCacheSkip == 0
+                    && sameValues(stack, base, ev.templateUriValues)) {
+                ev.templateUriCacheMisses = 0;
+                return ev.templateUri;
+            }
+
+            SmithyUri uri = template.expandInternal(stack, base, ev.templateUriBufferProvider);
+            if (sameNode && ev.templateUriCacheSkip > 0) {
+                ev.templateUriCacheSkip--;
+                return uri;
+            }
+
+            if (sameNode && ++ev.templateUriCacheMisses >= 2) {
+                // A stream of different values gets no benefit from the hot slot. Sample it
+                // periodically so a later stable phase is still detected, without taxing every miss.
+                ev.templateUriCacheMisses = 0;
+                ev.templateUriCacheSkip = CACHE_RECHECK_INTERVAL - 1;
+            } else if (!sameNode) {
+                ev.templateUriCacheMisses = 0;
+                ev.templateUriCacheSkip = 0;
+            }
+            if (ev.templateUriValues == null || ev.templateUriValues.length != values.length) {
+                ev.templateUriValues = new String[values.length];
+            }
+            for (int i = 0; i < values.length; i++) {
+                ev.templateUriValues[i] = (String) stack[base + i];
+            }
+            ev.templateUriNode = this;
+            ev.templateUri = uri;
+            return uri;
+        }
+
+        private static boolean sameValues(Object[] values, int from, String[] cached) {
+            if (cached == null) {
+                return false;
+            }
+            for (int i = 0; i < cached.length; i++) {
+                Object value = values[from + i];
+                if (value != cached[i] && !value.equals(cached[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     static final class ReturnEndpoint extends CompiledNode {
         private final CompiledNode url;
@@ -943,6 +1022,69 @@ abstract sealed class CompiledNode {
         Object eval(BytecodeEvaluator ev) {
             throw new RulesEvaluationError((String) message.eval(ev), position);
         }
+    }
+
+    /**
+     * Builds the URI node, preferring a pre-validated template when the host and path are built from
+     * literals and interpolated values.
+     *
+     * <p>Falls back to {@link BuildUri} for anything else, and for a template whose literals the URI
+     * validator rejects: those have always failed at resolution time rather than at load, and that is
+     * not changed here.
+     *
+     * @param scheme constant scheme.
+     * @param host node producing the host.
+     * @param path node producing the path.
+     * @return the URI node.
+     */
+    static CompiledNode buildUri(String scheme, CompiledNode host, CompiledNode path) {
+        try {
+            var builder = SmithyUriTemplate.builder().scheme(scheme).port(-1);
+            var dynamics = new ArrayList<CompiledNode>();
+            if (appendTemplate(host, dynamics, builder, true) && appendTemplate(path, dynamics, builder, false)) {
+                return new BuildUriTemplate(builder.build(), dynamics.toArray(new CompiledNode[0]));
+            }
+        } catch (IllegalArgumentException e) {
+            // A literal the validator rejects, which BuildUri reports when the result runs.
+        }
+        return new BuildUri(scheme, host, path);
+    }
+
+    private static boolean appendTemplate(
+            CompiledNode node,
+            List<CompiledNode> dynamics,
+            SmithyUriTemplate.Builder builder,
+            boolean isHost
+    ) {
+        if (node instanceof Const c) {
+            if (!(c.value instanceof String literal)) {
+                return false;
+            }
+            if (isHost) {
+                builder.addHostLiteral(literal);
+            } else {
+                builder.addPathLiteral(literal);
+            }
+            return true;
+        }
+        if (!(node instanceof Template t)) {
+            return false;
+        }
+        for (int i = 0; i < t.dynamics.length; i++) {
+            if (isHost) {
+                builder.addHostLiteral(t.literals[i]).addHostPlaceholder();
+            } else {
+                builder.addPathLiteral(t.literals[i]).addPathPlaceholder();
+            }
+            dynamics.add(t.dynamics[i]);
+        }
+        String last = t.literals[t.literals.length - 1];
+        if (isHost) {
+            builder.addHostLiteral(last);
+        } else {
+            builder.addPathLiteral(last);
+        }
+        return true;
     }
 
     /**

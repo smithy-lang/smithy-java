@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.function.IntFunction;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.io.uri.SmithyUri;
@@ -41,6 +42,14 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     final UriFactory uriFactory = new UriFactory();
     private final RegisterFiller registerFiller;
     Context context;
+    // Hot slot for CompiledNode.BuildUriTemplate, keyed on the values rather than on an assembled
+    // host and path, so a hit skips assembly instead of requiring it first.
+    CompiledNode templateUriNode;
+    String[] templateUriValues;
+    SmithyUri templateUri;
+    final IntFunction<char[]> templateUriBufferProvider = this::getCharBuffer;
+    int templateUriCacheMisses;
+    int templateUriCacheSkip;
     // Hot-slot cache for BUILD_URI
     String cachedUriHost;
     String cachedUriPath;

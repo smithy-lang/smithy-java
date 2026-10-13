@@ -234,7 +234,7 @@ final class NodeCompiler {
                     var scheme = string(u16(pc));
                     pc += 2;
                     var args = drain(stack, 2);
-                    stack.add(new CompiledNode.BuildUri(scheme, args.get(0), args.get(1)));
+                    stack.add(CompiledNode.buildUri(scheme, args.get(0), args.get(1)));
                 }
 
                 // coalesce(a, b, ...): the arms after this one are the self-contained range up to the

@@ -181,11 +181,14 @@ public final class SmithyUri {
     /**
      * Strip IPv6 brackets if the host is a bracketed IPv6 literal (contains ':' inside brackets).
      */
-    private static String stripBrackets(String host) {
-        if (host != null && host.startsWith("[") && host.endsWith("]")) {
-            String inner = host.substring(1, host.length() - 1);
-            if (inner.indexOf(':') >= 0) {
-                return inner;
+    static String stripBrackets(String host) {
+        if (host != null) {
+            int length = host.length();
+            if (length >= 3 && host.charAt(0) == '[' && host.charAt(length - 1) == ']') {
+                int colon = host.indexOf(':', 1);
+                if (colon >= 0 && colon < length - 1) {
+                    return host.substring(1, length - 1);
+                }
             }
         }
         return host;
@@ -691,7 +694,7 @@ public final class SmithyUri {
         sb.append(path, start, end);
     }
 
-    private static void validateScheme(String scheme) {
+    static void validateScheme(String scheme) {
         if (scheme.isEmpty()) {
             throw new IllegalArgumentException("Scheme must not be empty");
         }
@@ -719,27 +722,34 @@ public final class SmithyUri {
         }
 
         for (int i = 0; i < host.length(); i++) {
-            char c = host.charAt(i);
-            if (c >= 'A' && c <= 'Z') {
-                throw new IllegalArgumentException("Host must be lowercase: " + host);
-            }
-            if (c < 128 && maskContains(INVALID_HOST_LOW, INVALID_HOST_HIGH, c)) {
-                throw new IllegalArgumentException("Invalid character in host: '" + c + "' in " + host);
-            }
+            validateHostCharacter(host.charAt(i), host);
         }
     }
 
-    private static void validatePort(int port) {
+    static void validateHostCharacter(char c, String host) {
+        if (c >= 'A' && c <= 'Z') {
+            throw new IllegalArgumentException("Host must be lowercase: " + host);
+        }
+        if (c < 128 && maskContains(INVALID_HOST_LOW, INVALID_HOST_HIGH, c)) {
+            throw new IllegalArgumentException("Invalid character in host: '" + c + "' in " + host);
+        }
+    }
+
+    static void validatePort(int port) {
         if (port < -1 || port > 65535) {
             throw new IllegalArgumentException("Port out of range: " + port);
         }
     }
 
-    private static void validatePath(String path) {
+    static void validatePath(String path) {
         validateComponent(path, VALID_PATH_LOW, VALID_PATH_HIGH, "path");
     }
 
-    private static void validateQuery(String query) {
+    static boolean isValidPathCharacter(char c) {
+        return c < 128 && maskContains(VALID_PATH_LOW, VALID_PATH_HIGH, c);
+    }
+
+    static void validateQuery(String query) {
         validateComponent(query, VALID_QUERY_LOW, VALID_QUERY_HIGH, "query");
     }
 
@@ -764,7 +774,7 @@ public final class SmithyUri {
         }
     }
 
-    private static boolean isHex(char c) {
+    static boolean isHex(char c) {
         return c < 128 && maskContains(IS_HEX_LOW, IS_HEX_HIGH, c);
     }
 }

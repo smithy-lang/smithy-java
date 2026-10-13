@@ -8,6 +8,8 @@ package software.amazon.smithy.java.rulesengine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -195,6 +197,42 @@ class NodeCompilerTest {
         Bytecode bytecode = result(code, pool);
 
         assertEquals("https://bucket.example.com/path", resolve(bytecode, params("bucket", null)));
+    }
+
+    @Test
+    void buildsAndCachesPrevalidatedUriTemplates() {
+        var host = new CompiledNode.Template(
+                new String[] {"", ".example.com"},
+                new CompiledNode[] {new CompiledNode.Reg(0)});
+        var path = new CompiledNode.Template(
+                new String[] {"/", ""},
+                new CompiledNode[] {new CompiledNode.Reg(1)});
+        CompiledNode node = CompiledNode.buildUri("https", host, path);
+        assertInstanceOf(CompiledNode.BuildUriTemplate.class, node);
+
+        Bytecode bytecode = condition(
+                new byte[] {Opcodes.LOAD_CONST, 0, Opcodes.RETURN_VALUE},
+                new Object[] {Boolean.TRUE});
+        var evaluator = new BytecodeEvaluator(bytecode, new RulesExtension[0], RegisterFiller.of(bytecode, Map.of()));
+        evaluator.reset(Context.create(), params("bucket", "key"));
+
+        Object first = node.eval(evaluator);
+        assertEquals("https://bucket.example.com/key", first.toString());
+        assertSame(first, node.eval(evaluator), "repeated values should hit the value-keyed URI cache");
+
+        evaluator.registers[0] = "other";
+        Object changed = node.eval(evaluator);
+        assertNotSame(first, changed);
+        assertEquals("https://other.example.com/key", changed.toString());
+    }
+
+    @Test
+    void fallsBackWhenUriTemplateLiteralsAreInvalid() {
+        CompiledNode node = CompiledNode.buildUri(
+                "https",
+                new CompiledNode.Const("not/a/host"),
+                new CompiledNode.Const(""));
+        assertInstanceOf(CompiledNode.BuildUri.class, node);
     }
 
     @Test
