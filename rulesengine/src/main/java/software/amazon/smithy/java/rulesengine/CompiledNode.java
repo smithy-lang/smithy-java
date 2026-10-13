@@ -15,7 +15,6 @@ import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.io.uri.URLEncoding;
-import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Split;
 
 /**
@@ -539,7 +538,7 @@ abstract sealed class CompiledNode {
         @Override
         boolean test(BytecodeEvaluator ev) {
             var label = (String) target.eval(ev);
-            return IsValidHostLabel.isValidHostLabel(label, Boolean.TRUE.equals(allowDots.eval(ev)));
+            return EndpointUtils.isValidHostLabel(label, Boolean.TRUE.equals(allowDots.eval(ev)));
         }
     }
 
@@ -555,7 +554,7 @@ abstract sealed class CompiledNode {
 
         @Override
         boolean test(BytecodeEvaluator ev) {
-            return IsValidHostLabel.isValidHostLabel((String) target.eval(ev), allowDots);
+            return EndpointUtils.isValidHostLabel((String) target.eval(ev), allowDots);
         }
     }
 
