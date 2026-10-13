@@ -104,6 +104,27 @@ public class EndpointFixedCostBenchmark {
             }
             """;
 
+    /**
+     * Control for the single-operation rulesets below: same three-part URL they build, but no condition.
+     * Without it their deltas from {@link #TEMPLATE} would include the extra URL part, overstating what
+     * the operation itself costs.
+     */
+    private static final String TEMPLATE_LONG = """
+            {
+              "version": "1.0",
+              "parameters": {
+                "Region": {"type": "string", "builtIn": "AWS::Region", "required": true,
+                           "documentation": "region"},
+                "Bucket": {"type": "string", "required": true, "default": "my-bucket-name",
+                           "documentation": "bucket"}
+              },
+              "rules": [
+                {"conditions": [],
+                 "endpoint": {"url": "https://{Bucket}.svc.{Region}.amazonaws.com"}, "type": "endpoint"}
+              ]
+            }
+            """;
+
     // Each of the following adds exactly one rules-language operation on top of TEMPLATE, and supplies
     // its input through a parameter default so that parameter passing is identical across every ruleset
     // and the delta from TEMPLATE is the operation's own cost.
@@ -184,7 +205,14 @@ public class EndpointFixedCostBenchmark {
 
     @State(Scope.Benchmark)
     public static class ResolverState {
-        @Param({"constant", "template", "oneCondition", "partition", "hostLabel", "virtualHostable", "substring"})
+        @Param({"constant",
+                "template",
+                "oneCondition",
+                "templateLong",
+                "partition",
+                "hostLabel",
+                "virtualHostable",
+                "substring"})
         private String ruleset;
 
         EndpointResolver resolver;
@@ -196,6 +224,7 @@ public class EndpointFixedCostBenchmark {
                 case "constant" -> CONSTANT;
                 case "template" -> TEMPLATE;
                 case "oneCondition" -> ONE_CONDITION;
+                case "templateLong" -> TEMPLATE_LONG;
                 case "partition" -> PARTITION;
                 case "hostLabel" -> HOST_LABEL;
                 case "virtualHostable" -> VIRTUAL_HOSTABLE;
