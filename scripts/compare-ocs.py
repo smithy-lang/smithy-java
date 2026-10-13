@@ -154,6 +154,18 @@ def improvement_pct(baseline: float, current: float) -> float:
     return round((current / baseline - 1) * 100, 2)
 
 
+def software(baseline: Side, current: Side, lang: str) -> List[List[Optional[str]]]:
+    """[runtime, SDK] version pairs; the baseline SDK version is listed too when it differs from current."""
+    sdk = current.metadata.get("sdk", lang)
+    b, c = baseline.metadata.get("sdk_version"), current.metadata.get("sdk_version")
+    entries: List[List[Optional[str]]] = [["Java", current.java_version()]]
+    if b == c:
+        entries.append([sdk, c])
+    else:
+        entries += [[sdk + " (current)", c], [sdk + " (baseline)", b]]
+    return entries
+
+
 def compare(baseline: Side, current: Side, lang: str) -> dict:
     warnings: List[str] = []
     for key, what in COMPARED_METADATA:
@@ -219,7 +231,7 @@ def compare(baseline: Side, current: Side, lang: str) -> dict:
         "warmup_policy": meta.get("warmup_policy_detail"),
         "http_mock": meta.get("http_mock"),
         "mode": meta.get("mode"),
-        "software": [["Java", current.java_version()], [meta.get("sdk", lang), meta.get("sdk_version")]],
+        "software": software(baseline, current, lang),
         "os": current.environment("os_label"),
         "cpu": current.environment("cpu"),
         "baseline_date": baseline.date(),
@@ -298,9 +310,18 @@ def main(argv: List[str]) -> int:
     parser.add_argument("--current", nargs="+", required=True, metavar="RUN.json", help="run file(s) of the current side")
     parser.add_argument("--out", required=True, help="output prefix; <out>.json is written")
     parser.add_argument("--lang", default="smithy-java", help="SDK label in the results (default %(default)s)")
+    parser.add_argument("--baseline-date", metavar="YYYY-MM-DD",
+                        help="date recorded for the baseline side, e.g. the date of the baseline SDK code "
+                             "(default: the day the baseline run started)")
+    parser.add_argument("--current-date", metavar="YYYY-MM-DD",
+                        help="date recorded for the current side (default: the day the current run started)")
     args = parser.parse_args(argv)
 
     result = compare(Side("baseline", args.baseline), Side("current", args.current), args.lang)
+    if args.baseline_date:
+        result["metadata"]["baseline_date"] = args.baseline_date
+    if args.current_date:
+        result["metadata"]["current_date"] = args.current_date
     out = args.out[:-5] if args.out.endswith(".json") else args.out
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out + ".json", "w", encoding="utf-8") as handle:

@@ -23,3 +23,4 @@ benchmark-results/<run>/<instance-type>/<mode>/sample<N>.json
 | Run | SDK | Hosts | Modes | Date |
 |---|---|---|---|---|
 | [e2e-baseline-20260211](e2e-baseline-20260211/README.md) | 0.0.3 (Feb 2026 baseline) | m7i.metal-24xl, m7g.metal | stub, https | 2026-10-12 |
+| [e2e-main-20261013](e2e-main-20261013/README.md) | 1.7.0 (`main` at `304e02511`) | m7i.metal-24xl, m7g.metal | stub, https | 2026-10-13 |

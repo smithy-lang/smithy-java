@@ -178,6 +178,32 @@ class CompareTests(unittest.TestCase):
             self.assertIn("Overall Geometric Mean (2 benchmarks):", text)
             self.assertIn("CPU Time Reduction:", text)
 
+    def test_date_overrides_replace_the_run_dates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            b1 = self.write(directory, "b1.json", run_file({"awsJson1_0_GetItemOutput_S": 10_000}))
+            c1 = self.write(directory, "c1.json", run_file({"awsJson1_0_GetItemOutput_S": 20_000}, commit="bbbbbbb"))
+            out = os.path.join(directory, "m7imetal24xl_ocs_results")
+            with patch("sys.stdout"):
+                self.assertEqual(compare.main(["--baseline", b1, "--current", c1, "--out", out,
+                                               "--baseline-date", "2026-02-11", "--current-date", "2026-10-13"]), 0)
+            with open(out + ".json", encoding="utf-8") as handle:
+                meta = json.load(handle)["metadata"]
+            self.assertEqual((meta["baseline_date"], meta["current_date"]), ("2026-02-11", "2026-10-13"))
+            self.assertEqual(meta["sides"]["baseline"]["date"], "2026-10-10")
+
+    def test_software_lists_both_sdk_versions_when_they_differ(self):
+        with tempfile.TemporaryDirectory() as directory:
+            old = run_file({"awsJson1_0_GetItemOutput_S": 10_000})
+            old["metadata"]["sdk_version"] = "0.0.3"
+            b1 = self.write(directory, "b1.json", old)
+            c1 = self.write(directory, "c1.json", run_file({"awsJson1_0_GetItemOutput_S": 20_000}, commit="bbbbbbb"))
+            out = os.path.join(directory, "m7imetal24xl_ocs_results")
+            with patch("sys.stdout"):
+                self.assertEqual(compare.main(["--baseline", b1, "--current", c1, "--out", out]), 0)
+            with open(out + ".json", encoding="utf-8") as handle:
+                software = json.load(handle)["metadata"]["software"]
+            self.assertEqual(software, [["Java", "25.0.4"], ["smithy-java (current)", "1.7.0"], ["smithy-java (baseline)", "0.0.3"]])
+
     def test_different_modes_cases_and_fingerprints_are_compared_with_warnings(self):
         with tempfile.TemporaryDirectory() as directory:
             base = self.write(directory, "b.json", run_file({"restXml_GetObject_S": 1000, "restXml_GetObject_M": 500}))
