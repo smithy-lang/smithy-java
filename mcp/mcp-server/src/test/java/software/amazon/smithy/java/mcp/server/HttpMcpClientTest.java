@@ -15,6 +15,7 @@ import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -298,6 +299,122 @@ class HttpMcpClientTest {
                 .build();
 
         assertNull(proxy.exchange(notification));
+    }
+
+    @Test
+    void testNotificationIgnoresBodyOfAcceptedResponse() throws IOException {
+        // Some servers answer an accepted notification with 202 and a JSON body such as "{}"
+        // instead of no body.
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            writeJson(exchange, 202, "{}");
+        });
+
+        var notification = JsonRpcRequest.builder()
+                .method(McpMethod.Standard.NOTIFICATIONS_INITIALIZED.wireName())
+                .jsonrpc("2.0")
+                .build();
+
+        assertNull(proxy.exchange(notification));
+    }
+
+    @Test
+    void testNotificationIgnoresChunkedNonObjectBodyOfAcceptedResponse() throws IOException {
+        // A body of unknown length that is not a JSON object, here "" sent chunked with no
+        // Content-Length or content type, is discarded like any other notification response body.
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(202, 0);
+            try (var output = exchange.getResponseBody()) {
+                output.write("\"\"".getBytes(StandardCharsets.UTF_8));
+            }
+        });
+
+        var notification = JsonRpcRequest.builder()
+                .method(McpMethod.Standard.NOTIFICATIONS_INITIALIZED.wireName())
+                .jsonrpc("2.0")
+                .build();
+
+        assertNull(proxy.exchange(notification));
+    }
+
+    @Test
+    void testNotificationDoesNotReadAStreamingResponseBody() throws Exception {
+        // A server that answers a notification with a never-ending stream must not block the
+        // client or make it buffer the stream.
+        var release = new CountDownLatch(1);
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(202, 0);
+            try (var output = exchange.getResponseBody()) {
+                output.write("data: {}\n\n".getBytes(StandardCharsets.UTF_8));
+                output.flush();
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (IOException ignored) {
+                // The client closed the stream.
+            }
+        });
+
+        var notification = JsonRpcRequest.builder()
+                .method(McpMethod.Standard.NOTIFICATIONS_INITIALIZED.wireName())
+                .jsonrpc("2.0")
+                .build();
+        try {
+            assertTimeoutPreemptively(Duration.ofSeconds(5), () -> assertNull(proxy.exchange(notification)));
+        } finally {
+            release.countDown();
+        }
+    }
+
+    @Test
+    void initializeSucceedsWhenInitializedNotificationIsAcceptedWithABody() throws IOException {
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            var request = JsonRpcRequest.builder()
+                    .deserialize(JSON_CODEC.createDeserializer(exchange.getRequestBody().readAllBytes()))
+                    .build();
+            if (request.getId() == null) {
+                writeJson(exchange, 202, "{}");
+                return;
+            }
+            var result = McpHttpBinding.isInitialize(request)
+                    ? Document.of(Map.of("protocolVersion", Document.of("2025-03-26")))
+                    : Document.of("pong");
+            writeJson(exchange,
+                    200,
+                    JSON_CODEC.serializeToString(JsonRpcResponse.builder()
+                            .jsonrpc("2.0")
+                            .id(request.getId())
+                            .result(result)
+                            .build()));
+        });
+
+        var protocol = BuiltInProtocols.protocol(KnownProtocolVersion.V2025_06_18);
+        assertDoesNotThrow(() -> proxy.initialize(
+                ignored -> {},
+                ignored -> {},
+                JsonRpcRequest.builder()
+                        .method(McpMethod.Standard.INITIALIZE.wireName())
+                        .id(Document.of(1))
+                        .jsonrpc("2.0")
+                        .params(Document.of(Map.of(
+                                "protocolVersion",
+                                Document.of(protocol.id().identifier()))))
+                        .build(),
+                protocol));
+
+        var response = proxy.exchange(JsonRpcRequest.builder()
+                .method(McpMethod.Standard.PING.wireName())
+                .id(Document.of(2))
+                .jsonrpc("2.0")
+                .build());
+        assertEquals("pong", response.getResult().asString());
     }
 
     @Test

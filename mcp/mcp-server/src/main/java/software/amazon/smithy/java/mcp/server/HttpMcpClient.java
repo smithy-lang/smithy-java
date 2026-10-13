@@ -41,6 +41,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 public final class HttpMcpClient extends McpRemoteClient {
     private static final InternalLogger LOG = InternalLogger.getLogger(HttpMcpClient.class);
     private static final int UPSTREAM_HTTP_ERROR_CODE = -32000;
+    private static final long MAX_DISCARDED_BODY_BYTES = 8 * 1024;
 
     private final ClientTransport<HttpRequest, HttpResponse> transport;
     private final URI endpoint;
@@ -246,6 +247,13 @@ public final class HttpMcpClient extends McpRemoteClient {
                 return handleErrorResponse(response, request);
             }
 
+            // A notification has no JSON-RPC response. Streamable HTTP accepts one with 202 and no body,
+            // but some servers send a body anyway (e.g. "{}"), so discard it instead of parsing it.
+            if (request.getId() == null) {
+                discardBody(response);
+                return null;
+            }
+
             // Check if response is SSE
             String contentType = response.body().contentType();
             if (contentType != null && contentType.startsWith("text/event-stream")) {
@@ -261,6 +269,19 @@ public final class HttpMcpClient extends McpRemoteClient {
                     .build();
         } catch (Exception e) {
             throw new McpRemoteException("HTTP MCP exchange failed", e);
+        }
+    }
+
+    /**
+     * Reads a short body of known length so the connection can be reused, and closes anything longer,
+     * of unknown length, or streaming without reading it.
+     */
+    private static void discardBody(HttpResponse response) {
+        var body = response.body();
+        if (body != null && body.hasKnownLength() && body.contentLength() <= MAX_DISCARDED_BODY_BYTES) {
+            ByteBufferUtils.getBytes(body.asByteBuffer());
+        } else {
+            response.close();
         }
     }
 
