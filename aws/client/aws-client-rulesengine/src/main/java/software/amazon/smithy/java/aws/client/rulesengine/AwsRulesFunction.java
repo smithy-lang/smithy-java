@@ -21,21 +21,36 @@ import software.amazon.smithy.rulesengine.aws.language.functions.partition.Parti
  */
 enum AwsRulesFunction implements RulesFunction {
     AWS_PARTITION("aws.partition", 1) {
+        // Single volatile reference for thread-safe hot-key caching without ThreadLocal overhead.
+        private transient volatile PartitionMap cache;
+
         @Override
         public Object apply1(Object arg1) {
             String region = (String) arg1;
+
+            // A client almost always resolves for one region, and aws.partition appears in nearly every
+            // AWS ruleset, so the wrapper is cached rather than reallocated per resolution. Same
+            // single-volatile hot-key pattern as AWS_PARSE_ARN below.
+            var c = cache;
+            if (c != null && region.equals(c.region())) {
+                return c;
+            }
+
             var partition = AwsPartition.findPartition(region);
             if (partition == null) {
                 return null;
             }
-            return new PartitionMap(partition);
+
+            var result = new PartitionMap(region, partition);
+            cache = result;
+            return result;
         }
 
         // Convert AwsPartition to the map structure used in the rules engine.
         // Most of the entries aren't needed for evaluating rules, so map entries are created lazily (something that
         // isn't needed when evaluating rules), and accessing map values is done using a switch (something that is
         // essentially compiled into a map lookup via a lookupswitch).
-        private record PartitionMap(Partition partition) implements PropertyGetter, ToNode {
+        private record PartitionMap(String region, Partition partition) implements PropertyGetter, ToNode {
             @Override
             public Object getProperty(String name) {
                 return switch (name) {
