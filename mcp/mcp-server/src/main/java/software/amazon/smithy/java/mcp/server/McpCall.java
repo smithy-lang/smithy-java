@@ -29,6 +29,7 @@ public sealed interface McpCall permits
         McpCall.Complete,
         McpCall.SetLogLevel,
         McpCall.ReadResource,
+        McpCall.Listen,
         McpCall.Notification,
         McpCall.ExtensionCall,
         McpCall.UnknownCall {
@@ -168,6 +169,25 @@ public sealed interface McpCall permits
         @Override
         public McpMethod method() {
             return McpMethod.Standard.RESOURCES_READ;
+        }
+    }
+
+    /**
+     * Opens a long-lived notification stream ({@code subscriptions/listen}, protocol 2026-07-28).
+     *
+     * @param id the JSON-RPC id, which also identifies the subscription
+     * @param notifications the notification types the client opts in to
+     * @param metadata request metadata
+     */
+    record Listen(Document id, McpSubscriptionFilter notifications, McpMetadata metadata) implements McpCall {
+        public Listen {
+            Objects.requireNonNull(notifications, "notifications");
+            metadata = metadata == null ? McpMetadata.EMPTY : metadata;
+        }
+
+        @Override
+        public McpMethod method() {
+            return McpMethod.Standard.SUBSCRIPTIONS_LISTEN;
         }
     }
 

@@ -37,6 +37,14 @@ public interface McpOperations {
         throw new UnsupportedOperationException("logging/setLevel is not implemented");
     }
 
+    /**
+     * Handles {@code subscriptions/listen}, typically by returning {@link McpOutcome.Subscribed} with the
+     * notification types the transport can deliver.
+     */
+    default McpOutcome listen(McpCall.Listen call, McpRequestContext context) {
+        throw new UnsupportedOperationException("subscriptions/listen is not implemented");
+    }
+
     default McpOutcome readResource(McpCall.ReadResource call, McpRequestContext context) {
         throw new UnsupportedOperationException("resources/read is not implemented");
     }
