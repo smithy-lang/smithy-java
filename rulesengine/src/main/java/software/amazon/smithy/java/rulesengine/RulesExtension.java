@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
 
 /**
  * An SPI used to extend the rules engine with custom builtins and functions.
@@ -56,5 +57,23 @@ public interface RulesExtension {
             Map<String, List<String>> headers
     ) {
         // by default does nothing.
+    }
+
+    /**
+     * Creates an auth scheme directly from a compiled endpoint result.
+     *
+     * <p>This is an optional optimization for extensions that consume the conventional
+     * {@code authSchemes: [struct]} endpoint property. The supplied {@code authScheme} view is only
+     * valid for the duration of this call; implementations must copy any values they retain. Other
+     * endpoint properties continue to be passed to {@link #extractEndpointProperties}.
+     *
+     * <p>The default returns {@code null}, causing the rules engine to use
+     * {@link #extractEndpointProperties} with the fully materialized property graph.
+     *
+     * @param authScheme flat auth-scheme fields.
+     * @return the auth scheme to add to the endpoint, or null if none.
+     */
+    default EndpointAuthScheme createEndpointAuthScheme(PropertyGetter authScheme) {
+        return null;
     }
 }

@@ -121,11 +121,7 @@ final class NodeCompiler {
 
                 case Opcodes.RESOLVE_TEMPLATE -> {
                     int count = code[pc++] & 0xFF;
-                    var node = CompiledNode.template(drain(stack, count));
-                    if (node == null) {
-                        return null;
-                    }
-                    stack.add(node);
+                    stack.add(CompiledNode.template(drain(stack, count)));
                 }
 
                 case Opcodes.FN0 -> stack.add(new CompiledNode.Fn0(fn(code[pc++] & 0xFF)));
@@ -297,7 +293,7 @@ final class NodeCompiler {
                     var url = pop(stack);
                     var properties = (packed & 2) != 0 ? pop(stack) : null;
                     var headers = (packed & 1) != 0 ? pop(stack) : null;
-                    return stack.isEmpty() ? new CompiledNode.ReturnEndpoint(url, properties, headers) : null;
+                    return stack.isEmpty() ? CompiledNode.returnEndpoint(url, properties, headers) : null;
                 }
 
                 default -> {
@@ -380,21 +376,20 @@ final class NodeCompiler {
 
     /**
      * {@code STRUCTN} consumes an interleaved value/key run and hands it straight to
-     * {@link ArrayPropertyGetter}. Keys are always constants, so they are baked into a template array
-     * that each resolution clones and fills the value slots of.
+     * {@link ArrayPropertyGetter}. Keys are always constants, so they stay on the compiled node.
      */
     private static CompiledNode struct(List<CompiledNode> stack, int size) {
         var slots = drain(stack, size * 2);
-        var template = new Object[size * 2];
+        var keys = new String[size];
         var values = new CompiledNode[size];
         for (int i = 0; i < size; i++) {
             String key = CompiledNode.constantString(slots.get(i * 2 + 1));
             if (key == null) {
                 throw new IllegalArgumentException("Struct key is not a string constant");
             }
-            template[i * 2 + 1] = key;
+            keys[i] = key;
             values[i] = slots.get(i * 2);
         }
-        return new CompiledNode.StructNode(template, values);
+        return new CompiledNode.StructNode(keys, values);
     }
 }

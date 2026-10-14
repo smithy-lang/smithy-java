@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.io.uri.SmithyUri;
@@ -539,7 +540,7 @@ abstract sealed class CompiledNode {
         @Override
         boolean test(BytecodeEvaluator ev) {
             var label = (String) target.eval(ev);
-            return EndpointUtils.isValidHostLabel(label, Boolean.TRUE.equals(allowDots.eval(ev)));
+            return EndpointUtils.isValidHostLabel(label, (Boolean) allowDots.eval(ev));
         }
     }
 
@@ -843,21 +844,31 @@ abstract sealed class CompiledNode {
      * are always constants, so only the value slots are evaluated per resolution.
      */
     static final class StructNode extends CompiledNode {
-        private final Object[] template;
+        private final String[] keys;
         private final CompiledNode[] values;
 
-        StructNode(Object[] template, CompiledNode[] values) {
-            this.template = template;
+        StructNode(String[] keys, CompiledNode[] values) {
+            this.keys = keys;
             this.values = values;
         }
 
         @Override
         Object eval(BytecodeEvaluator ev) {
-            Object[] data = template.clone();
+            Object[] data = new Object[keys.length * 2];
             for (int i = 0; i < values.length; i++) {
                 data[i * 2] = values[i].eval(ev);
+                data[i * 2 + 1] = keys[i];
             }
             return new ArrayPropertyGetter(data);
+        }
+
+        DirectAuthSchemeProperties evalDirect(BytecodeEvaluator ev) {
+            DirectAuthSchemeProperties result = ev.directAuthSchemeProperties;
+            Object[] target = result.reset(keys);
+            for (int i = 0; i < values.length; i++) {
+                target[i] = values[i].eval(ev);
+            }
+            return result;
         }
     }
 
@@ -920,9 +931,10 @@ abstract sealed class CompiledNode {
             // Template stages its parts: nodes are shared across threads so they hold no scratch.
             Object[] stack = ev.stack;
             int base = ev.stackPosition;
-            for (int i = 0; i < values.length; i++) {
-                stack[ev.stackPosition++] = values[i].eval(ev);
+            for (CompiledNode value : values) {
+                stack[ev.stackPosition++] = value.eval(ev);
             }
+
             ev.stackPosition = base;
 
             boolean sameNode = ev.templateUriNode == this;
@@ -948,12 +960,15 @@ abstract sealed class CompiledNode {
                 ev.templateUriCacheMisses = 0;
                 ev.templateUriCacheSkip = 0;
             }
+
             if (ev.templateUriValues == null || ev.templateUriValues.length != values.length) {
                 ev.templateUriValues = new String[values.length];
             }
+
             for (int i = 0; i < values.length; i++) {
                 ev.templateUriValues[i] = (String) stack[base + i];
             }
+
             ev.templateUriNode = this;
             ev.templateUri = uri;
             return uri;
@@ -963,6 +978,7 @@ abstract sealed class CompiledNode {
             if (cached == null) {
                 return false;
             }
+
             for (int i = 0; i < cached.length; i++) {
                 Object value = values[from + i];
                 if (value != cached[i] && !value.equals(cached[i])) {
@@ -997,12 +1013,146 @@ abstract sealed class CompiledNode {
             if (!hdrs.isEmpty()) {
                 builder.putProperty(EndpointContext.HEADERS, hdrs);
             }
+
             for (var extension : ev.extensions) {
                 extension.extractEndpointProperties(builder, ev.context, props, hdrs);
             }
+
             return builder.build();
         }
     }
+
+    /**
+     * A terminal whose properties contain an auth-scheme list of structs.
+     *
+     * <p>When every property-consuming extension opts into the direct auth hook, this avoids constructing
+     * {@code Map -> List -> ArrayPropertyGetter -> Object[]} just so the extension can immediately unpack
+     * it again. Legacy extensions use {@link ReturnEndpoint} unchanged.
+     */
+    @SuppressWarnings("unchecked")
+    static final class ReturnAuthEndpoint extends CompiledNode {
+        private final CompiledNode url;
+        private final CompiledNode otherProperties;
+        private final CompiledNode headers;
+        private final StructNode[] authSchemes;
+        private final ReturnEndpoint fallback;
+
+        ReturnAuthEndpoint(
+                CompiledNode url,
+                CompiledNode properties,
+                CompiledNode otherProperties,
+                CompiledNode headers,
+                StructNode[] authSchemes
+        ) {
+            this.url = url;
+            this.otherProperties = otherProperties;
+            this.headers = headers;
+            this.authSchemes = authSchemes;
+            this.fallback = new ReturnEndpoint(url, properties, headers);
+        }
+
+        @Override
+        Object eval(BytecodeEvaluator ev) {
+            if (ev.directAuthExtensions.length == 0 || ev.legacyPropertyExtensions.length != 0) {
+                return fallback.eval(ev);
+            }
+
+            Object urlValue = url.eval(ev);
+            var props = (Map<String, Object>) (otherProperties == null ? Map.of() : otherProperties.eval(ev));
+            var hdrs = (Map<String, List<String>>) (headers == null ? Map.of() : headers.eval(ev));
+            SmithyUri uri = urlValue instanceof SmithyUri su
+                    ? su
+                    : ev.uriFactory.createUri((String) urlValue);
+            var builder = Endpoint.builder().uri(uri);
+
+            if (!hdrs.isEmpty()) {
+                builder.putProperty(EndpointContext.HEADERS, hdrs);
+            }
+
+            if (!props.isEmpty() || !hdrs.isEmpty()) {
+                for (RulesExtension extension : ev.directAuthExtensions) {
+                    extension.extractEndpointProperties(builder, ev.context, props, hdrs);
+                }
+            }
+
+            for (StructNode authScheme : authSchemes) {
+                PropertyGetter value = authScheme.evalDirect(ev);
+                for (RulesExtension extension : ev.directAuthExtensions) {
+                    var result = extension.createEndpointAuthScheme(value);
+                    if (result != null) {
+                        builder.addAuthScheme(result);
+                    }
+                }
+            }
+
+            return builder.build();
+        }
+    }
+
+    static CompiledNode returnEndpoint(
+            CompiledNode url,
+            CompiledNode properties,
+            CompiledNode headers
+    ) {
+        AuthSchemeProperty auth = findAuthSchemeProperty(properties);
+        return auth == null
+                ? new ReturnEndpoint(url, properties, headers)
+                : new ReturnAuthEndpoint(
+                        url,
+                        properties,
+                        auth.otherProperties,
+                        headers,
+                        auth.structs);
+    }
+
+    private static AuthSchemeProperty findAuthSchemeProperty(CompiledNode properties) {
+        if (properties instanceof Map1 map) {
+            StructNode[] structs = authSchemeStructs(map.key0, map.value0);
+            return structs == null ? null : new AuthSchemeProperty(structs, null);
+        }
+
+        if (properties instanceof Map2 map) {
+            StructNode[] structs = authSchemeStructs(map.key0, map.value0);
+            if (structs != null) {
+                return new AuthSchemeProperty(structs, new Map1(map.key1, map.value1));
+            }
+            structs = authSchemeStructs(map.key1, map.value1);
+            if (structs != null) {
+                return new AuthSchemeProperty(structs, new Map1(map.key0, map.value0));
+            }
+        }
+
+        return null;
+    }
+
+    private static StructNode[] authSchemeStructs(String key, CompiledNode value) {
+        if (!"authSchemes".equals(key)) {
+            return null;
+        }
+
+        return switch (value) {
+            case List1 list -> list.element0 instanceof StructNode struct ? new StructNode[] {struct} : null;
+            case List2 list -> {
+                if (list.element0 instanceof StructNode first && list.element1 instanceof StructNode second) {
+                    yield new StructNode[] {first, second};
+                }
+                yield null;
+            }
+            case ListN list -> {
+                var result = new StructNode[list.elements.length];
+                for (int i = 0; i < result.length; i++) {
+                    if (!(list.elements[i] instanceof StructNode struct)) {
+                        yield null;
+                    }
+                    result[i] = struct;
+                }
+                yield result;
+            }
+            default -> null;
+        };
+    }
+
+    private record AuthSchemeProperty(StructNode[] structs, CompiledNode otherProperties) {}
 
     static final class ReturnError extends CompiledNode {
         private final CompiledNode message;
@@ -1047,6 +1197,7 @@ abstract sealed class CompiledNode {
         } catch (IllegalArgumentException e) {
             // A literal the validator rejects, which BuildUri reports when the result runs.
         }
+
         return new BuildUri(scheme, host, path);
     }
 
@@ -1059,17 +1210,18 @@ abstract sealed class CompiledNode {
         if (node instanceof Const c) {
             if (!(c.value instanceof String literal)) {
                 return false;
-            }
-            if (isHost) {
+            } else if (isHost) {
                 builder.addHostLiteral(literal);
             } else {
                 builder.addPathLiteral(literal);
             }
             return true;
         }
+
         if (!(node instanceof Template t)) {
             return false;
         }
+
         for (int i = 0; i < t.dynamics.length; i++) {
             if (isHost) {
                 builder.addHostLiteral(t.literals[i]).addHostPlaceholder();
@@ -1078,6 +1230,7 @@ abstract sealed class CompiledNode {
             }
             dynamics.add(t.dynamics[i]);
         }
+
         String last = t.literals[t.literals.length - 1];
         if (isHost) {
             builder.addHostLiteral(last);
@@ -1117,6 +1270,7 @@ abstract sealed class CompiledNode {
             CompiledNode fused = fuseSubstringEquals(left, expected);
             return fused != null ? fused : stringEqualsConstant(left, expected);
         }
+
         expected = constantString(left);
         return expected != null ? stringEqualsConstant(right, expected) : new StringEq(left, right);
     }
@@ -1127,10 +1281,30 @@ abstract sealed class CompiledNode {
                 : new StringEqConst(value, expected);
     }
 
+    /**
+     * Recognizes {@code stringEquals(coalesce(substring(register, start, end, reverse), ""), expected)}
+     * and replaces the tree with one {@link SubstringEqReg} node.
+     *
+     * <p>The original tree extracts a substring, substitutes an empty string when extraction fails,
+     * and then compares the result. The fused node compares the selected register range directly,
+     * avoiding the intermediate substring and nested node calls.
+     *
+     * <p>The replacement is only equivalent when the coalesce has exactly the substring and
+     * empty-string alternatives, the substring reads directly from a register, the expected value is
+     * non-empty ASCII, and its length exactly matches the selected range. Non-empty is required because
+     * a failed substring coalesces to {@code ""}, whereas the direct comparison reports failure. ASCII
+     * is required because substring extraction rejects a selected range containing non-ASCII
+     * characters. Equal lengths prevent the bounded comparison from accepting only a prefix.
+     *
+     * @param left candidate coalesce expression.
+     * @param expected constant comparison value.
+     * @return the fused comparison, or null when the tree cannot be replaced exactly.
+     */
     private static CompiledNode fuseSubstringEquals(CompiledNode left, String expected) {
-        if (!(left instanceof Coalesce coalesce) || expected.isEmpty() || !isAscii(expected)) {
+        if (!(left instanceof Coalesce coalesce) || !CompactStringAccess.isAscii(expected)) {
             return null;
         }
+
         CompiledNode[] options = coalesce.options;
         if (options.length != 2
                 || !"".equals(constantString(options[1]))
@@ -1139,16 +1313,8 @@ abstract sealed class CompiledNode {
                 || (substring.end - substring.start) != expected.length()) {
             return null;
         }
-        return new SubstringEqReg(reg.index, substring.start, substring.end, substring.reverse, expected);
-    }
 
-    private static boolean isAscii(String value) {
-        for (int i = 0; i < value.length(); i++) {
-            if (value.charAt(i) > 127) {
-                return false;
-            }
-        }
-        return true;
+        return new SubstringEqReg(reg.index, substring.start, substring.end, substring.reverse, expected);
     }
 
     /**
@@ -1162,17 +1328,23 @@ abstract sealed class CompiledNode {
     }
 
     /**
-     * Builds a host-label check, folding the allow-dots flag when it is a constant, as it always is in
-     * the rulesets seen in practice.
+     * Builds a host-label check, folding the allow-dots flag when it is a constant.
      *
      * @param target node producing the label.
      * @param allowDots node producing the allow-dots flag.
      * @return the check node.
      */
     static CompiledNode isValidHostLabel(CompiledNode target, CompiledNode allowDots) {
-        return allowDots instanceof Const c && c.value instanceof Boolean flag
-                ? new IsValidHostLabelConst(target, flag)
-                : new IsValidHostLabelNode(target, allowDots);
+        if (!(allowDots instanceof Const c)) {
+            return new IsValidHostLabelNode(target, allowDots);
+        }
+
+        if (!(c.value instanceof Boolean flag)) {
+            String type = c.value == null ? "null" : c.value.getClass().getName();
+            throw new IllegalArgumentException("IS_VALID_HOST_LABEL allowDots must be a boolean, found " + type);
+        }
+
+        return new IsValidHostLabelConst(target, flag);
     }
 
     /**
@@ -1180,28 +1352,31 @@ abstract sealed class CompiledNode {
      * {@link Template}, returning alternating literals and dynamic nodes.
      *
      * @param parts the template parts in output order.
-     * @return the template node, or null if a part is a constant that is not a string.
+     * @return the template node.
+     * @throws IllegalArgumentException if a constant part is not a string.
      */
     static CompiledNode template(List<CompiledNode> parts) {
         List<String> literals = new ArrayList<>();
         List<CompiledNode> dynamics = new ArrayList<>();
         var pending = new StringBuilder();
+
         for (CompiledNode part : parts) {
-            if (part instanceof Const c) {
-                if (!(c.value instanceof String s)) {
-                    return null;
-                }
-                pending.append(s);
-            } else {
+            if (!(part instanceof Const c)) {
                 literals.add(pending.toString());
                 pending.setLength(0);
                 dynamics.add(part);
+            } else if (!(c.value instanceof String s)) {
+                var type = c.value == null ? "null" : c.value.getClass().getName();
+                throw new IllegalArgumentException("RESOLVE_TEMPLATE constant part must be string, found " + type);
+            } else {
+                pending.append(s);
             }
         }
+
         literals.add(pending.toString());
-        if (dynamics.isEmpty()) {
-            return new Const(literals.get(0));
-        }
-        return new Template(literals.toArray(new String[0]), dynamics.toArray(new CompiledNode[0]));
+
+        return dynamics.isEmpty()
+               ? new Const(literals.getFirst())
+               : new Template(literals.toArray(new String[0]), dynamics.toArray(new CompiledNode[0]));
     }
 }

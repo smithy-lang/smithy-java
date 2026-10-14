@@ -7,6 +7,7 @@ package software.amazon.smithy.java.rulesengine;
 
 import java.util.AbstractMap;
 import java.util.AbstractSet;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -36,6 +37,9 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     // Reused, zero-allocation live view over named registers, handed to a trace sink (one per evaluator).
     private final RegisterView registerView;
     final RulesExtension[] extensions;
+    final RulesExtension[] directAuthExtensions;
+    final RulesExtension[] legacyPropertyExtensions;
+    final DirectAuthSchemeProperties directAuthSchemeProperties = new DirectAuthSchemeProperties();
     Object[] stack = new Object[64]; // 64 is more than enough for virtual any ruleset
     int stackPosition = 0;
     private char[] charBuffer = new char[128];
@@ -58,10 +62,56 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     BytecodeEvaluator(Bytecode bytecode, RulesExtension[] extensions, RegisterFiller registerFiller) {
         this.bytecode = bytecode;
         this.extensions = extensions;
+        this.directAuthExtensions = directAuthExtensions(extensions);
+        this.legacyPropertyExtensions = legacyPropertyExtensions(extensions);
         this.registers = new Object[bytecode.getRegisterDefinitions().length];
         this.registerView = new RegisterView(registers, bytecode.getRegisterNameMap());
         this.registerFiller = registerFiller;
-        this.registerSink = new ContextProvider.RegisterSink(registers.length, bytecode.getInputRegisterMap());
+        this.registerSink = new ContextProvider.RegisterSink(registers, bytecode.getInputRegisterMap());
+    }
+
+    private static RulesExtension[] directAuthExtensions(RulesExtension[] extensions) {
+        return extensionsOverriding(
+                extensions,
+                "createEndpointAuthScheme",
+                PropertyGetter.class);
+    }
+
+    private static RulesExtension[] legacyPropertyExtensions(RulesExtension[] extensions) {
+        var direct = Set.of(directAuthExtensions(extensions));
+        var result = new ArrayList<RulesExtension>();
+        for (RulesExtension extension : extensionsOverriding(
+                extensions,
+                "extractEndpointProperties",
+                Endpoint.Builder.class,
+                Context.class,
+                Map.class,
+                Map.class)) {
+            if (!direct.contains(extension)) {
+                result.add(extension);
+            }
+        }
+        return result.toArray(new RulesExtension[0]);
+    }
+
+    private static RulesExtension[] extensionsOverriding(
+            RulesExtension[] extensions,
+            String method,
+            Class<?>... parameterTypes
+    ) {
+        var result = new ArrayList<RulesExtension>();
+        try {
+            for (RulesExtension extension : extensions) {
+                if (extension.getClass()
+                        .getMethod(method, parameterTypes)
+                        .getDeclaringClass() != RulesExtension.class) {
+                    result.add(extension);
+                }
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Unable to classify rules extensions", e);
+        }
+        return result.toArray(new RulesExtension[0]);
     }
 
     /**
@@ -77,16 +127,17 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         registerFiller.fillRegisters(registers, context, parameters);
     }
 
-    void resetFromSink(Context context) {
+    void prepareRegisters(Context context) {
         this.context = context;
         this.stackPosition = 0;
         // Copy template to set defaults and clear old state
         System.arraycopy(registerFiller.registerTemplate, 0, registers, 0, registers.length);
-        // Overlay sink values and capture filled mask
-        long prefilled = registerSink.filled;
-        registerSink.drainTo(registers);
+        registerSink.reset();
+    }
+
+    void finishRegisters(Context context) {
         // Fill builtins and validate
-        registerFiller.fillRegisters(registers, context, prefilled);
+        registerFiller.fillRegisters(registers, context, registerSink.filled);
     }
 
     @Override

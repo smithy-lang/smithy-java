@@ -19,6 +19,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
 
 /**
  * Covers {@link NodeCompiler}, which is the only way a rules program is evaluated now that the bytecode
@@ -111,14 +112,61 @@ class NodeCompilerTest {
 
     @Test
     void declinesFusionForAnEmptyLiteral() {
-        // An out-of-range substring coalesces to "", which equals the empty literal, whereas
-        // substringEquals reports false for an empty range.
-        var code = substringEqualsProgram(0, 6, true);
+        // A zero-length substring coalesces to "", which equals the empty literal, whereas the fused
+        // substringEquals operation reports false. The range length deliberately matches the expected
+        // length so the non-empty guard is the only reason this cannot fuse.
+        var code = substringEqualsProgram(0, 0, false);
         var pool = new Object[] {"", ""};
         Bytecode bytecode = condition(code, pool);
 
         assertFalse(bytecode.conditionNode(0) instanceof CompiledNode.SubstringEqReg);
-        assertTrue(evaluate(bytecode, "short"), "an unmatched substring coalesces to \"\"");
+        assertTrue(evaluate(bytecode, "anything"), "a zero-length substring coalesces to \"\"");
+    }
+
+    @Test
+    void evaluatesDynamicAllowDotsForHostLabels() {
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0,
+                Opcodes.LOAD_REGISTER,
+                1,
+                Opcodes.IS_VALID_HOST_LABEL,
+                Opcodes.RETURN_VALUE
+        };
+        Bytecode bytecode = condition(code, new Object[0]);
+
+        assertInstanceOf(CompiledNode.IsValidHostLabelNode.class, bytecode.conditionNode(0));
+
+        var evaluator = new BytecodeEvaluator(
+                bytecode,
+                new RulesExtension[0],
+                RegisterFiller.of(bytecode, Map.of()));
+        evaluator.reset(Context.create(), params("example.com", Boolean.TRUE));
+        assertTrue(evaluator.test(0));
+        evaluator.reset(Context.create(), params("example.com", Boolean.FALSE));
+        assertFalse(evaluator.test(0));
+        evaluator.reset(Context.create(), params("example.com", "true"));
+        assertThrows(RulesEvaluationError.class, () -> evaluator.test(0));
+    }
+
+    @Test
+    void rejectsNonBooleanConstantAllowDotsForHostLabels() {
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0,
+                Opcodes.LOAD_CONST,
+                0,
+                Opcodes.IS_VALID_HOST_LABEL,
+                Opcodes.RETURN_VALUE
+        };
+        Bytecode bytecode = condition(code, new Object[] {"true"});
+
+        var error = assertThrows(RulesEvaluationError.class, () -> bytecode.conditionNode(0));
+
+        assertTrue(
+                error.getMessage().contains(
+                        "IS_VALID_HOST_LABEL allowDots must be a boolean, found java.lang.String"),
+                error.getMessage());
     }
 
     @Test
@@ -200,6 +248,25 @@ class NodeCompilerTest {
     }
 
     @Test
+    void rejectsNonStringConstantTemplateParts() {
+        byte[] code = {
+                Opcodes.LOAD_CONST,
+                0,
+                Opcodes.RESOLVE_TEMPLATE,
+                1,
+                Opcodes.RETURN_VALUE
+        };
+        Bytecode bytecode = result(code, new Object[] {Boolean.TRUE});
+
+        var error = assertThrows(RulesEvaluationError.class, () -> bytecode.resultNode(0));
+
+        assertTrue(
+                error.getMessage().contains(
+                        "RESOLVE_TEMPLATE constant part must be string, found java.lang.Boolean"),
+                error.getMessage());
+    }
+
+    @Test
     void buildsAndCachesPrevalidatedUriTemplates() {
         var host = new CompiledNode.Template(
                 new String[] {"", ".example.com"},
@@ -267,6 +334,95 @@ class NodeCompilerTest {
     }
 
     @Test
+    void buildsAuthSchemeDirectlyWithoutMaterializingItsPropertyGraph() {
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0, // auth scheme name
+                Opcodes.LOAD_CONST,
+                0, // "name"
+                Opcodes.STRUCTN,
+                1,
+                Opcodes.LIST1,
+                Opcodes.LOAD_CONST,
+                1, // "authSchemes"
+                Opcodes.MAP1,
+                Opcodes.LOAD_CONST,
+                2, // URL
+                Opcodes.RETURN_ENDPOINT,
+                2
+        };
+        var bytecode = result(code, new Object[] {"name", "authSchemes", "https://example.com"});
+        var extension = new DirectAuthExtension();
+
+        Endpoint endpoint = resolveEndpoint(bytecode, params("aws.auth#test", null), extension);
+
+        assertInstanceOf(CompiledNode.ReturnAuthEndpoint.class, bytecode.resultNode(0));
+        assertEquals("aws.auth#test", endpoint.authSchemes().get(0).authSchemeId());
+        assertEquals(1, extension.directCalls);
+        assertEquals(0, extension.legacyCalls);
+        assertEquals(Map.of(), extension.otherProperties);
+    }
+
+    @Test
+    void passesOtherTerminalPropertiesAlongsideDirectAuthScheme() {
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0, // auth scheme name
+                Opcodes.LOAD_CONST,
+                0, // "name"
+                Opcodes.STRUCTN,
+                1,
+                Opcodes.LIST1,
+                Opcodes.LOAD_CONST,
+                1, // "authSchemes"
+                Opcodes.LOAD_REGISTER,
+                1, // backend value
+                Opcodes.LOAD_CONST,
+                2, // "backend"
+                Opcodes.MAP2,
+                Opcodes.LOAD_CONST,
+                3, // URL
+                Opcodes.RETURN_ENDPOINT,
+                2
+        };
+        var bytecode = result(
+                code,
+                new Object[] {"name", "authSchemes", "backend", "https://example.com"});
+        var extension = new DirectAuthExtension();
+
+        resolveEndpoint(bytecode, params("aws.auth#test", "S3Express"), extension);
+
+        assertEquals(Map.of("backend", "S3Express"), extension.otherProperties);
+    }
+
+    @Test
+    void materializesAuthSchemePropertiesForLegacyExtensions() {
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0,
+                Opcodes.LOAD_CONST,
+                0, // "name"
+                Opcodes.STRUCTN,
+                1,
+                Opcodes.LIST1,
+                Opcodes.LOAD_CONST,
+                1, // "authSchemes"
+                Opcodes.MAP1,
+                Opcodes.LOAD_CONST,
+                2, // URL
+                Opcodes.RETURN_ENDPOINT,
+                2
+        };
+        var bytecode = result(code, new Object[] {"name", "authSchemes", "https://example.com"});
+        var extension = new CapturingExtension();
+
+        resolveEndpoint(bytecode, params("aws.auth#test", null), extension);
+
+        var entries = (List<?>) extension.properties.get("authSchemes");
+        assertEquals("aws.auth#test", EndpointUtils.getProperty(entries.get(0), "name"));
+    }
+
+    @Test
     void reportsMalformedBytecodeInsteadOfDegrading() {
         // With no interpreter to fall back to, an undecodable stream has to be an error. It surfaces on
         // first use because compilation is lazy, which is also when the interpreter would have tripped.
@@ -316,6 +472,31 @@ class NodeCompilerTest {
         }
     }
 
+    private static final class DirectAuthExtension implements RulesExtension {
+        private int directCalls;
+        private int legacyCalls;
+        private Map<String, Object> otherProperties = Map.of();
+
+        @Override
+        public EndpointAuthScheme createEndpointAuthScheme(PropertyGetter authScheme) {
+            directCalls++;
+            return EndpointAuthScheme.builder()
+                    .authSchemeId((String) authScheme.getProperty("name"))
+                    .build();
+        }
+
+        @Override
+        public void extractEndpointProperties(
+                Endpoint.Builder builder,
+                Context context,
+                Map<String, Object> properties,
+                Map<String, List<String>> headers
+        ) {
+            legacyCalls++;
+            otherProperties = properties;
+        }
+    }
+
     private static Map<String, Object> params(Object value, Object other) {
         var map = new HashMap<String, Object>();
         map.put("value", value);
@@ -355,12 +536,20 @@ class NodeCompilerTest {
     }
 
     private static String resolve(Bytecode bytecode, Map<String, Object> parameters, RulesExtension extension) {
+        Endpoint endpoint = resolveEndpoint(bytecode, parameters, extension);
+        return endpoint == null ? null : endpoint.uri().toString();
+    }
+
+    private static Endpoint resolveEndpoint(
+            Bytecode bytecode,
+            Map<String, Object> parameters,
+            RulesExtension extension
+    ) {
         var extensions = extension == null
                 ? new RulesExtension[0]
                 : new RulesExtension[] {extension};
         var evaluator = new BytecodeEvaluator(bytecode, extensions, RegisterFiller.of(bytecode, Map.of()));
         evaluator.reset(Context.create(), parameters);
-        var endpoint = evaluator.resolveResult(0);
-        return endpoint == null ? null : endpoint.uri().toString();
+        return evaluator.resolveResult(0);
     }
 }

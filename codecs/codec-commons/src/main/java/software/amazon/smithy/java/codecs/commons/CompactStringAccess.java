@@ -49,6 +49,35 @@ public final class CompactStringAccess {
     }
 
     /**
+     * Checks whether every character in a string is ASCII.
+     *
+     * <p>Compact Latin-1 strings use the JDK's vectorized positive-byte scan when available. UTF-16 strings and
+     * runtimes where compact-string access is unavailable fall back to scanning characters.
+     *
+     * @param value string to check.
+     * @return true if every character is in the ASCII range.
+     */
+    public static boolean isAscii(String value) {
+        if (value.isEmpty()) {
+            return false;
+        }
+
+        byte[] bytes = latin1Bytes(value);
+        if (bytes != null) {
+            return countPositives(bytes, 0, bytes.length) == bytes.length;
+        }
+
+        // Fall-back scan
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) > 0x7F) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Decodes bytes the caller has verified are ASCII.
      *
      * <p>The hibyte constructor avoids charset dispatch, but needs the charset path for vectorized inflation under

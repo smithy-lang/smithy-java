@@ -64,12 +64,14 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
 
         BytecodeEvaluator evaluator = acquire(base);
         try {
-            // Write endpoint params into the register sink
+            // Reset registers before writing parameters so the binding can write directly into the
+            // evaluator rather than staging values in a second array and copying them back.
+            evaluator.prepareRegisters(ctx);
             var sink = evaluator.registerSink;
             ContextProvider.createEndpointParams(sink, ctxProvider, ctx, operation, params.inputValue());
 
-            // Reset the evaluator and prepare new registers from the sink.
-            evaluator.resetFromSink(ctx);
+            // Fill any builtins not supplied by the operation binding and validate required inputs.
+            evaluator.finishRegisters(ctx);
 
             LOGGER.debug("Resolving endpoint of {} using VM", operation);
 
@@ -78,7 +80,7 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
                     ? evaluator.evaluateBddTraced(traceSink)
                     : evaluator.evaluateBdd();
         } finally {
-            // Recycle for the next resolve. resetFromSink fully reinitializes per-resolve state, so a
+            // Recycle for the next resolve. prepareRegisters fully reinitializes per-resolve state, so a
             // stale evaluator carries nothing across uses; the Endpoint just returned holds no
             // reference into it.
             release(evaluator, base);
