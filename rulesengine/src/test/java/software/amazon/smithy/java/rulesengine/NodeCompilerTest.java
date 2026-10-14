@@ -27,14 +27,14 @@ import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
  *
  * <p>The broad correctness gate is {@code EndpointRulesetConformanceTest}, which resolves every endpoint
  * test case every AWS ruleset declares. These cases pin down the shapes those rulesets do not happen to
- * contain: in particular the inputs where folding {@code substring} plus {@code stringEquals} into a
- * bounded {@code regionMatches} would <em>not</em> be equivalent, so the fold must be declined. Each of
- * those asserts the outcome the unfused form produces, which is the semantics the rules language defines.
+ * contain, including the constants for which {@code substring} plus {@code stringEquals} cannot become a
+ * bounded {@code regionMatches}. They verify that those cases still specialize without changing the
+ * semantics the rules language defines.
  */
 class NodeCompilerTest {
 
     // LOAD_REGISTER 0; SUBSTRING start end reverse; JNN_OR_POP -> past the ""; LOAD_CONST ""; LOAD_CONST x;
-    // STRING_EQUALS; RETURN_VALUE -- the prefix/suffix test idiom the rules compiler emits.
+    // STRING_EQUALS; RETURN_VALUE -- the generic encoding of the prefix/suffix test idiom.
     private static byte[] substringEqualsProgram(int start, int end, boolean reverse) {
         return new byte[] {
                 Opcodes.LOAD_REGISTER,
@@ -51,6 +51,19 @@ class NodeCompilerTest {
                 Opcodes.LOAD_CONST,
                 1, // the expected literal
                 Opcodes.STRING_EQUALS,
+                Opcodes.RETURN_VALUE
+        };
+    }
+
+    private static byte[] substringEqualsOpcodeProgram(int start, int end, boolean reverse) {
+        return new byte[] {
+                Opcodes.SUBSTRING_EQ,
+                0,
+                (byte) start,
+                (byte) end,
+                (byte) (reverse ? 1 : 0),
+                0,
+                0,
                 Opcodes.RETURN_VALUE
         };
     }
@@ -74,53 +87,75 @@ class NodeCompilerTest {
     }
 
     @Test
-    void declinesFusionWhenTheLiteralIsShorterThanTheRange() {
+    void foldsSubstringEqualsToFalseWhenTheLiteralIsShorterThanTheRange() {
         // substringEquals compares only as many characters of the literal as the range covers, so fusing
         // would report a match for anything whose last six characters merely start with "--".
         var code = substringEqualsProgram(0, 6, true);
         var pool = new Object[] {"", "--"};
         Bytecode bytecode = condition(code, pool);
 
-        assertFalse(bytecode.conditionNode(0) instanceof CompiledNode.SubstringEqReg);
+        assertInstanceOf(CompiledNode.Const.class, bytecode.conditionNode(0));
         assertFalse(evaluate(bytecode, "bucket--x-s3"), "\"--x-s3\" is not equal to \"--\"");
         assertFalse(evaluate(bytecode, "ab--"));
     }
 
     @Test
-    void declinesFusionWhenTheLiteralIsLongerThanTheRange() {
+    void foldsSubstringEqualsToFalseWhenTheLiteralIsLongerThanTheRange() {
         // Last two characters of "xx--" are "--", which are also the first two of the literal, so a
         // bounded regionMatches would call this a match where stringEquals does not.
         var code = substringEqualsProgram(0, 2, true);
         var pool = new Object[] {"", "--x-s3"};
         Bytecode bytecode = condition(code, pool);
 
-        assertFalse(bytecode.conditionNode(0) instanceof CompiledNode.SubstringEqReg);
+        assertInstanceOf(CompiledNode.Const.class, bytecode.conditionNode(0));
         assertFalse(evaluate(bytecode, "xx--"), "\"--\" is not equal to \"--x-s3\"");
     }
 
     @Test
-    void declinesFusionForNonAsciiLiterals() {
+    void foldsSubstringEqualsToFalseForNonAsciiLiterals() {
         // getSubstring rejects a range containing non-ASCII and so yields "" through the coalesce, while
         // substringEquals would match the characters.
         var code = substringEqualsProgram(0, 2, false);
         var pool = new Object[] {"", "éé"};
         Bytecode bytecode = condition(code, pool);
 
-        assertFalse(bytecode.conditionNode(0) instanceof CompiledNode.SubstringEqReg);
+        assertInstanceOf(CompiledNode.Const.class, bytecode.conditionNode(0));
         assertFalse(evaluate(bytecode, "éérest"), "a non-ASCII range reads as unmatched");
     }
 
     @Test
-    void declinesFusionForAnEmptyLiteral() {
+    void specializesSubstringEqualsForAnEmptyLiteral() {
         // A zero-length substring coalesces to "", which equals the empty literal, whereas the fused
         // substringEquals operation reports false. The range length deliberately matches the expected
-        // length so the non-empty guard is the only reason this cannot fuse.
+        // length so this must use the extraction-failure node rather than bounded regionMatches.
         var code = substringEqualsProgram(0, 0, false);
         var pool = new Object[] {"", ""};
         Bytecode bytecode = condition(code, pool);
 
-        assertFalse(bytecode.conditionNode(0) instanceof CompiledNode.SubstringEqReg);
+        assertInstanceOf(CompiledNode.SubstringEmptyReg.class, bytecode.conditionNode(0));
         assertTrue(evaluate(bytecode, "anything"), "a zero-length substring coalesces to \"\"");
+    }
+
+    @Test
+    void specializesSubstringEqualsOpcodeWithoutChangingCoalesceSemantics() {
+        Bytecode direct = condition(substringEqualsOpcodeProgram(0, 6, true), new Object[] {"--x-s3"});
+        assertInstanceOf(CompiledNode.SubstringEqReg.class, direct.conditionNode(0));
+        assertTrue(evaluate(direct, "bucket--x-s3"));
+
+        Bytecode wrongLength = condition(substringEqualsOpcodeProgram(0, 6, true), new Object[] {"--"});
+        assertInstanceOf(CompiledNode.Const.class, wrongLength.conditionNode(0));
+        assertFalse(evaluate(wrongLength, "bucket--x-s3"));
+
+        Bytecode nonAscii = condition(substringEqualsOpcodeProgram(0, 2, false), new Object[] {"éé"});
+        assertInstanceOf(CompiledNode.Const.class, nonAscii.conditionNode(0));
+        assertFalse(evaluate(nonAscii, "éérest"));
+
+        Bytecode empty = condition(substringEqualsOpcodeProgram(0, 2, false), new Object[] {""});
+        assertInstanceOf(CompiledNode.SubstringEmptyReg.class, empty.conditionNode(0));
+        assertFalse(evaluate(empty, "ab"));
+        assertTrue(evaluate(empty, "éé"));
+        assertTrue(evaluate(empty, "a"));
+        assertTrue(evaluate(empty, null));
     }
 
     @Test

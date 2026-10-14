@@ -275,9 +275,9 @@ abstract sealed class CompiledNode {
     }
 
     /**
-     * {@code stringEquals(coalesce(substring(reg, s, e, rev), ""), "literal")}, which the rules compiler
-     * emits as six instructions and which collapses to a single bounded {@code regionMatches}. This is the
-     * most common non-trivial condition shape in the S3 ruleset.
+     * The fast, exactly equivalent case of
+     * {@code stringEquals(coalesce(substring(reg, s, e, rev), ""), "literal")}: the literal is
+     * non-empty ASCII and exactly as long as the selected range.
      */
     static final class SubstringEqReg extends BoolNode {
         private final int index;
@@ -297,6 +297,32 @@ abstract sealed class CompiledNode {
         @Override
         boolean test(BytecodeEvaluator ev) {
             return EndpointUtils.substringEquals((String) ev.registers[index], start, end, reverse, expected);
+        }
+    }
+
+    /**
+     * The empty-literal case of
+     * {@code stringEquals(coalesce(substring(reg, s, e, rev), ""), "")}.
+     *
+     * <p>The comparison succeeds precisely when substring extraction would fail and coalesce to the
+     * empty string.
+     */
+    static final class SubstringEmptyReg extends BoolNode {
+        private final int index;
+        private final int start;
+        private final int end;
+        private final boolean reverse;
+
+        SubstringEmptyReg(int index, int start, int end, boolean reverse) {
+            this.index = index;
+            this.start = start;
+            this.end = end;
+            this.reverse = reverse;
+        }
+
+        @Override
+        boolean test(BytecodeEvaluator ev) {
+            return EndpointUtils.substringIsEmpty((String) ev.registers[index], start, end, reverse);
         }
     }
 
@@ -1283,25 +1309,20 @@ abstract sealed class CompiledNode {
 
     /**
      * Recognizes {@code stringEquals(coalesce(substring(register, start, end, reverse), ""), expected)}
-     * and replaces the tree with one {@link SubstringEqReg} node.
+     * and replaces the generic tree with its specialized result.
      *
      * <p>The original tree extracts a substring, substitutes an empty string when extraction fails,
-     * and then compares the result. The fused node compares the selected register range directly,
-     * avoiding the intermediate substring and nested node calls.
-     *
-     * <p>The replacement is only equivalent when the coalesce has exactly the substring and
-     * empty-string alternatives, the substring reads directly from a register, the expected value is
-     * non-empty ASCII, and its length exactly matches the selected range. Non-empty is required because
-     * a failed substring coalesces to {@code ""}, whereas the direct comparison reports failure. ASCII
-     * is required because substring extraction rejects a selected range containing non-ASCII
-     * characters. Equal lengths prevent the bounded comparison from accepting only a prefix.
+     * and then compares the result. Once the structural shape matches, {@link #substringEqualsReg}
+     * handles every constant: a directly comparable literal becomes {@link SubstringEqReg}, an
+     * impossible comparison becomes constant false, and an empty literal becomes
+     * {@link SubstringEmptyReg}. No intermediate substring is allocated.
      *
      * @param left candidate coalesce expression.
      * @param expected constant comparison value.
      * @return the fused comparison, or null when the tree cannot be replaced exactly.
      */
     private static CompiledNode fuseSubstringEquals(CompiledNode left, String expected) {
-        if (!(left instanceof Coalesce coalesce) || !CompactStringAccess.isAscii(expected)) {
+        if (!(left instanceof Coalesce coalesce)) {
             return null;
         }
 
@@ -1309,12 +1330,25 @@ abstract sealed class CompiledNode {
         if (options.length != 2
                 || !"".equals(constantString(options[1]))
                 || !(options[0] instanceof Substring substring)
-                || !(substring.target instanceof Reg reg)
-                || (substring.end - substring.start) != expected.length()) {
+                || !(substring.target instanceof Reg reg)) {
             return null;
         }
 
-        return new SubstringEqReg(reg.index, substring.start, substring.end, substring.reverse, expected);
+        return substringEqualsReg(reg.index, substring.start, substring.end, substring.reverse, expected);
+    }
+
+    /**
+     * Specializes the SUBSTRING_EQ operation without changing the source expression's coalesce
+     * semantics.
+     */
+    static CompiledNode substringEqualsReg(int index, int start, int end, boolean reverse, String expected) {
+        if (expected.isEmpty()) {
+            return new SubstringEmptyReg(index, start, end, reverse);
+        }
+        if (expected.length() != end - start || !CompactStringAccess.isAscii(expected)) {
+            return new Const(Boolean.FALSE);
+        }
+        return new SubstringEqReg(index, start, end, reverse, expected);
     }
 
     /**

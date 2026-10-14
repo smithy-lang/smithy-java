@@ -199,7 +199,7 @@ final class NodeCompiler {
                     boolean reverse = (code[pc++] & 0x01) != 0;
                     var expected = string(u16(pc));
                     pc += 2;
-                    stack.add(new CompiledNode.SubstringEqReg(reg, start2, end, reverse, expected));
+                    stack.add(CompiledNode.substringEqualsReg(reg, start2, end, reverse, expected));
                 }
                 case Opcodes.IS_VALID_HOST_LABEL -> {
                     var args = drain(stack, 2);

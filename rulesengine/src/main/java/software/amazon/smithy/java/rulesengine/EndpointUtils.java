@@ -248,6 +248,25 @@ public final class EndpointUtils {
         return value.regionMatches(actualStart, expected, 0, actualEnd - actualStart);
     }
 
+    // True when substring extraction would yield null and coalescing it with "" would yield "".
+    static boolean substringIsEmpty(String value, int start, int end, boolean reverse) {
+        if (value == null) {
+            return true;
+        }
+        int length = value.length();
+        if (start >= end || length < end) {
+            return true;
+        }
+        int actualStart = reverse ? length - end : start;
+        int actualEnd = reverse ? length - start : end;
+        for (int i = actualStart; i < actualEnd; i++) {
+            if (value.charAt(i) > 127) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Split and get element at index without allocating array
     static Object splitGet(String value, String delimiter, int index) {
         if (value == null || delimiter == null || delimiter.isEmpty()) {
