@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.rulesengine;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,6 +22,16 @@ import java.util.Objects;
  * dynamic slots.
  */
 abstract sealed class PropertyPlan {
+    private static final DynamicSlot[] COMMON_SLOTS = {
+            new DynamicSlot(0),
+            new DynamicSlot(1),
+            new DynamicSlot(2),
+            new DynamicSlot(3),
+            new DynamicSlot(4),
+            new DynamicSlot(5),
+            new DynamicSlot(6),
+            new DynamicSlot(7)
+    };
 
     /** A subtree with no interpolated leaf, materialized once at load time. */
     static final class Constant extends PropertyPlan {
@@ -318,7 +327,6 @@ abstract sealed class PropertyPlan {
     static final class Interner {
         private final IdentityHashMap<Object, Constant> literalConstants = new IdentityHashMap<>();
         private final Map<Object, Constant> foldedConstants = new HashMap<>();
-        private final Map<Integer, DynamicSlot> slots = new HashMap<>();
         private final Map<ShapeKey, PropertyPlan> shapes = new HashMap<>();
         private final Constant nullConstant = new Constant(null);
 
@@ -333,8 +341,8 @@ abstract sealed class PropertyPlan {
             return foldedConstants.computeIfAbsent(value, Constant::new);
         }
 
-        synchronized DynamicSlot slot(int slot) {
-            return slots.computeIfAbsent(slot, DynamicSlot::new);
+        DynamicSlot slot(int slot) {
+            return slot < COMMON_SLOTS.length ? COMMON_SLOTS[slot] : new DynamicSlot(slot);
         }
 
         synchronized MapShape map(String[] keys, PropertyPlan[] values) {
@@ -382,31 +390,35 @@ abstract sealed class PropertyPlan {
     }
 
     static Compiled compile(CompiledNode node, Interner interner) {
-        var dynamics = new ArrayList<CompiledNode>();
+        var dynamics = new Dynamics();
         PropertyPlan plan = node == null ? interner.folded(Map.of()) : plan(node, dynamics, interner);
         return switch (dynamics.size()) {
             case 0 -> new Compiled0(plan, ((Constant) plan).value());
             case 1 -> new Compiled1(plan, dynamics.get(0));
             case 2 -> new Compiled2(plan, dynamics.get(0), dynamics.get(1));
             case 3 -> new Compiled3(plan, dynamics.get(0), dynamics.get(1), dynamics.get(2));
-            default -> new CompiledN(plan, dynamics.toArray(new CompiledNode[0]));
+            default -> new CompiledN(plan, dynamics.toArray());
         };
     }
 
     private static PropertyPlan plan(
             CompiledNode node,
-            List<CompiledNode> dynamics,
+            Dynamics dynamics,
             Interner interner
     ) {
         return switch (node) {
             case CompiledNode.Const n -> interner.literal(n.constantValue());
-            case CompiledNode.Map1 n ->
-                mapPlan(new String[] {n.key()}, new CompiledNode[] {n.value()}, dynamics, interner);
-            case CompiledNode.Map2 n -> mapPlan(n.keys(), n.values(), dynamics, interner);
+            case CompiledNode.Map1 n -> map1Plan(n.key(), n.value(), dynamics, interner);
+            case CompiledNode.Map2 n -> map2Plan(
+                    n.key0(),
+                    n.value0(),
+                    n.key1(),
+                    n.value1(),
+                    dynamics,
+                    interner);
             case CompiledNode.MapN n -> mapPlan(n.keys(), n.values(), dynamics, interner);
-            case CompiledNode.List1 n ->
-                listPlan(new CompiledNode[] {n.element()}, dynamics, interner);
-            case CompiledNode.List2 n -> listPlan(n.elements(), dynamics, interner);
+            case CompiledNode.List1 n -> list1Plan(n.element(), dynamics, interner);
+            case CompiledNode.List2 n -> list2Plan(n.element0(), n.element1(), dynamics, interner);
             case CompiledNode.ListN n -> listPlan(n.elements(), dynamics, interner);
             case CompiledNode.StructNode n -> structPlan(n.keys(), n.values(), dynamics, interner);
             default -> {
@@ -416,10 +428,41 @@ abstract sealed class PropertyPlan {
         };
     }
 
+    private static PropertyPlan map1Plan(
+            String key,
+            CompiledNode value,
+            Dynamics dynamics,
+            Interner interner
+    ) {
+        PropertyPlan valuePlan = plan(value, dynamics, interner);
+        if (valuePlan instanceof Constant constant) {
+            return interner.folded(Map.of(key, constant.value()));
+        }
+        return interner.map(new String[] {key}, new PropertyPlan[] {valuePlan});
+    }
+
+    private static PropertyPlan map2Plan(
+            String key0,
+            CompiledNode value0,
+            String key1,
+            CompiledNode value1,
+            Dynamics dynamics,
+            Interner interner
+    ) {
+        PropertyPlan plan0 = plan(value0, dynamics, interner);
+        PropertyPlan plan1 = plan(value1, dynamics, interner);
+        if (plan0 instanceof Constant constant0 && plan1 instanceof Constant constant1) {
+            return interner.folded(Map.of(key0, constant0.value(), key1, constant1.value()));
+        }
+        return interner.map(
+                new String[] {key0, key1},
+                new PropertyPlan[] {plan0, plan1});
+    }
+
     private static PropertyPlan mapPlan(
             String[] keys,
             CompiledNode[] values,
-            List<CompiledNode> dynamics,
+            Dynamics dynamics,
             Interner interner
     ) {
         PropertyPlan[] plans = plans(values, dynamics, interner);
@@ -441,7 +484,7 @@ abstract sealed class PropertyPlan {
 
     private static PropertyPlan listPlan(
             CompiledNode[] elements,
-            List<CompiledNode> dynamics,
+            Dynamics dynamics,
             Interner interner
     ) {
         PropertyPlan[] plans = plans(elements, dynamics, interner);
@@ -455,10 +498,34 @@ abstract sealed class PropertyPlan {
         return interner.folded(result);
     }
 
+    private static PropertyPlan list1Plan(
+            CompiledNode element,
+            Dynamics dynamics,
+            Interner interner
+    ) {
+        PropertyPlan elementPlan = plan(element, dynamics, interner);
+        return elementPlan instanceof Constant constant
+                ? interner.folded(List.of(constant.value()))
+                : interner.list(new PropertyPlan[] {elementPlan});
+    }
+
+    private static PropertyPlan list2Plan(
+            CompiledNode element0,
+            CompiledNode element1,
+            Dynamics dynamics,
+            Interner interner
+    ) {
+        PropertyPlan plan0 = plan(element0, dynamics, interner);
+        PropertyPlan plan1 = plan(element1, dynamics, interner);
+        return plan0 instanceof Constant constant0 && plan1 instanceof Constant constant1
+                ? interner.folded(List.of(constant0.value(), constant1.value()))
+                : interner.list(new PropertyPlan[] {plan0, plan1});
+    }
+
     private static PropertyPlan structPlan(
             String[] keys,
             CompiledNode[] values,
-            List<CompiledNode> dynamics,
+            Dynamics dynamics,
             Interner interner
     ) {
         PropertyPlan[] plans = plans(values, dynamics, interner);
@@ -476,7 +543,7 @@ abstract sealed class PropertyPlan {
 
     private static PropertyPlan[] plans(
             CompiledNode[] nodes,
-            List<CompiledNode> dynamics,
+            Dynamics dynamics,
             Interner interner
     ) {
         var plans = new PropertyPlan[nodes.length];
@@ -487,13 +554,70 @@ abstract sealed class PropertyPlan {
     }
 
     private static Object[] constants(PropertyPlan[] plans) {
-        var values = new Object[plans.length];
-        for (int i = 0; i < plans.length; i++) {
-            if (!(plans[i] instanceof Constant constant)) {
+        for (PropertyPlan plan : plans) {
+            if (!(plan instanceof Constant)) {
                 return null;
             }
+        }
+
+        var values = new Object[plans.length];
+        for (int i = 0; i < plans.length; i++) {
+            var constant = (Constant) plans[i];
             values[i] = constant.value();
         }
         return values;
+    }
+
+    /**
+     * Tiny collector for a result's dynamic leaves. Endpoint property bags overwhelmingly have at
+     * most three, so those cases avoid the backing array allocated by a general-purpose list.
+     */
+    private static final class Dynamics {
+        private CompiledNode dynamic0;
+        private CompiledNode dynamic1;
+        private CompiledNode dynamic2;
+        private CompiledNode[] overflow;
+        private int size;
+
+        void add(CompiledNode node) {
+            switch (size++) {
+                case 0 -> dynamic0 = node;
+                case 1 -> dynamic1 = node;
+                case 2 -> dynamic2 = node;
+                case 3 -> {
+                    overflow = new CompiledNode[8];
+                    overflow[0] = dynamic0;
+                    overflow[1] = dynamic1;
+                    overflow[2] = dynamic2;
+                    overflow[3] = node;
+                }
+                default -> {
+                    if (size > overflow.length) {
+                        overflow = Arrays.copyOf(overflow, overflow.length * 2);
+                    }
+                    overflow[size - 1] = node;
+                }
+            }
+        }
+
+        int size() {
+            return size;
+        }
+
+        CompiledNode get(int index) {
+            if (overflow != null) {
+                return overflow[index];
+            }
+            return switch (index) {
+                case 0 -> dynamic0;
+                case 1 -> dynamic1;
+                case 2 -> dynamic2;
+                default -> throw new IndexOutOfBoundsException(index);
+            };
+        }
+
+        CompiledNode[] toArray() {
+            return Arrays.copyOf(overflow, size);
+        }
     }
 }

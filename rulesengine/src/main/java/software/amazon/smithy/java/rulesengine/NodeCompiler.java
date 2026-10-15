@@ -5,9 +5,8 @@
 
 package software.amazon.smithy.java.rulesengine;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -83,7 +82,8 @@ final class NodeCompiler {
      * behind. Stops early at a terminator instruction or at a {@code JUMP}.
      */
     private CompiledNode decode(int start, int limit) {
-        List<CompiledNode> stack = new ArrayList<>(8);
+        int estimatedDepth = Math.max(4, Math.min(16, (limit - start) >>> 2));
+        NodeStack stack = new NodeStack(estimatedDepth);
         int pc = start;
         pendingJumpTarget = -1;
 
@@ -110,8 +110,11 @@ final class NodeCompiler {
                 case Opcodes.TEST_REGISTER_IS_FALSE -> stack.add(new CompiledNode.RegIsFalse(code[pc++] & 0xFF));
 
                 case Opcodes.LIST0 -> stack.add(new CompiledNode.Const(Collections.emptyList()));
-                case Opcodes.LIST1 -> stack.add(list(stack, 1));
-                case Opcodes.LIST2 -> stack.add(list(stack, 2));
+                case Opcodes.LIST1 -> stack.add(new CompiledNode.List1(pop(stack)));
+                case Opcodes.LIST2 -> {
+                    var element1 = pop(stack);
+                    stack.add(new CompiledNode.List2(pop(stack), element1));
+                }
                 case Opcodes.LISTN -> stack.add(list(stack, code[pc++] & 0xFF));
 
                 case Opcodes.MAP0 -> stack.add(new CompiledNode.Const(Map.of()));
@@ -138,18 +141,18 @@ final class NodeCompiler {
                 }
                 case Opcodes.FN2 -> {
                     var fn = fn(code[pc++] & 0xFF);
-                    var args = drain(stack, 2);
-                    stack.add(new CompiledNode.Fn2(fn, args.get(0), args.get(1)));
+                    var arg2 = pop(stack);
+                    stack.add(new CompiledNode.Fn2(fn, pop(stack), arg2));
                 }
                 case Opcodes.FN3 -> {
                     var fn = fn(code[pc++] & 0xFF);
-                    var args = drain(stack, 3);
-                    stack.add(new CompiledNode.Fn3(fn, args.get(0), args.get(1), args.get(2)));
+                    var arg3 = pop(stack);
+                    var arg2 = pop(stack);
+                    stack.add(new CompiledNode.Fn3(fn, pop(stack), arg2, arg3));
                 }
                 case Opcodes.FN -> {
                     var fn = fn(code[pc++] & 0xFF);
-                    var args = drain(stack, fn.getArgumentCount());
-                    stack.add(new CompiledNode.FnN(fn, args.toArray(new CompiledNode[0])));
+                    stack.add(new CompiledNode.FnN(fn, drain(stack, fn.getArgumentCount())));
                 }
 
                 case Opcodes.GET_PROPERTY -> {
@@ -176,16 +179,16 @@ final class NodeCompiler {
                 }
 
                 case Opcodes.EQUALS -> {
-                    var args = drain(stack, 2);
-                    stack.add(new CompiledNode.EqualsNode(args.get(0), args.get(1)));
+                    var right = pop(stack);
+                    stack.add(new CompiledNode.EqualsNode(pop(stack), right));
                 }
                 case Opcodes.BOOLEAN_EQUALS -> {
-                    var args = drain(stack, 2);
-                    stack.add(new CompiledNode.BooleanEq(args.get(0), args.get(1)));
+                    var right = pop(stack);
+                    stack.add(new CompiledNode.BooleanEq(pop(stack), right));
                 }
                 case Opcodes.STRING_EQUALS -> {
-                    var args = drain(stack, 2);
-                    stack.add(CompiledNode.stringEquals(args.get(0), args.get(1)));
+                    var right = pop(stack);
+                    stack.add(CompiledNode.stringEquals(pop(stack), right));
                 }
                 case Opcodes.STRING_EQUALS_REG_CONST -> {
                     int reg = code[pc++] & 0xFF;
@@ -209,14 +212,15 @@ final class NodeCompiler {
                     stack.add(CompiledNode.substringEqualsReg(reg, start2, end, reverse, expected));
                 }
                 case Opcodes.IS_VALID_HOST_LABEL -> {
-                    var args = drain(stack, 2);
-                    stack.add(CompiledNode.isValidHostLabel(args.get(0), args.get(1)));
+                    var allowDots = pop(stack);
+                    stack.add(CompiledNode.isValidHostLabel(pop(stack), allowDots));
                 }
                 case Opcodes.PARSE_URL -> stack.add(new CompiledNode.ParseUrlNode(pop(stack)));
                 case Opcodes.URI_ENCODE -> stack.add(new CompiledNode.UriEncode(pop(stack)));
                 case Opcodes.SPLIT -> {
-                    var args = drain(stack, 3);
-                    stack.add(new CompiledNode.SplitNode(args.get(0), args.get(1), args.get(2)));
+                    var arg3 = pop(stack);
+                    var arg2 = pop(stack);
+                    stack.add(new CompiledNode.SplitNode(pop(stack), arg2, arg3));
                 }
                 case Opcodes.SPLIT_GET -> {
                     int reg = code[pc++] & 0xFF;
@@ -236,8 +240,8 @@ final class NodeCompiler {
                 case Opcodes.BUILD_URI -> {
                     var scheme = string(u16(pc));
                     pc += 2;
-                    var args = drain(stack, 2);
-                    stack.add(CompiledNode.buildUri(scheme, args.get(0), args.get(1)));
+                    var path = pop(stack);
+                    stack.add(CompiledNode.buildUri(scheme, pop(stack), path));
                 }
 
                 // coalesce(a, b, ...): the arms after this one are the self-contained range up to the
@@ -336,70 +340,116 @@ final class NodeCompiler {
         return functions[index];
     }
 
-    private static CompiledNode pop(List<CompiledNode> stack) {
-        if (stack.isEmpty()) {
-            throw new IllegalStateException("Symbolic stack underflow");
-        }
-        return stack.removeLast();
+    private static CompiledNode pop(NodeStack stack) {
+        return stack.pop();
     }
 
     /** Removes the top {@code count} entries and returns them in push order. */
-    private static List<CompiledNode> drain(List<CompiledNode> stack, int count) {
-        if (count > stack.size()) {
-            throw new IllegalStateException("Symbolic stack underflow");
-        }
-        var sub = stack.subList(stack.size() - count, stack.size());
-        var copy = new ArrayList<CompiledNode>(sub);
-        sub.clear();
-        return copy;
+    private static CompiledNode[] drain(NodeStack stack, int count) {
+        return stack.drain(count);
     }
 
     /** Picks the list node for this arity, so evaluation never re-decides it. */
-    private static CompiledNode list(List<CompiledNode> stack, int size) {
+    private static CompiledNode list(NodeStack stack, int size) {
         var elements = drain(stack, size);
         return switch (size) {
-            case 1 -> new CompiledNode.List1(elements.get(0));
-            case 2 -> new CompiledNode.List2(elements.get(0), elements.get(1));
-            default -> new CompiledNode.ListN(elements.toArray(new CompiledNode[0]));
+            case 1 -> new CompiledNode.List1(elements[0]);
+            case 2 -> new CompiledNode.List2(elements[0], elements[1]);
+            default -> new CompiledNode.ListN(elements);
         };
     }
 
     /** Map entries are pushed value-then-key, so the keys sit at the odd offsets of the drained run. */
-    private static CompiledNode map(List<CompiledNode> stack, int size) {
-        var slots = drain(stack, size * 2);
+    private static CompiledNode map(NodeStack stack, int size) {
+        if (size == 1) {
+            String key = mapKey(pop(stack));
+            return new CompiledNode.Map1(key, pop(stack));
+        } else if (size == 2) {
+            String key1 = mapKey(pop(stack));
+            CompiledNode value1 = pop(stack);
+            String key0 = mapKey(pop(stack));
+            return new CompiledNode.Map2(key0, pop(stack), key1, value1);
+        }
+
         var keys = new String[size];
         var values = new CompiledNode[size];
-        for (int i = 0; i < size; i++) {
-            String key = CompiledNode.constantString(slots.get(i * 2 + 1));
-            if (key == null) {
-                throw new IllegalArgumentException("Map key is not a string constant");
-            }
-            keys[i] = key;
-            values[i] = slots.get(i * 2);
+        for (int i = size - 1; i >= 0; i--) {
+            keys[i] = mapKey(pop(stack));
+            values[i] = pop(stack);
         }
-        return switch (size) {
-            case 1 -> new CompiledNode.Map1(keys[0], values[0]);
-            case 2 -> new CompiledNode.Map2(keys[0], values[0], keys[1], values[1]);
-            default -> new CompiledNode.MapN(keys, values);
-        };
+        return new CompiledNode.MapN(keys, values);
+    }
+
+    private static String mapKey(CompiledNode node) {
+        String key = CompiledNode.constantString(node);
+        if (key == null) {
+            throw new IllegalArgumentException("Map key is not a string constant");
+        }
+        return key;
     }
 
     /**
      * {@code STRUCTN} consumes an interleaved value/key run and hands it straight to
      * {@link ArrayPropertyGetter}. Keys are always constants, so they stay on the compiled node.
      */
-    private static CompiledNode struct(List<CompiledNode> stack, int size) {
-        var slots = drain(stack, size * 2);
+    private static CompiledNode struct(NodeStack stack, int size) {
         var keys = new String[size];
         var values = new CompiledNode[size];
-        for (int i = 0; i < size; i++) {
-            String key = CompiledNode.constantString(slots.get(i * 2 + 1));
+        for (int i = size - 1; i >= 0; i--) {
+            String key = CompiledNode.constantString(pop(stack));
             if (key == null) {
                 throw new IllegalArgumentException("Struct key is not a string constant");
             }
             keys[i] = key;
-            values[i] = slots.get(i * 2);
+            values[i] = pop(stack);
         }
         return new CompiledNode.StructNode(keys, values);
+    }
+
+    /** Minimal symbolic operand stack; compilation does not need the machinery of {@link java.util.List}. */
+    private static final class NodeStack {
+        private CompiledNode[] values;
+        private int size;
+
+        NodeStack(int capacity) {
+            values = new CompiledNode[capacity];
+        }
+
+        void add(CompiledNode node) {
+            if (size == values.length) {
+                values = Arrays.copyOf(values, values.length * 2);
+            }
+            values[size++] = node;
+        }
+
+        CompiledNode pop() {
+            if (size == 0) {
+                throw new IllegalStateException("Symbolic stack underflow");
+            }
+            return values[--size];
+        }
+
+        CompiledNode[] drain(int count) {
+            if (count > size) {
+                throw new IllegalStateException("Symbolic stack underflow");
+            }
+            int start = size - count;
+            var result = new CompiledNode[count];
+            System.arraycopy(values, start, result, 0, count);
+            size = start;
+            return result;
+        }
+
+        boolean isEmpty() {
+            return size == 0;
+        }
+
+        int size() {
+            return size;
+        }
+
+        CompiledNode get(int index) {
+            return values[index];
+        }
     }
 }

@@ -792,6 +792,14 @@ abstract sealed class CompiledNode {
         CompiledNode[] elements() {
             return new CompiledNode[] {element0, element1};
         }
+
+        CompiledNode element0() {
+            return element0;
+        }
+
+        CompiledNode element1() {
+            return element1;
+        }
     }
 
     /** {@code LISTN}, which unlike {@link List1} and {@link List2} tolerates null elements. */
@@ -872,6 +880,22 @@ abstract sealed class CompiledNode {
 
         CompiledNode[] values() {
             return new CompiledNode[] {value0, value1};
+        }
+
+        String key0() {
+            return key0;
+        }
+
+        CompiledNode value0() {
+            return value0;
+        }
+
+        String key1() {
+            return key1;
+        }
+
+        CompiledNode value1() {
+            return value1;
         }
     }
 
@@ -1311,28 +1335,56 @@ abstract sealed class CompiledNode {
      * @return the template node.
      * @throws IllegalArgumentException if a constant part is not a string.
      */
-    static CompiledNode template(List<CompiledNode> parts) {
-        List<String> literals = new ArrayList<>();
-        List<CompiledNode> dynamics = new ArrayList<>();
-        var pending = new StringBuilder();
-
+    static CompiledNode template(CompiledNode[] parts) {
+        int dynamicCount = 0;
         for (CompiledNode part : parts) {
             if (!(part instanceof Const c)) {
-                literals.add(pending.toString());
-                pending.setLength(0);
-                dynamics.add(part);
-            } else if (!(c.value instanceof String s)) {
+                dynamicCount++;
+            } else if (!(c.value instanceof String)) {
                 var type = c.value == null ? "null" : c.value.getClass().getName();
                 throw new IllegalArgumentException("RESOLVE_TEMPLATE constant part must be string, found " + type);
-            } else {
-                pending.append(s);
             }
         }
 
-        literals.add(pending.toString());
+        if (dynamicCount == 0) {
+            return parts.length == 1
+                    ? parts[0]
+                    : new Const(templateLiteral(parts, 0, parts.length));
+        }
 
-        return dynamics.isEmpty()
-                ? new Const(literals.getFirst())
-                : new Template(literals.toArray(new String[0]), dynamics.toArray(new CompiledNode[0]));
+        var literals = new String[dynamicCount + 1];
+        var dynamics = new CompiledNode[dynamicCount];
+        int literalStart = 0;
+        int index = 0;
+        for (int i = 0; i < parts.length; i++) {
+            CompiledNode part = parts[i];
+            if (!(part instanceof Const)) {
+                literals[index] = templateLiteral(parts, literalStart, i);
+                dynamics[index++] = part;
+                literalStart = i + 1;
+            }
+        }
+        literals[index] = templateLiteral(parts, literalStart, parts.length);
+        return new Template(literals, dynamics);
+    }
+
+    /** Joins one constant run, reusing its String when the run contains exactly one part. */
+    private static String templateLiteral(CompiledNode[] parts, int from, int to) {
+        int count = to - from;
+        if (count == 0) {
+            return "";
+        } else if (count == 1) {
+            return (String) ((Const) parts[from]).value;
+        }
+
+        int length = 0;
+        for (int i = from; i < to; i++) {
+            length += ((String) ((Const) parts[i]).value).length();
+        }
+        var result = new StringBuilder(length);
+        for (int i = from; i < to; i++) {
+            result.append((String) ((Const) parts[i]).value);
+        }
+        return result.toString();
     }
 }
