@@ -735,6 +735,14 @@ final class CborDeserializer implements ShapeDeserializer {
         throw badType("timestamp", token);
     }
 
+    /**
+     * Converts a failure raised by a member consumer (typically a shape builder rejecting the input, e.g. a union
+     * with more than one member set) into a {@link SerializationException}.
+     */
+    private static SerializationException callbackFailure(RuntimeException e) {
+        return e instanceof SerializationException se ? se : new SerializationException(e);
+    }
+
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
         byte token = this.token;
@@ -798,7 +806,11 @@ final class CborDeserializer implements ShapeDeserializer {
                 continue;
             }
 
-            consumer.accept(state, member, this);
+            try {
+                consumer.accept(state, member, this);
+            } catch (RuntimeException e) {
+                throw callbackFailure(e);
+            }
         }
         depth--;
     }
@@ -821,10 +833,18 @@ final class CborDeserializer implements ShapeDeserializer {
         String name = CborReadUtil.readTextString(payload, memberPos, memberLen);
         Schema member = structSchema.member(name);
         if (member != null) {
-            consumer.accept(state, member, this);
+            try {
+                consumer.accept(state, member, this);
+            } catch (RuntimeException e) {
+                throw callbackFailure(e);
+            }
             return member.memberIndex() + 1;
         }
-        consumer.unknownMember(state, name);
+        try {
+            consumer.unknownMember(state, name);
+        } catch (RuntimeException e) {
+            throw callbackFailure(e);
+        }
         skipUnknownMember();
         return expectedNext;
     }
@@ -858,7 +878,11 @@ final class CborDeserializer implements ShapeDeserializer {
         }
 
         for (token = advance(); token != Token.END_ARRAY; token = advance()) {
-            consumer.accept(state, this);
+            try {
+                consumer.accept(state, this);
+            } catch (RuntimeException e) {
+                throw callbackFailure(e);
+            }
         }
         depth--;
     }
@@ -885,7 +909,11 @@ final class CborDeserializer implements ShapeDeserializer {
             }
             var key = CborReadUtil.readTextString(payload, idx, itemLength);
             advance();
-            consumer.accept(state, key, this);
+            try {
+                consumer.accept(state, key, this);
+            } catch (RuntimeException e) {
+                throw callbackFailure(e);
+            }
         }
         depth--;
     }
