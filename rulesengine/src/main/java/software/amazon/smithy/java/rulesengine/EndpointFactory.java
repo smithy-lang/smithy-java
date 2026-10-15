@@ -19,44 +19,59 @@ import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
 /**
- * Resolver-local, load-time compilation of endpoint result properties.
+ * Resolver-local, lazy compilation of endpoint result properties.
  *
- * <p>Every result gets a direct array entry, and results with the same interned {@link PropertyPlan}
- * share their extension bindings. Resolution therefore performs neither synchronization nor a map
- * lookup before constructing the endpoint.
+ * <p>A ruleset can contain hundreds of results, but one resolution reaches exactly one. Each result's
+ * direct factory plan is therefore built when that result is first selected and then stored in a direct
+ * array entry. Results with the same interned {@link PropertyPlan} share their extension bindings.
+ * Steady-state resolution performs neither synchronization nor a map lookup before constructing the
+ * endpoint.
  */
 final class EndpointFactory {
     private static final RulesExtension.EndpointPropertyBinding.ResolutionValues CONSTANT_VALUES =
             new RulesExtension.EndpointPropertyBinding.ResolutionValues() {};
     private static final Set<Context.Key<?>> HEADER_PROPERTIES = Set.of(EndpointContext.HEADERS);
 
+    private final Bytecode bytecode;
     private final RulesExtension[] extensions;
     private final ResultPlan[] results;
+    // Accessed only while holding this instance's monitor. Compilation is a cold, one-time path, and
+    // serializing it keeps the identity-based interning maps safe without taxing steady-state reads.
+    private final IdentityHashMap<PropertyPlan, BindingGroup> bindingsByShape = new IdentityHashMap<>();
+    private final Set<PropertyPlan> materializedShapes =
+            Collections.newSetFromMap(new IdentityHashMap<PropertyPlan, Boolean>());
 
     EndpointFactory(Bytecode bytecode, RulesExtension[] extensions) {
+        this.bytecode = bytecode;
         this.extensions = extensions;
         this.results = new ResultPlan[bytecode.getResultCount()];
-
-        var bindingsByShape = new IdentityHashMap<PropertyPlan, BindingGroup>();
-        var materializedShapes = Collections.newSetFromMap(new IdentityHashMap<PropertyPlan, Boolean>());
-        for (int i = 0; i < results.length; i++) {
-            CompiledNode node = bytecode.resultNode(i);
-            if (node instanceof CompiledNode.ReturnEndpoint endpoint) {
-                results[i] = projected(endpoint, extensions, bindingsByShape, materializedShapes);
-            }
-        }
     }
 
     Endpoint create(int resultIndex, SmithyUri uri, BytecodeEvaluator evaluator) {
-        return results[resultIndex].create(uri, evaluator);
+        ResultPlan plan = results[resultIndex];
+        return (plan != null ? plan : compile(resultIndex)).create(uri, evaluator);
     }
 
-    private ResultPlan projected(
-            CompiledNode.ReturnEndpoint endpoint,
-            RulesExtension[] extensions,
-            IdentityHashMap<PropertyPlan, BindingGroup> bindingsByShape,
-            Set<PropertyPlan> materializedShapes
-    ) {
+    private synchronized ResultPlan compile(int resultIndex) {
+        // The unsynchronized hot-path read is allowed to observe a stale null. Entering this monitor
+        // then acquires the publication of any earlier compilation, so the second read prevents
+        // duplicate work while keeping synchronization entirely off the steady-state path.
+        ResultPlan plan = results[resultIndex];
+        if (plan != null) {
+            return plan;
+        }
+
+        CompiledNode node = bytecode.resultNode(resultIndex);
+        if (!(node instanceof CompiledNode.ReturnEndpoint endpoint)) {
+            throw new IllegalStateException("Result " + resultIndex + " does not return an endpoint");
+        }
+
+        plan = projected(endpoint);
+        results[resultIndex] = plan;
+        return plan;
+    }
+
+    private ResultPlan projected(CompiledNode.ReturnEndpoint endpoint) {
         PropertyPlan.Compiled properties = endpoint.properties();
         PropertyPlan.Compiled headers = endpoint.headers();
         if (materializedShapes.contains(properties.plan())) {
@@ -64,7 +79,7 @@ final class EndpointFactory {
         }
         BindingGroup group = bindingsByShape.get(properties.plan());
         if (group == null) {
-            group = bind(properties, extensions);
+            group = bind(properties);
             if (group == null) {
                 materializedShapes.add(properties.plan());
                 return materialized(endpoint);
@@ -100,10 +115,7 @@ final class EndpointFactory {
         };
     }
 
-    private BindingGroup bind(
-            PropertyPlan.Compiled properties,
-            RulesExtension[] extensions
-    ) {
+    private BindingGroup bind(PropertyPlan.Compiled properties) {
         var bindings = new RulesExtension.EndpointPropertyBinding[extensions.length];
         var keys = new HashSet<Context.Key<?>>();
         int authSchemeCount = 0;

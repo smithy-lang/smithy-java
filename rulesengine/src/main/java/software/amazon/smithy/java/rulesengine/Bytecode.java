@@ -195,9 +195,9 @@ public final class Bytecode {
      *
      * <p>Filled lazily by {@link #conditionNode} and {@link #resultNode}, where a null entry means "not
      * compiled yet". Compiling eagerly would decode every condition and result in the program, but a
-     * resolution only walks one path through the BDD and returns one result — for S3 that is 15 to 30 of
-     * 76 conditions and 1 of 116 results — so most of that work would be thrown away. Since
-     * {@code Bytecode} is built per client, not per JVM, it is work that would be paid repeatedly.
+     * resolution only walks one path through the BDD and returns one result — for S3 that is roughly
+     * 15 to 30 conditions and 1 of hundreds of results — so most of that work would be thrown away.
+     * Since {@code Bytecode} is built per client, not per JVM, it is work that would be paid repeatedly.
      *
      * <p>Entries are published by a plain array write and may be computed twice under a race. That is
      * safe and deliberate: every field of every {@link CompiledNode} is final and no array reachable from

@@ -1055,9 +1055,9 @@ abstract sealed class CompiledNode {
     /**
      * {@code RETURN_ENDPOINT}: builds the endpoint and hands its properties to the extensions.
      *
-     * <p>Properties and headers are compiled into an interned {@link PropertyPlan}. The resolver then
-     * compiles each result into a direct endpoint factory plan, so resolution evaluates only dynamic
-     * leaves and does not inspect the property graph.
+     * <p>Properties and headers are compiled into an interned {@link PropertyPlan}. When a result is
+     * first selected, the resolver compiles it into a direct endpoint factory plan, so subsequent
+     * resolutions evaluate only dynamic leaves and do not inspect the property graph.
      */
     static final class ReturnEndpoint extends CompiledNode {
         private final CompiledNode url;

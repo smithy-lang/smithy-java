@@ -686,6 +686,29 @@ class NodeCompilerTest {
         assertEquals(1, bytecode.getCompiledNodeCount(), "the condition should compile on first use");
     }
 
+    @Test
+    void endpointFactoryDoesNotEagerlyCompileResults() {
+        byte[] code = {
+                Opcodes.LOAD_CONST,
+                0,
+                Opcodes.RETURN_ENDPOINT,
+                0
+        };
+        Bytecode bytecode = result(code, new Object[] {"https://example.com"});
+
+        assertEquals(0, bytecode.getCompiledNodeCount());
+        var factory = new EndpointFactory(bytecode, new RulesExtension[0]);
+        assertEquals(0, bytecode.getCompiledNodeCount(), "constructing a resolver must not compile unused results");
+
+        var evaluator = new BytecodeEvaluator(
+                bytecode,
+                RegisterFiller.of(bytecode, Map.of()),
+                factory);
+        bind(evaluator, Context.create(), params(null, null));
+        assertEquals("https://example.com", evaluator.resolveResult(0).uri().toString());
+        assertEquals(1, bytecode.getCompiledNodeCount(), "the selected result compiles on first use");
+    }
+
     // -------------------------------------------------------------------------------------------------
     // Harness
     // -------------------------------------------------------------------------------------------------
