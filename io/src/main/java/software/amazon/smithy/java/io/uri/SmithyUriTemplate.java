@@ -8,6 +8,7 @@ package software.amazon.smithy.java.io.uri;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntFunction;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * A URI whose constant parts are validated once, so building one from interpolated values only has to
@@ -230,6 +231,7 @@ public final class SmithyUriTemplate {
      * @throws IllegalArgumentException if a value is not legal for the component it fills.
      * @hidden
      */
+    @SmithyInternalApi
     public SmithyUri expandInternal(Object[] values, int from, IntFunction<char[]> acquireBuffer) {
         int hostLength = expandedLength(values, from, hostPlaceholders, hostLiteralLength);
         int pathLength = expandedLength(
@@ -450,7 +452,7 @@ public final class SmithyUriTemplate {
         }
         for (int i = start; i < end; i++) {
             char c = value.charAt(i);
-            checkHostChar(c, value);
+            SmithyUri.validateHostCharacter(c, value);
             buf[pos++] = c;
         }
         if (trailingBracket) {
@@ -492,12 +494,8 @@ public final class SmithyUriTemplate {
     // decide: an empty value is fine as long as the literals or another value make the host non-empty.
     private static void checkHostValue(String value) {
         for (int i = 0; i < value.length(); i++) {
-            checkHostChar(value.charAt(i), value);
+            SmithyUri.validateHostCharacter(value.charAt(i), value);
         }
-    }
-
-    private static void checkHostChar(char c, String value) {
-        SmithyUri.validateHostCharacter(c, value);
     }
 
     /**

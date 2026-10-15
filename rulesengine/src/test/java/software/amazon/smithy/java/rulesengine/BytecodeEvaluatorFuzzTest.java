@@ -43,7 +43,8 @@ class BytecodeEvaluatorFuzzTest {
         BytecodeEvaluator evaluator = new BytecodeEvaluator(bytecode,
                 new RulesExtension[0],
                 RegisterFiller.of(bytecode, Map.of()));
-        evaluator.reset(null, Map.of());
+        evaluator.prepareRegisters(null);
+        evaluator.finishRegisters(null);
 
         try {
             evaluator.test(0);
@@ -72,7 +73,8 @@ class BytecodeEvaluatorFuzzTest {
         BytecodeEvaluator evaluator = new BytecodeEvaluator(bytecode,
                 new RulesExtension[0],
                 RegisterFiller.of(bytecode, Map.of()));
-        evaluator.reset(null, Map.of());
+        evaluator.prepareRegisters(null);
+        evaluator.finishRegisters(null);
 
         try {
             evaluator.resolveResult(0);

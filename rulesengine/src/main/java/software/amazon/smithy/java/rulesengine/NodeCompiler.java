@@ -28,6 +28,7 @@ final class NodeCompiler {
     private final byte[] code;
     private final Object[] constantPool;
     private final RulesFunction[] functions;
+    private final PropertyPlan.Interner propertyPlanInterner;
 
     /**
      * Target of the {@code JUMP} that ended the most recent {@link #decode} call, or -1 if that call
@@ -41,10 +42,16 @@ final class NodeCompiler {
      */
     private int pendingJumpTarget = -1;
 
-    NodeCompiler(byte[] code, Object[] constantPool, RulesFunction[] functions) {
+    NodeCompiler(
+            byte[] code,
+            Object[] constantPool,
+            RulesFunction[] functions,
+            PropertyPlan.Interner propertyPlanInterner
+    ) {
         this.code = code;
         this.constantPool = constantPool;
         this.functions = functions;
+        this.propertyPlanInterner = propertyPlanInterner;
     }
 
     /**
@@ -245,6 +252,7 @@ final class NodeCompiler {
                     if (fallback == null) {
                         return null;
                     }
+                    pendingJumpTarget = -1;
                     stack.add(new CompiledNode.Coalesce(new CompiledNode[] {preferred, fallback}));
                     pc = target;
                 }
@@ -293,7 +301,9 @@ final class NodeCompiler {
                     var url = pop(stack);
                     var properties = (packed & 2) != 0 ? pop(stack) : null;
                     var headers = (packed & 1) != 0 ? pop(stack) : null;
-                    return stack.isEmpty() ? CompiledNode.returnEndpoint(url, properties, headers) : null;
+                    return stack.isEmpty()
+                            ? CompiledNode.returnEndpoint(url, properties, headers, propertyPlanInterner)
+                            : null;
                 }
 
                 default -> {

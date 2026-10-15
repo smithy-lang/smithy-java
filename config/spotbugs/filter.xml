@@ -181,6 +181,27 @@
         <Method name="sameNames"/>
         <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ"/>
     </Match>
+    <!--
+    ~ stripBrackets deliberately preserves the input reference when it performs no normalization.
+    ~ normalizeHost uses that identity result to distinguish unchanged malformed brackets without
+    ~ rescanning the host. A distinct reference is always the strictly shorter bracket-stripped value.
+    -->
+    <Match>
+        <Class name="software.amazon.smithy.java.io.uri.SmithyUriTemplate"/>
+        <Method name="normalizeHost"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+
+    <!--
+    ~ RulesExtension.Binding.authScheme explicitly permits null for a malformed dynamic
+    ~ candidate, which preserves the materialized path's skip behavior. SpotBugs infers non-null from
+    ~ the common implementations and incorrectly marks the required check as redundant.
+    -->
+    <Match>
+        <Class name="software.amazon.smithy.java.rulesengine.EndpointFactory"/>
+        <Method name="constantAuthSchemes"/>
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+    </Match>
 
     <Match>
         <Class name="~software\.amazon\.smithy\.java\.mcp\.server\.ProtocolVersion\$.*"/>

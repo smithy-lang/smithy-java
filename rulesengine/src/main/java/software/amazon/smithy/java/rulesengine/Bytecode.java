@@ -207,6 +207,7 @@ public final class Bytecode {
      */
     private final CompiledNode[] compiledConditions;
     private final CompiledNode[] compiledResults;
+    private final PropertyPlan.Interner propertyPlanInterner = new PropertyPlan.Interner();
 
     private Bdd bdd;
 
@@ -296,7 +297,7 @@ public final class Bytecode {
         int offset = offsets[index];
         // A fresh compiler per call: NodeCompiler carries decode state across its recursion and so is
         // not reentrant, and lazy compilation can run on any thread.
-        CompiledNode node = new NodeCompiler(bytecode, constantPool, functions).compile(offset);
+        CompiledNode node = new NodeCompiler(bytecode, constantPool, functions, propertyPlanInterner).compile(offset);
         cache[index] = node;
         return node;
     }

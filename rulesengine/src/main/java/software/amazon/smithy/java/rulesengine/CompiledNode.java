@@ -12,8 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
-import software.amazon.smithy.java.endpoints.Endpoint;
-import software.amazon.smithy.java.endpoints.EndpointContext;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.io.uri.SmithyUriTemplate;
 import software.amazon.smithy.java.io.uri.URLEncoding;
@@ -88,6 +86,10 @@ abstract sealed class CompiledNode {
 
         @Override
         Object eval(BytecodeEvaluator ev) {
+            return value;
+        }
+
+        Object constantValue() {
             return value;
         }
     }
@@ -766,6 +768,10 @@ abstract sealed class CompiledNode {
         Object eval(BytecodeEvaluator ev) {
             return List.of(element0.eval(ev));
         }
+
+        CompiledNode element() {
+            return element0;
+        }
     }
 
     /** {@code LIST2}. */
@@ -781,6 +787,10 @@ abstract sealed class CompiledNode {
         @Override
         Object eval(BytecodeEvaluator ev) {
             return List.of(element0.eval(ev), element1.eval(ev));
+        }
+
+        CompiledNode[] elements() {
+            return new CompiledNode[] {element0, element1};
         }
     }
 
@@ -799,6 +809,10 @@ abstract sealed class CompiledNode {
                 values[i] = elements[i].eval(ev);
             }
             return Arrays.asList(values);
+        }
+
+        CompiledNode[] elements() {
+            return elements;
         }
     }
 
@@ -823,6 +837,14 @@ abstract sealed class CompiledNode {
         Object eval(BytecodeEvaluator ev) {
             return Map.of(key0, value0.eval(ev));
         }
+
+        String key() {
+            return key0;
+        }
+
+        CompiledNode value() {
+            return value0;
+        }
     }
 
     /** {@code MAP2}. */
@@ -843,6 +865,14 @@ abstract sealed class CompiledNode {
         Object eval(BytecodeEvaluator ev) {
             return Map.of(key0, value0.eval(ev), key1, value1.eval(ev));
         }
+
+        String[] keys() {
+            return new String[] {key0, key1};
+        }
+
+        CompiledNode[] values() {
+            return new CompiledNode[] {value0, value1};
+        }
     }
 
     /** {@code MAP3}, {@code MAP4} and {@code MAPN}, which tolerate null values. */
@@ -862,6 +892,14 @@ abstract sealed class CompiledNode {
                 map.put(keys[i], values[i].eval(ev));
             }
             return map;
+        }
+
+        String[] keys() {
+            return keys;
+        }
+
+        CompiledNode[] values() {
+            return values;
         }
     }
 
@@ -888,13 +926,12 @@ abstract sealed class CompiledNode {
             return new ArrayPropertyGetter(data);
         }
 
-        DirectAuthSchemeProperties evalDirect(BytecodeEvaluator ev) {
-            DirectAuthSchemeProperties result = ev.directAuthSchemeProperties;
-            Object[] target = result.reset(keys);
-            for (int i = 0; i < values.length; i++) {
-                target[i] = values[i].eval(ev);
-            }
-            return result;
+        String[] keys() {
+            return keys;
+        }
+
+        CompiledNode[] values() {
+            return values;
         }
     }
 
@@ -921,7 +958,7 @@ abstract sealed class CompiledNode {
         Object eval(BytecodeEvaluator ev) {
             var h = (String) host.eval(ev);
             var p = (String) path.eval(ev);
-            if (h != null && h.equals(ev.cachedUriHost) && p.equals(ev.cachedUriPath)) {
+            if (h != null && p != null && h.equals(ev.cachedUriHost) && p.equals(ev.cachedUriPath)) {
                 return ev.cachedUri;
             }
             var uri = SmithyUri.of(scheme, h, -1, p, null);
@@ -1015,170 +1052,55 @@ abstract sealed class CompiledNode {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * {@code RETURN_ENDPOINT}: builds the endpoint and hands its properties to the extensions.
+     *
+     * <p>Properties and headers are compiled into an interned {@link PropertyPlan}. The resolver then
+     * compiles each result into a direct endpoint factory plan, so resolution evaluates only dynamic
+     * leaves and does not inspect the property graph.
+     */
     static final class ReturnEndpoint extends CompiledNode {
         private final CompiledNode url;
-        private final CompiledNode properties;
-        private final CompiledNode headers;
+        private final PropertyPlan.Compiled properties;
+        private final PropertyPlan.Compiled headers;
 
-        ReturnEndpoint(CompiledNode url, CompiledNode properties, CompiledNode headers) {
-            this.url = url;
-            this.properties = properties;
-            this.headers = headers;
-        }
-
-        @Override
-        Object eval(BytecodeEvaluator ev) {
-            Object urlValue = url.eval(ev);
-            var props = (Map<String, Object>) (properties == null ? Map.of() : properties.eval(ev));
-            var hdrs = (Map<String, List<String>>) (headers == null ? Map.of() : headers.eval(ev));
-            SmithyUri uri = urlValue instanceof SmithyUri su
-                    ? su
-                    : ev.uriFactory.createUri((String) urlValue);
-            var builder = Endpoint.builder().uri(uri);
-            if (!hdrs.isEmpty()) {
-                builder.putProperty(EndpointContext.HEADERS, hdrs);
-            }
-
-            for (var extension : ev.extensions) {
-                extension.extractEndpointProperties(builder, ev.context, props, hdrs);
-            }
-
-            return builder.build();
-        }
-    }
-
-    /**
-     * A terminal whose properties contain an auth-scheme list of structs.
-     *
-     * <p>When every property-consuming extension opts into the direct auth hook, this avoids constructing
-     * {@code Map -> List -> ArrayPropertyGetter -> Object[]} just so the extension can immediately unpack
-     * it again. Legacy extensions use {@link ReturnEndpoint} unchanged.
-     */
-    @SuppressWarnings("unchecked")
-    static final class ReturnAuthEndpoint extends CompiledNode {
-        private final CompiledNode url;
-        private final CompiledNode otherProperties;
-        private final CompiledNode headers;
-        private final StructNode[] authSchemes;
-        private final ReturnEndpoint fallback;
-
-        ReturnAuthEndpoint(
+        ReturnEndpoint(
                 CompiledNode url,
                 CompiledNode properties,
-                CompiledNode otherProperties,
                 CompiledNode headers,
-                StructNode[] authSchemes
+                PropertyPlan.Interner propertyPlanInterner
         ) {
             this.url = url;
-            this.otherProperties = otherProperties;
-            this.headers = headers;
-            this.authSchemes = authSchemes;
-            this.fallback = new ReturnEndpoint(url, properties, headers);
+            this.properties = PropertyPlan.compile(properties, propertyPlanInterner);
+            this.headers = PropertyPlan.compile(headers, propertyPlanInterner);
         }
 
         @Override
         Object eval(BytecodeEvaluator ev) {
-            if (ev.directAuthExtensions.length == 0 || ev.legacyPropertyExtensions.length != 0) {
-                return fallback.eval(ev);
-            }
-
             Object urlValue = url.eval(ev);
-            var props = (Map<String, Object>) (otherProperties == null ? Map.of() : otherProperties.eval(ev));
-            var hdrs = (Map<String, List<String>>) (headers == null ? Map.of() : headers.eval(ev));
             SmithyUri uri = urlValue instanceof SmithyUri su
                     ? su
                     : ev.uriFactory.createUri((String) urlValue);
-            var builder = Endpoint.builder().uri(uri);
+            return ev.endpointFactory.create(ev.resultIndex, uri, ev);
+        }
 
-            if (!hdrs.isEmpty()) {
-                builder.putProperty(EndpointContext.HEADERS, hdrs);
-            }
+        PropertyPlan.Compiled properties() {
+            return properties;
+        }
 
-            if (!props.isEmpty() || !hdrs.isEmpty()) {
-                for (RulesExtension extension : ev.directAuthExtensions) {
-                    extension.extractEndpointProperties(builder, ev.context, props, hdrs);
-                }
-            }
-
-            for (StructNode authScheme : authSchemes) {
-                PropertyGetter value = authScheme.evalDirect(ev);
-                for (RulesExtension extension : ev.directAuthExtensions) {
-                    var result = extension.createEndpointAuthScheme(value);
-                    if (result != null) {
-                        builder.addAuthScheme(result);
-                    }
-                }
-            }
-
-            return builder.build();
+        PropertyPlan.Compiled headers() {
+            return headers;
         }
     }
 
     static CompiledNode returnEndpoint(
             CompiledNode url,
             CompiledNode properties,
-            CompiledNode headers
+            CompiledNode headers,
+            PropertyPlan.Interner propertyPlanInterner
     ) {
-        AuthSchemeProperty auth = findAuthSchemeProperty(properties);
-        return auth == null
-                ? new ReturnEndpoint(url, properties, headers)
-                : new ReturnAuthEndpoint(
-                        url,
-                        properties,
-                        auth.otherProperties,
-                        headers,
-                        auth.structs);
+        return new ReturnEndpoint(url, properties, headers, propertyPlanInterner);
     }
-
-    private static AuthSchemeProperty findAuthSchemeProperty(CompiledNode properties) {
-        if (properties instanceof Map1 map) {
-            StructNode[] structs = authSchemeStructs(map.key0, map.value0);
-            return structs == null ? null : new AuthSchemeProperty(structs, null);
-        }
-
-        if (properties instanceof Map2 map) {
-            StructNode[] structs = authSchemeStructs(map.key0, map.value0);
-            if (structs != null) {
-                return new AuthSchemeProperty(structs, new Map1(map.key1, map.value1));
-            }
-            structs = authSchemeStructs(map.key1, map.value1);
-            if (structs != null) {
-                return new AuthSchemeProperty(structs, new Map1(map.key0, map.value0));
-            }
-        }
-
-        return null;
-    }
-
-    private static StructNode[] authSchemeStructs(String key, CompiledNode value) {
-        if (!"authSchemes".equals(key)) {
-            return null;
-        }
-
-        return switch (value) {
-            case List1 list -> list.element0 instanceof StructNode struct ? new StructNode[] {struct} : null;
-            case List2 list -> {
-                if (list.element0 instanceof StructNode first && list.element1 instanceof StructNode second) {
-                    yield new StructNode[] {first, second};
-                }
-                yield null;
-            }
-            case ListN list -> {
-                var result = new StructNode[list.elements.length];
-                for (int i = 0; i < result.length; i++) {
-                    if (!(list.elements[i] instanceof StructNode struct)) {
-                        yield null;
-                    }
-                    result[i] = struct;
-                }
-                yield result;
-            }
-            default -> null;
-        };
-    }
-
-    private record AuthSchemeProperty(StructNode[] structs, CompiledNode otherProperties) {}
 
     static final class ReturnError extends CompiledNode {
         private final CompiledNode message;
@@ -1410,7 +1332,7 @@ abstract sealed class CompiledNode {
         literals.add(pending.toString());
 
         return dynamics.isEmpty()
-               ? new Const(literals.getFirst())
-               : new Template(literals.toArray(new String[0]), dynamics.toArray(new CompiledNode[0]));
+                ? new Const(literals.getFirst())
+                : new Template(literals.toArray(new String[0]), dynamics.toArray(new CompiledNode[0]));
     }
 }

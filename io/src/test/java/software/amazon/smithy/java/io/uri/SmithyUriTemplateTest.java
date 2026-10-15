@@ -230,7 +230,7 @@ class SmithyUriTemplateTest {
                     .build()
                     .expand(value),
                     "https",
-                    "a." + value + "/p".substring(2),
+                    "a." + value,
                     -1,
                     "/p",
                     null);

@@ -7,7 +7,6 @@ package software.amazon.smithy.java.rulesengine;
 
 import java.util.AbstractMap;
 import java.util.AbstractSet;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -36,10 +35,8 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     final Object[] registers;
     // Reused, zero-allocation live view over named registers, handed to a trace sink (one per evaluator).
     private final RegisterView registerView;
-    final RulesExtension[] extensions;
-    final RulesExtension[] directAuthExtensions;
-    final RulesExtension[] legacyPropertyExtensions;
-    final DirectAuthSchemeProperties directAuthSchemeProperties = new DirectAuthSchemeProperties();
+    final EndpointFactory endpointFactory;
+    int resultIndex = -1;
     Object[] stack = new Object[64]; // 64 is more than enough for virtual any ruleset
     int stackPosition = 0;
     private char[] charBuffer = new char[128];
@@ -60,73 +57,27 @@ final class BytecodeEvaluator implements ConditionEvaluator {
     SmithyUri cachedUri;
 
     BytecodeEvaluator(Bytecode bytecode, RulesExtension[] extensions, RegisterFiller registerFiller) {
+        this(bytecode, registerFiller, new EndpointFactory(bytecode, extensions));
+    }
+
+    BytecodeEvaluator(Bytecode bytecode, RegisterFiller registerFiller, EndpointFactory endpointFactory) {
         this.bytecode = bytecode;
-        this.extensions = extensions;
-        this.directAuthExtensions = directAuthExtensions(extensions);
-        this.legacyPropertyExtensions = legacyPropertyExtensions(extensions);
+        this.endpointFactory = endpointFactory;
         this.registers = new Object[bytecode.getRegisterDefinitions().length];
         this.registerView = new RegisterView(registers, bytecode.getRegisterNameMap());
         this.registerFiller = registerFiller;
         this.registerSink = new ContextProvider.RegisterSink(registers, bytecode.getInputRegisterMap());
     }
 
-    private static RulesExtension[] directAuthExtensions(RulesExtension[] extensions) {
-        return extensionsOverriding(
-                extensions,
-                "createEndpointAuthScheme",
-                PropertyGetter.class);
-    }
-
-    private static RulesExtension[] legacyPropertyExtensions(RulesExtension[] extensions) {
-        var direct = Set.of(directAuthExtensions(extensions));
-        var result = new ArrayList<RulesExtension>();
-        for (RulesExtension extension : extensionsOverriding(
-                extensions,
-                "extractEndpointProperties",
-                Endpoint.Builder.class,
-                Context.class,
-                Map.class,
-                Map.class)) {
-            if (!direct.contains(extension)) {
-                result.add(extension);
-            }
-        }
-        return result.toArray(new RulesExtension[0]);
-    }
-
-    private static RulesExtension[] extensionsOverriding(
-            RulesExtension[] extensions,
-            String method,
-            Class<?>... parameterTypes
-    ) {
-        var result = new ArrayList<RulesExtension>();
-        try {
-            for (RulesExtension extension : extensions) {
-                if (extension.getClass()
-                        .getMethod(method, parameterTypes)
-                        .getDeclaringClass() != RulesExtension.class) {
-                    result.add(extension);
-                }
-            }
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Unable to classify rules extensions", e);
-        }
-        return result.toArray(new RulesExtension[0]);
-    }
-
     /**
-     * Reset the evaluator and registers of the evaluator so it can be reused, using the given context and
-     * input parameters.
+     * Readies the evaluator for a resolution, clearing per-resolution state and applying register
+     * defaults, so that the operation binding can write parameters straight into {@link #registerSink}.
      *
-     * @param context Context to get context from.
-     * @param parameters Parameters to get input from.
+     * <p>Always paired with {@link #finishRegisters}, which fills the builtins the binding did not supply
+     * and validates that every required parameter arrived.
+     *
+     * @param context context the resolution reads builtins from.
      */
-    void reset(Context context, Map<String, Object> parameters) {
-        this.context = context;
-        this.stackPosition = 0;
-        registerFiller.fillRegisters(registers, context, parameters);
-    }
-
     void prepareRegisters(Context context) {
         this.context = context;
         this.stackPosition = 0;
@@ -135,8 +86,14 @@ final class BytecodeEvaluator implements ConditionEvaluator {
         registerSink.reset();
     }
 
+    /**
+     * Completes the register setup {@link #prepareRegisters} began, filling any builtin the operation
+     * binding did not supply and rejecting a resolution missing a required parameter.
+     *
+     * @param context context the resolution reads builtins from.
+     * @throws RulesEvaluationError if a required parameter was not supplied.
+     */
     void finishRegisters(Context context) {
-        // Fill builtins and validate
         registerFiller.fillRegisters(registers, context, registerSink.filled);
     }
 
@@ -255,6 +212,7 @@ final class BytecodeEvaluator implements ConditionEvaluator {
             return null;
         }
         stackPosition = 0;
+        this.resultIndex = resultIndex;
         try {
             return (Endpoint) bytecode.resultNode(resultIndex).eval(this);
         } catch (ArrayIndexOutOfBoundsException | ClassCastException | NullPointerException e) {

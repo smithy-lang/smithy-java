@@ -22,7 +22,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
 import software.amazon.smithy.java.rulesengine.EndpointUtils;
-import software.amazon.smithy.java.rulesengine.PropertyGetter;
 import software.amazon.smithy.java.rulesengine.RulesExtension;
 import software.amazon.smithy.java.rulesengine.RulesFunction;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -34,6 +33,9 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  */
 @SmithyUnstableApi
 public class AwsRulesExtension implements RulesExtension {
+
+    private static final EndpointPropertyBinding EMPTY_ENDPOINT_PROPERTIES = new EndpointPropertyBinding() {};
+    private static final Set<Context.Key<?>>[] AUTH_PROPERTY_SETS = createAuthPropertySets();
 
     /**
      * Memoize the conversion from raw {@code authSchemes} property bag → typed
@@ -97,35 +99,63 @@ public class AwsRulesExtension implements RulesExtension {
         if (!(raw instanceof List<?> entries) || entries.isEmpty()) {
             return;
         }
-        var schemes = AUTH_SCHEME_CACHE.computeIfAbsent(entries, AwsRulesExtension::buildAuthSchemes);
-        for (var s : schemes) {
+
+        for (var s : AUTH_SCHEME_CACHE.computeIfAbsent(entries, AwsRulesExtension::buildAuthSchemes)) {
             builder.addAuthScheme(s);
         }
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public EndpointAuthScheme createEndpointAuthScheme(PropertyGetter authScheme) {
-        Object name = authScheme.getProperty("name");
-        if (!(name instanceof String schemeName) || schemeName.isEmpty()) {
+    public EndpointPropertyBinding bindEndpointProperties(EndpointPropertyBinding.Properties properties) {
+        if (!properties.isObject()) {
             return null;
         }
-        Object signingName = authScheme.getProperty("signingName");
-        Object signingRegion = authScheme.getProperty("signingRegion");
-        Object disableDoubleEncoding = authScheme.getProperty("disableDoubleEncoding");
-        Object signingRegionSet = authScheme.getProperty("signingRegionSet");
-        return new DirectAuthScheme(
-                toShapeIdName(schemeName),
-                signingName instanceof String s && !s.isEmpty() ? s : null,
-                signingRegion instanceof String s && !s.isEmpty() ? s : null,
-                disableDoubleEncoding instanceof Boolean b ? b : null,
-                signingRegionSet instanceof List<?> set ? (List<String>) set : null);
+
+        EndpointPropertyBinding.Properties authSchemes = properties.get("authSchemes");
+        if (authSchemes == null) {
+            return EMPTY_ENDPOINT_PROPERTIES;
+        }
+        if (!authSchemes.isList()) {
+            return null;
+        }
+
+        int count = authSchemes.size();
+        if (count == 0) {
+            return EMPTY_ENDPOINT_PROPERTIES;
+        }
+
+        var schemes = new AuthSchemeShape[count];
+        for (int i = 0; i < count; i++) {
+            AuthSchemeShape scheme = AuthSchemeShape.compile(authSchemes.get(i));
+            if (scheme == null) {
+                // A wholly dynamic entry has no statically visible fields. Preserve the materialized
+                // path for that shape rather than guessing how to interpret its runtime value.
+                return null;
+            }
+            schemes[i] = scheme;
+        }
+
+        return new EndpointPropertyBinding() {
+            @Override
+            public int authSchemeCount() {
+                return schemes.length;
+            }
+
+            @Override
+            public EndpointAuthScheme authScheme(int index, ResolutionValues values) {
+                return schemes[index].resolve(values);
+            }
+        };
     }
 
     @SuppressWarnings("unchecked")
     private static List<EndpointAuthScheme> buildAuthSchemes(List<?> entries) {
         var result = new ArrayList<EndpointAuthScheme>(entries.size());
-        for (Object entry : entries) {
+
+        // Indexed rather than for-each: the rules engine may hand over a lazy list view, and iterating it
+        // would allocate an iterator on every resolution for no benefit.
+        for (int i = 0; i < entries.size(); i++) {
+            Object entry = entries.get(i);
             // Each entry is either a Map (when the rules engine emits via MAPN) or a
             // PropertyGetter (the STRUCTN fast path for small fixed-key blocks).
             // EndpointUtils.getProperty handles both.
@@ -133,6 +163,7 @@ public class AwsRulesExtension implements RulesExtension {
             if (!(name instanceof String schemeName) || schemeName.isEmpty()) {
                 continue;
             }
+
             // Endpoint rules emit names like "sigv4-s3express" with hyphens, but Smithy ShapeIds
             // (used as map keys for AuthScheme registration) only allow alphanumerics and '_'.
             // Map each hyphen + following segment to upper-camel ("sigv4-s3express" ->
@@ -159,7 +190,161 @@ public class AwsRulesExtension implements RulesExtension {
 
             result.add(schemeBuilder.build());
         }
+
         return List.copyOf(result);
+    }
+
+    private static final class AuthSchemeShape {
+        private static final AuthSchemeShape SKIPPED = new AuthSchemeShape(null, null, null, null, null);
+
+        private final EndpointPropertyBinding.Properties name;
+        private final EndpointPropertyBinding.Properties signingName;
+        private final EndpointPropertyBinding.Properties signingRegion;
+        private final EndpointPropertyBinding.Properties disableDoubleEncoding;
+        private final EndpointPropertyBinding.Properties signingRegionSet;
+        private final boolean isConstant;
+        private final EndpointAuthScheme constant;
+
+        AuthSchemeShape(
+                EndpointPropertyBinding.Properties name,
+                EndpointPropertyBinding.Properties signingName,
+                EndpointPropertyBinding.Properties signingRegion,
+                EndpointPropertyBinding.Properties disableDoubleEncoding,
+                EndpointPropertyBinding.Properties signingRegionSet
+        ) {
+            this.name = name;
+            this.signingName = signingName;
+            this.signingRegion = signingRegion;
+            this.disableDoubleEncoding = disableDoubleEncoding;
+            this.signingRegionSet = signingRegionSet;
+            this.isConstant = isConstant(name)
+                    && isConstant(signingName)
+                    && isConstant(signingRegion)
+                    && isConstant(disableDoubleEncoding)
+                    && isConstant(signingRegionSet);
+            this.constant = isConstant ? create(null) : null;
+        }
+
+        /**
+         * Compiles one statically visible list entry.
+         *
+         * @return the compiled entry, {@link #SKIPPED} for an entry the legacy path would ignore, or
+         *     null when the entire entry is dynamic and requires materialization.
+         */
+        static AuthSchemeShape compile(EndpointPropertyBinding.Properties entry) {
+            if (entry == null) {
+                return null;
+            }
+            if (!entry.isObject()) {
+                return entry.isConstant() ? SKIPPED : null;
+            }
+
+            EndpointPropertyBinding.Properties name = entry.get("name");
+            if (name == null) {
+                return SKIPPED;
+            }
+            return new AuthSchemeShape(
+                    name,
+                    entry.get("signingName"),
+                    entry.get("signingRegion"),
+                    entry.get("disableDoubleEncoding"),
+                    entry.get("signingRegionSet"));
+        }
+
+        EndpointAuthScheme resolve(EndpointPropertyBinding.ResolutionValues values) {
+            return isConstant ? constant : create(values);
+        }
+
+        @SuppressWarnings("unchecked")
+        private EndpointAuthScheme create(EndpointPropertyBinding.ResolutionValues values) {
+            String schemeName = nonEmptyString(resolve(name, values));
+            if (schemeName == null) {
+                return null;
+            }
+
+            String resolvedSigningName = nonEmptyString(resolve(signingName, values));
+            String resolvedSigningRegion = nonEmptyString(resolve(signingRegion, values));
+            Object doubleEncodingValue = resolve(disableDoubleEncoding, values);
+            Boolean resolvedDisableDoubleEncoding = doubleEncodingValue instanceof Boolean value ? value : null;
+            Object regionSetValue = resolve(signingRegionSet, values);
+            var resolvedSigningRegionSet = regionSetValue instanceof List<?> value ? (List<String>) value : null;
+            return new DirectAuthScheme(
+                    toShapeIdName(schemeName),
+                    resolvedSigningName,
+                    resolvedSigningRegion,
+                    resolvedDisableDoubleEncoding,
+                    resolvedSigningRegionSet);
+        }
+
+        private static boolean isConstant(EndpointPropertyBinding.Properties property) {
+            return property == null || property.isConstant();
+        }
+
+        private static Object resolve(
+                EndpointPropertyBinding.Properties property,
+                EndpointPropertyBinding.ResolutionValues values
+        ) {
+            return property == null
+                    ? null
+                    : property.isConstant() ? property.constantValue() : property.resolve(values);
+        }
+
+        private static String nonEmptyString(Object value) {
+            return value instanceof String string && !string.isEmpty() ? string : null;
+        }
+    }
+
+    private record DirectAuthScheme(
+            String authSchemeId,
+            String signingName,
+            String signingRegion,
+            Boolean disableDoubleEncoding,
+            List<String> signingRegionSet) implements EndpointAuthScheme {
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> T property(Context.Key<T> property) {
+            if (property == EndpointAuthSchemeSettings.SIGNING_NAME) {
+                return (T) signingName;
+            } else if (property == EndpointAuthSchemeSettings.SIGNING_REGION) {
+                return (T) signingRegion;
+            } else if (property == EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING) {
+                return (T) disableDoubleEncoding;
+            } else if (property == EndpointAuthSchemeSettings.SIGNING_REGION_SET) {
+                return (T) signingRegionSet;
+            }
+            return null;
+        }
+
+        @Override
+        public Set<Context.Key<?>> properties() {
+            int mask = signingName == null ? 0 : 1;
+            mask |= signingRegion == null ? 0 : 2;
+            mask |= disableDoubleEncoding == null ? 0 : 4;
+            mask |= signingRegionSet == null ? 0 : 8;
+            return AUTH_PROPERTY_SETS[mask];
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Set<Context.Key<?>>[] createAuthPropertySets() {
+        var result = (Set<Context.Key<?>>[]) new Set<?>[16];
+        for (int mask = 0; mask < result.length; mask++) {
+            var keys = new HashSet<Context.Key<?>>(4);
+            if ((mask & 1) != 0) {
+                keys.add(EndpointAuthSchemeSettings.SIGNING_NAME);
+            }
+            if ((mask & 2) != 0) {
+                keys.add(EndpointAuthSchemeSettings.SIGNING_REGION);
+            }
+            if ((mask & 4) != 0) {
+                keys.add(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING);
+            }
+            if ((mask & 8) != 0) {
+                keys.add(EndpointAuthSchemeSettings.SIGNING_REGION_SET);
+            }
+            result[mask] = Set.copyOf(keys);
+        }
+        return result;
     }
 
     /**
@@ -187,45 +372,5 @@ public class AwsRulesExtension implements RulesExtension {
                 yield sb.toString();
             }
         };
-    }
-
-    private record DirectAuthScheme(
-            String authSchemeId,
-            String signingName,
-            String signingRegion,
-            Boolean disableDoubleEncoding,
-            List<String> signingRegionSet) implements EndpointAuthScheme {
-        @Override
-        @SuppressWarnings("unchecked")
-        public <T> T property(Context.Key<T> property) {
-            Object result = property == EndpointAuthSchemeSettings.SIGNING_NAME
-                    ? signingName
-                    : property == EndpointAuthSchemeSettings.SIGNING_REGION
-                            ? signingRegion
-                            : property == EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING
-                                    ? disableDoubleEncoding
-                                    : property == EndpointAuthSchemeSettings.SIGNING_REGION_SET
-                                            ? signingRegionSet
-                                            : null;
-            return (T) result;
-        }
-
-        @Override
-        public Set<Context.Key<?>> properties() {
-            var result = new HashSet<Context.Key<?>>(4);
-            if (signingName != null) {
-                result.add(EndpointAuthSchemeSettings.SIGNING_NAME);
-            }
-            if (signingRegion != null) {
-                result.add(EndpointAuthSchemeSettings.SIGNING_REGION);
-            }
-            if (disableDoubleEncoding != null) {
-                result.add(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING);
-            }
-            if (signingRegionSet != null) {
-                result.add(EndpointAuthSchemeSettings.SIGNING_REGION_SET);
-            }
-            return Set.copyOf(result);
-        }
     }
 }

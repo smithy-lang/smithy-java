@@ -16,10 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.Endpoint;
-import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
+import software.amazon.smithy.java.endpoints.EndpointContext;
 
 /**
  * Covers {@link NodeCompiler}, which is the only way a rules program is evaluated now that the bytecode
@@ -176,11 +177,11 @@ class NodeCompilerTest {
                 bytecode,
                 new RulesExtension[0],
                 RegisterFiller.of(bytecode, Map.of()));
-        evaluator.reset(Context.create(), params("example.com", Boolean.TRUE));
+        bind(evaluator, Context.create(), params("example.com", Boolean.TRUE));
         assertTrue(evaluator.test(0));
-        evaluator.reset(Context.create(), params("example.com", Boolean.FALSE));
+        bind(evaluator, Context.create(), params("example.com", Boolean.FALSE));
         assertFalse(evaluator.test(0));
-        evaluator.reset(Context.create(), params("example.com", "true"));
+        bind(evaluator, Context.create(), params("example.com", "true"));
         assertThrows(RulesEvaluationError.class, () -> evaluator.test(0));
     }
 
@@ -199,8 +200,9 @@ class NodeCompilerTest {
         var error = assertThrows(RulesEvaluationError.class, () -> bytecode.conditionNode(0));
 
         assertTrue(
-                error.getMessage().contains(
-                        "IS_VALID_HOST_LABEL allowDots must be a boolean, found java.lang.String"),
+                error.getMessage()
+                        .contains(
+                                "IS_VALID_HOST_LABEL allowDots must be a boolean, found java.lang.String"),
                 error.getMessage());
     }
 
@@ -261,6 +263,35 @@ class NodeCompilerTest {
     }
 
     @Test
+    void rejectsIteWhoseTrueArmOnlyHasANestedCoalesceJump() {
+        // The true arm has no JUMP to the ITE join. Its nested coalesce fallback does, but that target
+        // belongs only to the recursive fallback decode and must not be reused as the ITE end target.
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0,
+                Opcodes.JMP_IF_FALSE,
+                0,
+                10,
+                Opcodes.LOAD_CONST,
+                0,
+                Opcodes.JNN_OR_POP,
+                0,
+                5,
+                Opcodes.LOAD_CONST,
+                1,
+                Opcodes.JUMP,
+                0,
+                3,
+                Opcodes.LOAD_CONST,
+                2,
+                Opcodes.RETURN_VALUE
+        };
+        Bytecode bytecode = condition(code, new Object[] {"preferred", "fallback", "false"});
+
+        assertThrows(RulesEvaluationError.class, () -> bytecode.conditionNode(0));
+    }
+
+    @Test
     void mergesAdjacentConstantTemplateParts() {
         byte[] code = {
                 Opcodes.LOAD_CONST,
@@ -296,8 +327,9 @@ class NodeCompilerTest {
         var error = assertThrows(RulesEvaluationError.class, () -> bytecode.resultNode(0));
 
         assertTrue(
-                error.getMessage().contains(
-                        "RESOLVE_TEMPLATE constant part must be string, found java.lang.Boolean"),
+                error.getMessage()
+                        .contains(
+                                "RESOLVE_TEMPLATE constant part must be string, found java.lang.Boolean"),
                 error.getMessage());
     }
 
@@ -316,7 +348,7 @@ class NodeCompilerTest {
                 new byte[] {Opcodes.LOAD_CONST, 0, Opcodes.RETURN_VALUE},
                 new Object[] {Boolean.TRUE});
         var evaluator = new BytecodeEvaluator(bytecode, new RulesExtension[0], RegisterFiller.of(bytecode, Map.of()));
-        evaluator.reset(Context.create(), params("bucket", "key"));
+        bind(evaluator, Context.create(), params("bucket", "key"));
 
         Object first = node.eval(evaluator);
         assertEquals("https://bucket.example.com/key", first.toString());
@@ -335,6 +367,20 @@ class NodeCompilerTest {
                 new CompiledNode.Const("not/a/host"),
                 new CompiledNode.Const(""));
         assertInstanceOf(CompiledNode.BuildUri.class, node);
+    }
+
+    @Test
+    void buildUriAcceptsANullPath() {
+        CompiledNode node = new CompiledNode.BuildUri(
+                "https",
+                new CompiledNode.Const("example.com"),
+                new CompiledNode.Const(null));
+        Bytecode bytecode = condition(
+                new byte[] {Opcodes.LOAD_CONST, 0, Opcodes.RETURN_VALUE},
+                new Object[] {Boolean.TRUE});
+        var evaluator = new BytecodeEvaluator(bytecode, new RulesExtension[0], RegisterFiller.of(bytecode, Map.of()));
+
+        assertEquals("https://example.com", node.eval(evaluator).toString());
     }
 
     @Test
@@ -369,10 +415,43 @@ class NodeCompilerTest {
     }
 
     @Test
-    void buildsAuthSchemeDirectlyWithoutMaterializingItsPropertyGraph() {
+    void sharesAConstantPropertyBagAcrossResolutions() {
+        // Nothing in the bag is interpolated, so the plan materializes it once at load time and every
+        // resolution hands the extension the very same object.
+        byte[] code = {
+                Opcodes.LOAD_CONST,
+                0, // "aws.auth#test"
+                Opcodes.LOAD_CONST,
+                1, // "name"
+                Opcodes.STRUCTN,
+                1,
+                Opcodes.LIST1,
+                Opcodes.LOAD_CONST,
+                2, // "authSchemes"
+                Opcodes.MAP1,
+                Opcodes.LOAD_CONST,
+                3, // URL
+                Opcodes.RETURN_ENDPOINT,
+                2
+        };
+        var pool = new Object[] {"aws.auth#test", "name", "authSchemes", "https://example.com"};
+        var bytecode = result(code, pool);
+        var capture = new CapturingExtension();
+
+        resolveEndpoint(bytecode, params(null, null), capture);
+        Map<String, Object> first = capture.properties;
+        resolveEndpoint(bytecode, params(null, null), capture);
+
+        assertSame(first, capture.properties);
+        assertEquals("aws.auth#test",
+                EndpointUtils.getProperty(((List<?>) first.get("authSchemes")).getFirst(), "name"));
+    }
+
+    @Test
+    void readsAnInterpolatedPropertyThroughLazyViews() {
         byte[] code = {
                 Opcodes.LOAD_REGISTER,
-                0, // auth scheme name
+                0, // auth scheme name, per resolution
                 Opcodes.LOAD_CONST,
                 0, // "name"
                 Opcodes.STRUCTN,
@@ -387,22 +466,30 @@ class NodeCompilerTest {
                 2
         };
         var bytecode = result(code, new Object[] {"name", "authSchemes", "https://example.com"});
-        var extension = new DirectAuthExtension();
+        var capture = new CapturingExtension();
 
-        Endpoint endpoint = resolveEndpoint(bytecode, params("aws.auth#test", null), extension);
+        resolveEndpoint(bytecode, params("aws.auth#first", null), capture);
+        var schemes = (List<?>) capture.properties.get("authSchemes");
 
-        assertInstanceOf(CompiledNode.ReturnAuthEndpoint.class, bytecode.resultNode(0));
-        assertEquals("aws.auth#test", endpoint.authSchemes().get(0).authSchemeId());
-        assertEquals(1, extension.directCalls);
-        assertEquals(0, extension.legacyCalls);
-        assertEquals(Map.of(), extension.otherProperties);
+        assertEquals(1, schemes.size());
+        assertEquals("aws.auth#first", EndpointUtils.getProperty(schemes.getFirst(), "name"));
+        assertEquals(1, capture.properties.size());
+        assertTrue(capture.properties.containsKey("authSchemes"));
+
+        resolveEndpoint(bytecode, params("aws.auth#second", null), capture);
+        assertEquals("aws.auth#second",
+                EndpointUtils.getProperty(
+                        ((List<?>) capture.properties.get("authSchemes")).getFirst(),
+                        "name"));
     }
 
     @Test
-    void passesOtherTerminalPropertiesAlongsideDirectAuthScheme() {
+    void viewsOverEqualValuesAreEqualSoContentKeyedCachesStillHit() {
+        // AwsRulesExtension memoizes typed auth schemes keyed on the raw authSchemes list, so the views
+        // must compare by value rather than by identity or that cache would miss on every resolution.
         byte[] code = {
                 Opcodes.LOAD_REGISTER,
-                0, // auth scheme name
+                0,
                 Opcodes.LOAD_CONST,
                 0, // "name"
                 Opcodes.STRUCTN,
@@ -410,24 +497,23 @@ class NodeCompilerTest {
                 Opcodes.LIST1,
                 Opcodes.LOAD_CONST,
                 1, // "authSchemes"
-                Opcodes.LOAD_REGISTER,
-                1, // backend value
+                Opcodes.MAP1,
                 Opcodes.LOAD_CONST,
-                2, // "backend"
-                Opcodes.MAP2,
-                Opcodes.LOAD_CONST,
-                3, // URL
+                2,
                 Opcodes.RETURN_ENDPOINT,
                 2
         };
-        var bytecode = result(
-                code,
-                new Object[] {"name", "authSchemes", "backend", "https://example.com"});
-        var extension = new DirectAuthExtension();
+        var bytecode = result(code, new Object[] {"name", "authSchemes", "https://example.com"});
+        var capture = new CapturingExtension();
 
-        resolveEndpoint(bytecode, params("aws.auth#test", "S3Express"), extension);
+        resolveEndpoint(bytecode, params("aws.auth#test", null), capture);
+        Object first = capture.properties.get("authSchemes");
+        resolveEndpoint(bytecode, params("aws.auth#test", null), capture);
+        Object second = capture.properties.get("authSchemes");
 
-        assertEquals(Map.of("backend", "S3Express"), extension.otherProperties);
+        assertNotSame(first, second);
+        assertEquals(first, second);
+        assertEquals(first.hashCode(), second.hashCode());
     }
 
     @Test
@@ -455,6 +541,123 @@ class NodeCompilerTest {
 
         var entries = (List<?>) extension.properties.get("authSchemes");
         assertEquals("aws.auth#test", EndpointUtils.getProperty(entries.get(0), "name"));
+    }
+
+    @Test
+    void projectsDynamicPropertiesDirectlyOntoTheEndpoint() {
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0,
+                Opcodes.LOAD_CONST,
+                0, // "backend"
+                Opcodes.MAP1,
+                Opcodes.LOAD_CONST,
+                1, // URL
+                Opcodes.RETURN_ENDPOINT,
+                2
+        };
+        var bytecode = result(code, new Object[] {"backend", "https://example.com"});
+        var extension = new DirectPropertyExtension();
+        var evaluator = new BytecodeEvaluator(
+                bytecode,
+                new RulesExtension[] {new StdExtension(), extension},
+                RegisterFiller.of(bytecode, Map.of()));
+
+        bind(evaluator, Context.create(), params("first", null));
+        Endpoint first = evaluator.resolveResult(0);
+        bind(evaluator, Context.create(), params("second", null));
+        Endpoint second = evaluator.resolveResult(0);
+
+        assertInstanceOf(ProjectedEndpoint.Endpoint1.class, first);
+        assertEquals("first", first.property(DirectPropertyExtension.BACKEND));
+        assertEquals("second", second.property(DirectPropertyExtension.BACKEND));
+        assertEquals(Set.of(DirectPropertyExtension.BACKEND), first.properties());
+        assertEquals(1, extension.bindCalls);
+        assertEquals(0, extension.materializedCalls);
+    }
+
+    @Test
+    void sharesBindingsForInternedPropertyShapes() {
+        byte[] result = {
+                Opcodes.LOAD_REGISTER,
+                0,
+                Opcodes.LOAD_CONST,
+                0, // "backend"
+                Opcodes.MAP1,
+                Opcodes.LOAD_CONST,
+                1, // URL
+                Opcodes.RETURN_ENDPOINT,
+                2
+        };
+        byte[] code = new byte[result.length * 2];
+        System.arraycopy(result, 0, code, 0, result.length);
+        System.arraycopy(result, 0, code, result.length, result.length);
+        var bytecode = build(
+                code,
+                new int[0],
+                new int[] {0, result.length},
+                new Object[] {"backend", "https://example.com"});
+        var extension = new DirectPropertyExtension();
+        var evaluator = new BytecodeEvaluator(
+                bytecode,
+                new RulesExtension[] {extension},
+                RegisterFiller.of(bytecode, Map.of()));
+
+        bind(evaluator, Context.create(), params("first", null));
+        assertEquals("first", evaluator.resolveResult(0).property(DirectPropertyExtension.BACKEND));
+        assertEquals("first", evaluator.resolveResult(1).property(DirectPropertyExtension.BACKEND));
+        assertEquals(1, extension.bindCalls);
+    }
+
+    @Test
+    void projectsDynamicHeadersOntoTheEndpoint() {
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0,
+                Opcodes.LIST1,
+                Opcodes.LOAD_CONST,
+                0, // "x-test"
+                Opcodes.MAP1,
+                Opcodes.LOAD_CONST,
+                1, // URL
+                Opcodes.RETURN_ENDPOINT,
+                1 // headers present, properties absent
+        };
+        var bytecode = result(code, new Object[] {"x-test", "https://example.com"});
+        var evaluator = new BytecodeEvaluator(
+                bytecode,
+                new RulesExtension[0],
+                RegisterFiller.of(bytecode, Map.of()));
+
+        bind(evaluator, Context.create(), params("first", null));
+        Endpoint endpoint = evaluator.resolveResult(0);
+
+        assertInstanceOf(ProjectedEndpoint.Endpoint1.class, endpoint);
+        assertEquals(Map.of("x-test", List.of("first")), endpoint.property(EndpointContext.HEADERS));
+        assertEquals(Set.of(EndpointContext.HEADERS), endpoint.properties());
+    }
+
+    @Test
+    void preservesDynamicHeadersForMaterializedExtensions() {
+        byte[] code = {
+                Opcodes.LOAD_REGISTER,
+                0,
+                Opcodes.LIST1,
+                Opcodes.LOAD_CONST,
+                0, // "x-test"
+                Opcodes.MAP1,
+                Opcodes.LOAD_CONST,
+                1, // URL
+                Opcodes.RETURN_ENDPOINT,
+                1 // headers present, properties absent
+        };
+        var bytecode = result(code, new Object[] {"x-test", "https://example.com"});
+        var extension = new CapturingExtension();
+
+        Endpoint endpoint = resolveEndpoint(bytecode, params("first", null), extension);
+
+        assertEquals(Map.of("x-test", List.of("first")), extension.headers);
+        assertEquals(extension.headers, endpoint.property(EndpointContext.HEADERS));
     }
 
     @Test
@@ -495,6 +698,7 @@ class NodeCompilerTest {
     /** Captures the properties a result hands to the extensions, which is otherwise not observable. */
     private static final class CapturingExtension implements RulesExtension {
         private Map<String, Object> properties;
+        private Map<String, List<String>> headers;
 
         @Override
         public void extractEndpointProperties(
@@ -504,20 +708,33 @@ class NodeCompilerTest {
                 Map<String, List<String>> headers
         ) {
             this.properties = properties;
+            this.headers = headers;
         }
     }
 
-    private static final class DirectAuthExtension implements RulesExtension {
-        private int directCalls;
-        private int legacyCalls;
-        private Map<String, Object> otherProperties = Map.of();
+    private static final class DirectPropertyExtension implements RulesExtension {
+        private static final Context.Key<String> BACKEND = Context.key("test backend");
+        private int bindCalls;
+        private int materializedCalls;
 
         @Override
-        public EndpointAuthScheme createEndpointAuthScheme(PropertyGetter authScheme) {
-            directCalls++;
-            return EndpointAuthScheme.builder()
-                    .authSchemeId((String) authScheme.getProperty("name"))
-                    .build();
+        public EndpointPropertyBinding bindEndpointProperties(EndpointPropertyBinding.Properties properties) {
+            EndpointPropertyBinding.Properties backend = properties.get("backend");
+            if (backend == null) {
+                return null;
+            }
+            bindCalls++;
+            return new EndpointPropertyBinding() {
+                @Override
+                public Set<Context.Key<?>> properties() {
+                    return Set.of(BACKEND);
+                }
+
+                @Override
+                public Object property(Context.Key<?> property, ResolutionValues values) {
+                    return property == BACKEND ? backend.resolve(values) : null;
+                }
+            };
         }
 
         @Override
@@ -527,9 +744,18 @@ class NodeCompilerTest {
                 Map<String, Object> properties,
                 Map<String, List<String>> headers
         ) {
-            legacyCalls++;
-            otherProperties = properties;
+            materializedCalls++;
         }
+    }
+
+    /**
+     * Binds parameters the way {@link BytecodeEndpointResolver} does, so these tests exercise the same
+     * register setup a real resolution performs rather than a test-only shortcut.
+     */
+    private static void bind(BytecodeEvaluator evaluator, Context context, Map<String, Object> parameters) {
+        evaluator.prepareRegisters(context);
+        evaluator.registerSink.putAll(parameters);
+        evaluator.finishRegisters(context);
     }
 
     private static Map<String, Object> params(Object value, Object other) {
@@ -562,7 +788,7 @@ class NodeCompilerTest {
         var evaluator = new BytecodeEvaluator(bytecode,
                 new RulesExtension[0],
                 RegisterFiller.of(bytecode, Map.of()));
-        evaluator.reset(Context.create(), params(value, null));
+        bind(evaluator, Context.create(), params(value, null));
         return evaluator.test(0);
     }
 
@@ -584,7 +810,7 @@ class NodeCompilerTest {
                 ? new RulesExtension[0]
                 : new RulesExtension[] {extension};
         var evaluator = new BytecodeEvaluator(bytecode, extensions, RegisterFiller.of(bytecode, Map.of()));
-        evaluator.reset(Context.create(), parameters);
+        bind(evaluator, Context.create(), parameters);
         return evaluator.resolveResult(0);
     }
 }

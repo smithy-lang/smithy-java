@@ -18,16 +18,30 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 final class EndpointImpl implements Endpoint {
 
     private final SmithyUri uri;
-    private final List<EndpointAuthScheme> authSchemes;
+    private final EndpointAuthScheme authScheme;
+    /**
+     * The scheme list, or null while {@link #authScheme} is holding a lone scheme that nothing has asked
+     * for yet.
+     *
+     * <p>Not final because of that laziness. Two threads racing to fill it both store an equal
+     * {@code List.of} whose fields are final, so the JMM's final-field freeze means a racing reader sees
+     * a fully built list and it does not matter which write lands — the same argument {@code SmithyUri}
+     * uses for its lazily derived string.
+     */
+    private List<EndpointAuthScheme> authSchemes;
     private final Map<Context.Key<?>, Object> properties;
 
     private EndpointImpl(Builder builder) {
         this.uri = Objects.requireNonNull(builder.uri);
         if (builder.authSchemes != null) {
+            this.authScheme = null;
             this.authSchemes = Collections.unmodifiableList(builder.authSchemes);
         } else if (builder.authScheme != null) {
-            this.authSchemes = List.of(builder.authScheme);
+            // Deferred: wrapping one scheme in a list costs an object that a caller reading only the URI
+            // or the properties never needs.
+            this.authScheme = builder.authScheme;
         } else {
+            this.authScheme = null;
             this.authSchemes = List.of();
         }
         this.properties = builder.properties == null ? Map.of() : Collections.unmodifiableMap(builder.properties);
@@ -55,7 +69,11 @@ final class EndpointImpl implements Endpoint {
 
     @Override
     public List<EndpointAuthScheme> authSchemes() {
-        return authSchemes;
+        List<EndpointAuthScheme> result = authSchemes;
+        if (result == null) {
+            result = authSchemes = List.of(authScheme);
+        }
+        return result;
     }
 
     @Override
@@ -67,18 +85,18 @@ final class EndpointImpl implements Endpoint {
             return false;
         }
         EndpointImpl endpoint = (EndpointImpl) o;
-        return Objects.equals(uri, endpoint.uri) && Objects.equals(authSchemes, endpoint.authSchemes)
+        return Objects.equals(uri, endpoint.uri) && authSchemes().equals(endpoint.authSchemes())
                 && Objects.equals(properties, endpoint.properties);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(uri, authSchemes, properties);
+        return Objects.hash(uri, authSchemes(), properties);
     }
 
     @Override
     public String toString() {
-        return "Endpoint{uri=" + uri + ", authSchemes=" + authSchemes + ", properties=" + properties + '}';
+        return "Endpoint{uri=" + uri + ", authSchemes=" + authSchemes() + ", properties=" + properties + '}';
     }
 
     static final class Builder implements Endpoint.Builder {

@@ -25,8 +25,8 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
     private static final int MAX_PROBE = 3;
 
     private final Bytecode bytecode;
-    private final RulesExtension[] extensions;
     private final RegisterFiller registerFiller;
+    private final EndpointFactory endpointFactory;
     private final ContextProvider ctxProvider = new ContextProvider.OrchestratingProvider();
     private final AtomicReferenceArray<BytecodeEvaluator> pool;
     private final int poolMask;
@@ -37,7 +37,7 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
             Map<String, Function<Context, Object>> builtinProviders
     ) {
         this.bytecode = bytecode;
-        this.extensions = extensions.toArray(new RulesExtension[0]);
+        this.endpointFactory = new EndpointFactory(bytecode, extensions.toArray(new RulesExtension[0]));
 
         // Create and reuse this register filler across pooled evaluators.
         this.registerFiller = RegisterFiller.of(bytecode, builtinProviders);
@@ -96,7 +96,7 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
                 return e;
             }
         }
-        return new BytecodeEvaluator(bytecode, extensions, registerFiller);
+        return new BytecodeEvaluator(bytecode, registerFiller, endpointFactory);
     }
 
     private void release(BytecodeEvaluator evaluator, int base) {

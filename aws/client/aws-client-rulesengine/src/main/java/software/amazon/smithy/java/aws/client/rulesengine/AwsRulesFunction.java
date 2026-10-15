@@ -33,7 +33,7 @@ enum AwsRulesFunction implements RulesFunction {
             // AWS ruleset, so the wrapper is cached rather than reallocated per resolution. Same
             // single-volatile hot-key pattern as AWS_PARSE_ARN below.
             var c = cache;
-            if (c != null && region.equals(c.region())) {
+            if (region != null && c != null && region.equals(c.region())) {
                 return c;
             }
 

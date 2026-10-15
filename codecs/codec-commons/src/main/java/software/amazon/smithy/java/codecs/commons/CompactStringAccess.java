@@ -58,10 +58,6 @@ public final class CompactStringAccess {
      * @return true if every character is in the ASCII range.
      */
     public static boolean isAscii(String value) {
-        if (value.isEmpty()) {
-            return false;
-        }
-
         byte[] bytes = latin1Bytes(value);
         if (bytes != null) {
             return countPositives(bytes, 0, bytes.length) == bytes.length;
