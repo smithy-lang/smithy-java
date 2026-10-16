@@ -618,6 +618,11 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
                 decoder.finishReadingStruct(flattenedState, eventFactory, xmlInfo, state, consumer);
             } catch (XMLStreamException e) {
                 throw error("Failed to read struct", e);
+            } catch (SerializationException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                // E.g. a shape builder rejecting the input, such as a union with more than one member set.
+                throw error("Failed to read struct", e);
             }
         }
 
@@ -660,6 +665,11 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
                     reader.closeElement(); // Close the list member.
                 }
             } catch (XMLStreamException e) {
+                throw error("Failed to read list", e);
+            } catch (SerializationException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                // E.g. a shape builder rejecting the input, such as a union with more than one member set.
                 throw error("Failed to read list", e);
             }
         }
@@ -709,6 +719,11 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
                     reader.closeElement();
                 }
             } catch (XMLStreamException e) {
+                throw error("Failed to read map", e);
+            } catch (SerializationException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                // E.g. a shape builder rejecting the input, such as a union with more than one member set.
                 throw error("Failed to read map", e);
             }
         }
