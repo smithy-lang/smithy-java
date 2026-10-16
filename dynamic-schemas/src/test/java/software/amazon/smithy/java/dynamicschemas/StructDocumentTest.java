@@ -221,6 +221,58 @@ public class StructDocumentTest {
                         (Function<Document, Object>) Document::asBlob));
     }
 
+    @ParameterizedTest
+    @MethodSource("coercesNumbersToModeledTypeProvider")
+    public void coercesNumbersToModeledType(Schema schema, Object expected) {
+        var listSchema = Schema.listBuilder(ShapeId.from("foo#NumberList"))
+                .putMember("member", schema)
+                .build();
+        var mapSchema = Schema.mapBuilder(ShapeId.from("foo#NumberMap"))
+                .putMember("key", PreludeSchemas.STRING)
+                .putMember("value", schema)
+                .build();
+        var nestedSchema = Schema.structureBuilder(ShapeId.from("foo#Nested"))
+                .putMember("value", schema)
+                .build();
+        var wrappingSchema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
+                .putMember("value", schema)
+                .putMember("list", listSchema)
+                .putMember("map", mapSchema)
+                .putMember("nested", nestedSchema)
+                .build();
+
+        // Untyped documents (e.g. parsed from JSON) carry whatever Number type the parser chose, typically Integer.
+        var document = Document.ofObject(Map.of(
+                "value",
+                1,
+                "list",
+                List.of(1),
+                "map",
+                Map.of("k", 1),
+                "nested",
+                Map.of("value", 1)));
+        var sd = StructDocument.of(wrappingSchema, document, ShapeId.from("smithy.example#S"));
+
+        assertThat(sd.getMemberValue(wrappingSchema.member("value")), equalTo(expected));
+        assertThat(sd.getMemberValue(wrappingSchema.member("list")), equalTo(List.of(expected)));
+        assertThat(sd.getMemberValue(wrappingSchema.member("map")), equalTo(Map.of("k", expected)));
+        assertThat(sd.getMember("value").asNumber(), equalTo(expected));
+        var nested = (SerializableStruct) sd.getMember("nested");
+        assertThat(nested.getMemberValue(nestedSchema.member("value")), equalTo(expected));
+    }
+
+    static List<Arguments> coercesNumbersToModeledTypeProvider() {
+        return List.of(
+                Arguments.arguments(PreludeSchemas.BYTE, (byte) 1),
+                Arguments.arguments(PreludeSchemas.SHORT, (short) 1),
+                Arguments.arguments(PreludeSchemas.INTEGER, 1),
+                Arguments.arguments(PreludeSchemas.LONG, 1L),
+                Arguments.arguments(PreludeSchemas.FLOAT, 1f),
+                Arguments.arguments(PreludeSchemas.DOUBLE, 1d),
+                Arguments.arguments(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                Arguments.arguments(PreludeSchemas.BIG_DECIMAL, BigDecimal.valueOf(1d)));
+    }
+
     @Test
     public void convertingToListWrapsValuesInSchemas() {
         var listSchema = Schema.listBuilder(ShapeId.from("foo#Bar"))

@@ -189,9 +189,14 @@ public final class StructDocument implements Document, SerializableStruct {
             case BOOLEAN -> new ContentDocument(schema, delegate.asBoolean());
             case STRING, ENUM -> new ContentDocument(schema, delegate.asString());
             case TIMESTAMP -> new ContentDocument(schema, convertTimestamp(delegate));
-            case BYTE, SHORT, INTEGER, INT_ENUM,
-                    LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL ->
-                new ContentDocument(schema, delegate.asNumber());
+            case BYTE -> new ContentDocument(schema, delegate.asByte());
+            case SHORT -> new ContentDocument(schema, delegate.asShort());
+            case INTEGER, INT_ENUM -> new ContentDocument(schema, delegate.asInteger());
+            case LONG -> new ContentDocument(schema, delegate.asLong());
+            case FLOAT -> new ContentDocument(schema, delegate.asFloat());
+            case DOUBLE -> new ContentDocument(schema, delegate.asDouble());
+            case BIG_INTEGER -> new ContentDocument(schema, delegate.asBigInteger());
+            case BIG_DECIMAL -> new ContentDocument(schema, delegate.asBigDecimal());
             case DOCUMENT -> new ContentDocument.SchemaDocument(schema, delegate);
             case BLOB -> {
                 if (schema.hasTrait(TraitKey.STREAMING_TRAIT)) {
