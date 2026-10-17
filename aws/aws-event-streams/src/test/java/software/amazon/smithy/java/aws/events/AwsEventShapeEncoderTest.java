@@ -67,6 +67,26 @@ class AwsEventShapeEncoderTest {
     }
 
     @Test
+    public void testEncodeHeadersOnlyMemberWithEmitEmptyPayload() {
+        // With emitEmptyPayload=true, a header-only event still emits an empty codec body and the
+        // content-type header, instead of omitting both as the default (false) does.
+        var encoder = createEncoder(TestOperation.instance(), true);
+        var event = TestEventStream.builder()
+                .headersOnlyMember(HeadersOnlyEvent.builder().sequenceNum(123).build())
+                .build();
+
+        var result = encoder.encode(event);
+
+        var expectedHeaders = HeadersBuilder.forEvent()
+                .contentType("text/json")
+                .eventType("headersOnlyMember")
+                .put("sequenceNum", 123)
+                .build();
+        assertEquals(expectedHeaders, result.unwrap().getHeaders());
+        assertEquals("{}", new String(result.unwrap().getPayload()));
+    }
+
+    @Test
     public void testEncodeStructureMember() {
         // Arrange
         var encoder = createEncoder(TestOperation.instance());
@@ -168,11 +188,18 @@ class AwsEventShapeEncoderTest {
 
     static <I extends SerializableStruct,
             O extends SerializableStruct> AwsEventShapeEncoder createEncoder(ApiOperation<I, O> operation) {
+        return createEncoder(operation, false);
+    }
+
+    static <I extends SerializableStruct, O extends SerializableStruct> AwsEventShapeEncoder createEncoder(
+            ApiOperation<I, O> operation,
+            boolean emitEmptyPayload
+    ) {
         return new AwsEventShapeEncoder(InitialEventType.INITIAL_REQUEST,
                 operation.outputStreamMember(), // event schema
                 createJsonCodec(), // codec
                 "text/json",
-                false,
+                emitEmptyPayload,
                 (e) -> new EventStreamingException("InternalServerException", "Internal Server Error"));
     }
 
