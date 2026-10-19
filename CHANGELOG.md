@@ -1,5 +1,137 @@
 # Change Log
 
+## 1.7.1 (TBD)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+* Added an option to restrict which MCP protocol versions a server negotiates
+  and advertises, using `McpEngine.Builder#protocolVersions` or
+  `StdioMcpServerBuilder#protocolVersions`. A server that relays tool list
+  changes from proxied servers can serve only the `initialize` handshake
+  versions, so that clients preferring 2026-07-28 fall back to `initialize`
+  and keep receiving `notifications/tools/list_changed`. The default
+  behavior is unchanged.
+  ([#1385](https://github.com/smithy-lang/smithy-java/pull/1385))
+* Added opt-in runtime code generation for JSON codecs and HTTP bindings on
+  JDK 25 and newer, which generates per-shape serializers and deserializers
+  as bytecode to reduce serialization CPU and allocation. Enable it with
+  `JsonCodec.Builder#runtimeCodegen`, `HttpBinding.Builder#runtimeCodegen`,
+  or the `smithy-java.runtime-codegen` system property (`disabled`,
+  `enabled`, or `strict`), with per-backend overrides such as
+  `smithy-java.runtime-codegen.json`. In `enabled` mode, shapes that cannot
+  be generated fall back to the existing serde, and `strict` mode fails
+  instead of falling back. The default behavior is unchanged.
+  ([#1358](https://github.com/smithy-lang/smithy-java/pull/1358),
+  [#1354](https://github.com/smithy-lang/smithy-java/pull/1354),
+  [#1353](https://github.com/smithy-lang/smithy-java/pull/1353))
+
+### Bug Fixes
+
+* Fixed `HttpMcpClient` failing to initialize a remote MCP server that
+  accepts a notification, such as `notifications/initialized`, with a `202`
+  response that has a body (for example `{}`). The client parsed that body
+  as a JSON-RPC response and failed, so the remote server contributed no
+  tools. The body of a successful notification response is now ignored.
+  ([#1413](https://github.com/smithy-lang/smithy-java/pull/1413))
+* Fixed the dynamic client throwing a `ClassCastException` when input built
+  from untyped data, such as a `Document` parsed from JSON, contains a number
+  whose Java type differs from the modeled type, for example an `Integer`
+  for a `long` member. `StructDocument` now converts numbers to the modeled
+  numeric type.
+  ([#1419](https://github.com/smithy-lang/smithy-java/pull/1419))
+* Fixed MCP `tools/call` and remote `prompts/get` requests being forwarded
+  to remote MCP servers with the caller's protocol version instead of the
+  version negotiated with the remote. Remotes that validate the
+  `MCP-Protocol-Version` header rejected these calls with HTTP 400 even
+  though listing their tools and prompts succeeded. Session-based remotes
+  also no longer receive the stateless `_meta` keys.
+  ([#1386](https://github.com/smithy-lang/smithy-java/pull/1386))
+* Fixed the `aws.userAgentAppId` system property being ignored, and a
+  malformed `User-Agent` header when an application ID was set without
+  feature IDs. The default application ID is now resolved once when a client
+  is built, from the `aws.userAgentAppId` or `sdk.ua.appId` system property
+  or the `AWS_SDK_UA_APP_ID` environment variable.
+  ([#1402](https://github.com/smithy-lang/smithy-java/pull/1402))
+* Fixed static identities registered with `IdentityResolver.of(identity)`,
+  such as credentials created with `AwsCredentialsIdentity.create`, being
+  missed by identity resolver lookups, which caused SigV4 to sign with the
+  default AWS credential chain or fail. Resolvers now match assignable
+  identity types, and a new `IdentityResolver.of(Class, Identity)` overload
+  registers an identity under an explicit type.
+  ([#1392](https://github.com/smithy-lang/smithy-java/pull/1392))
+* Fixed the MCP server relabeling typed structure documents for `oneOf`
+  schemas as the `defaultTarget` variant, which dropped variant-specific
+  fields, and not wrapping typed documents when no `defaultTarget` was set.
+  Epoch-seconds timestamps no longer accept numeric strings, and an unknown
+  `@timestampFormat` no longer fails the call.
+  ([#1378](https://github.com/smithy-lang/smithy-java/pull/1378))
+* Fixed generated `Schemas` classes exceeding the JVM 64KB method size limit
+  for models with relatively few shapes but large schema definitions. Code
+  generation now measures the generated size before keeping all schemas in
+  a single class.
+  ([#1382](https://github.com/smithy-lang/smithy-java/pull/1382))
+
+### Improvements
+
+* Improved event stream encoding and decoding performance by computing each
+  event's header and payload member layout once per schema instead of on
+  every frame, and by serializing event bodies through pooled buffers.
+  ([#1380](https://github.com/smithy-lang/smithy-java/pull/1380))
+* Improved endpoint resolution performance, roughly halving steady-state
+  resolution time in S3 benchmarks. Endpoint rules are now compiled lazily
+  into node trees instead of being interpreted as bytecode, URI templates
+  and host label validation are specialized, and endpoint properties and
+  auth schemes are projected from the compiled ruleset instead of being
+  rebuilt on every resolution. Rules extensions can implement the new
+  unstable `RulesExtension#bindEndpointProperties` hook to bind endpoint
+  properties without materializing them.
+  ([#1417](https://github.com/smithy-lang/smithy-java/pull/1417))
+* Improved serialization performance by pooling output buffers in the JSON,
+  CBOR, XML, and Query codecs and client protocols. Codec builders accept an
+  `OutputBuffers` pool through `outputBuffers`. The client pipeline releases
+  a pooled request body after all retry attempts complete, and reading a
+  released body throws an `IllegalStateException`. Code that keeps a
+  request after its call completes must copy the body while the call is in
+  progress, for example with `HttpClientProtocol.retainRequest`.
+  ([#1410](https://github.com/smithy-lang/smithy-java/pull/1410))
+* Improved SigV4 signing performance by building canonical requests in
+  reusable byte buffers and caching timestamps, signing keys, header
+  ordering, and signer properties.
+  ([#1409](https://github.com/smithy-lang/smithy-java/pull/1409))
+* Improved per-request client performance by invoking only the interceptor
+  hooks that an interceptor overrides, skipping the auth property merge when
+  an auth scheme option has no overrides, resolving the default application
+  ID once per client, compacting HTTP header arrays only when a header is
+  removed, and reducing retry token bucket lookup and debug logging
+  overhead. `Signer` and `IdentityResolver` implementations must treat the
+  properties they receive as read-only, because those properties can now be
+  shared across calls.
+  ([#1408](https://github.com/smithy-lang/smithy-java/pull/1408),
+  [#1406](https://github.com/smithy-lang/smithy-java/pull/1406),
+  [#1405](https://github.com/smithy-lang/smithy-java/pull/1405),
+  [#1404](https://github.com/smithy-lang/smithy-java/pull/1404),
+  [#1402](https://github.com/smithy-lang/smithy-java/pull/1402),
+  [#1401](https://github.com/smithy-lang/smithy-java/pull/1401))
+* Improved serialization performance for recursive shapes by caching
+  resolved member targets, and kept schema member target checks small
+  enough for the JVM to inline.
+  ([#1403](https://github.com/smithy-lang/smithy-java/pull/1403),
+  [#1400](https://github.com/smithy-lang/smithy-java/pull/1400))
+* Improved CBOR, JSON, and XML string encoding and decoding performance for
+  ASCII content by using JDK intrinsics. Serialized output is unchanged.
+  ([#1393](https://github.com/smithy-lang/smithy-java/pull/1393))
+* Improved floating-point performance by formatting `float` and `double`
+  values with the zmij algorithm, with output unchanged, and by scanning and
+  converting JSON numbers in a single pass during deserialization.
+  ([#1389](https://github.com/smithy-lang/smithy-java/pull/1389),
+  [#1387](https://github.com/smithy-lang/smithy-java/pull/1387))
+
 ## 1.7.0 (9/30/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
