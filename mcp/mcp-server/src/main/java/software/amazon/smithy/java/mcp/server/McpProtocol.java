@@ -102,6 +102,7 @@ public sealed interface McpProtocol permits BuiltInProtocol, ExtensionMcpProtoco
                 yield operations.setLogLevel(setLogLevel, context);
             }
             case McpCall.ReadResource readResource -> operations.readResource(readResource, context);
+            case McpCall.Listen listen -> operations.listen(listen, context);
             case McpCall.Notification ignored -> McpOutcome.NoResponse.INSTANCE;
             case McpCall.ExtensionCall<?> ignored ->
                 throw new IllegalStateException("Extension calls are dispatched before standard calls");
