@@ -10,11 +10,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Random;
+import javax.crypto.Mac;
 import org.junit.jupiter.api.Test;
 
 class SigningResourcesTest {
@@ -153,5 +155,32 @@ class SigningResourcesTest {
             out.add(r.headers[i * 2 + 1]);
         }
         return out;
+    }
+
+    @Test
+    void hashingHonorsTheDefaultJcaLookupUnlessBuiltInProvidersArePreferred() throws Exception {
+        assertThat(System.getProperty(SigningResources.PREFER_BUILTIN_HASH_PROVIDERS_PROPERTY)).isNull();
+        var resources = new SigningResources();
+        assertThat(resources.sha256Digest.getProvider().getName())
+                .isEqualTo(MessageDigest.getInstance("SHA-256").getProvider().getName());
+        assertThat(resources.sha256Mac.getProvider().getName())
+                .isEqualTo(Mac.getInstance("HmacSHA256").getProvider().getName());
+
+        assertThat(SigningResources.newSha256(true).getProvider().getName()).isEqualTo("SUN");
+        assertThat(SigningResources.newHmacSha256(true).getProvider().getName()).isEqualTo("SunJCE");
+    }
+
+    @Test
+    void regionSetHeaderValueTracksMutationsOfTheSameList() {
+        var resources = new SigningResources();
+        var regions = new ArrayList<>(List.of("us-east-1"));
+        assertThat(resources.regionSetHeaderValue(regions)).isEqualTo("us-east-1");
+
+        regions.set(0, "us-west-2");
+        assertThat(resources.regionSetHeaderValue(regions)).isEqualTo("us-west-2");
+
+        regions.add(" us-east-1 ");
+        assertThat(resources.regionSetHeaderValue(regions)).isEqualTo("us-west-2,us-east-1");
+        assertThat(resources.regionSetHeaderValue(List.of("us-west-2", "us-east-1"))).isEqualTo("us-west-2,us-east-1");
     }
 }
