@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.nio.charset.StandardCharsets;
@@ -15,9 +16,13 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
 import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
@@ -144,6 +149,68 @@ class SigV4EventSignerTest {
         assertNotNull(sig2Hex);
         assertEquals(64, sig1Hex.length());
         assertEquals(64, sig2Hex.length());
+    }
+
+    @Test
+    void usesEndpointSigningNameAndRegionOverridesLikeTheRequestSigner() throws Exception {
+        var credentials = AwsCredentialsIdentity.create("AKIDEXAMPLE", "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY");
+        var instant = Instant.parse("2026-01-16T06:30:01Z");
+        var context = Context.create()
+                .put(SigV4Settings.REGION, "us-west-2")
+                .put(SigV4Settings.SIGNING_NAME, "service")
+                .put(software.amazon.smithy.java.aws.client.core.settings.EndpointAuthSchemeSettings.SIGNING_NAME,
+                        "endpoint-service")
+                .put(software.amazon.smithy.java.aws.client.core.settings.EndpointAuthSchemeSettings.SIGNING_REGION,
+                        "eu-west-1")
+                .put(SigV4Settings.CLOCK, Clock.fixed(instant, ZoneOffset.UTC));
+        var seed = hash(new byte[0]);
+        var signer = new SigV4EventSigner(credentials, context, seed);
+
+        var signed = signer.transformFrame(new AwsEventFrame(new Message(new HashMap<>(), "A".getBytes()))).unwrap();
+        var actual = HexFormat.of().formatHex(signed.getHeaders().get(":chunk-signature").getByteArray());
+
+        assertEquals(expectedEventSignature(credentials,
+                instant,
+                "eu-west-1",
+                "endpoint-service",
+                seed,
+                signed.getPayload()), actual);
+        assertNotEquals(expectedEventSignature(credentials,
+                instant,
+                "us-west-2",
+                "service",
+                seed,
+                signed.getPayload()), actual);
+    }
+
+    private static String expectedEventSignature(
+            AwsCredentialsIdentity credentials,
+            Instant instant,
+            String region,
+            String service,
+            String previousSignature,
+            byte[] payload
+    ) throws Exception {
+        var dateTime = DateTimeFormatter.ofPattern("uuuuMMdd'T'HHmmss'Z'")
+                .withZone(ZoneOffset.UTC)
+                .format(instant);
+        var dateStamp = dateTime.substring(0, 8);
+        var scope = dateStamp + "/" + region + "/" + service + "/aws4_request";
+        var dateHeader =
+                Message.encodeHeaders(Map.of(":date", HeaderValue.fromTimestamp(instant)).entrySet());
+        var stringToSign = "AWS4-HMAC-SHA256-PAYLOAD\n" + dateTime + "\n" + scope + "\n" + previousSignature + "\n"
+                + hash(dateHeader) + "\n" + hash(payload);
+        byte[] key = hmac(("AWS4" + credentials.secretAccessKey()).getBytes(StandardCharsets.UTF_8), dateStamp);
+        key = hmac(key, region);
+        key = hmac(key, service);
+        key = hmac(key, "aws4_request");
+        return HexFormat.of().formatHex(hmac(key, stringToSign));
+    }
+
+    private static byte[] hmac(byte[] key, String data) throws Exception {
+        var mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(key, "HmacSHA256"));
+        return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String hash(byte[] data) throws Exception {

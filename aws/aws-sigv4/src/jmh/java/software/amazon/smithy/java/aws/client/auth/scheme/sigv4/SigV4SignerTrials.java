@@ -19,7 +19,8 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import software.amazon.smithy.java.auth.api.Signer;
+import org.openjdk.jmh.annotations.Threads;
+import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -29,13 +30,14 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.QueryStringBuilder;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 
-@State(Scope.Thread)
+@State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Mode.AverageTime)
 public class SigV4SignerTrials {
-    private static final AwsCredentialsIdentity TEST_IDENTITY = AwsCredentialsIdentity.create(
-            "access-key",
-            "secret-key");
+
+    private static final AwsCredentialsIdentity[] IDENTITIES = {
+            AwsCredentialsIdentity.create("AKIDEXAMPLE", "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"),
+            AwsCredentialsIdentity.create("AKIDROTATED", "rotated-secret-key", "AQoDYXdzEJr/session/token")};
 
     private static final Context TEST_PROPERTIES;
     static {
@@ -47,53 +49,53 @@ public class SigV4SignerTrials {
 
     private static final Map<String, HttpRequest> CASES = Map.ofEntries(
             Map.entry(
-                    "put_no_headers_no_query_no_body",
-                    parsePostRequest(Collections.emptyMap(), Collections.emptyMap(), null)),
+                    "post_no_headers_no_query_no_body",
+                    request(Collections.emptyMap(), Collections.emptyMap(), 0)),
             Map.entry(
-                    "put_with_headers_no_query_with_body",
-                    parsePostRequest(Collections.emptyMap(),
-                            Collections.emptyMap(),
-                            "body of the messsssssssssssssage")),
-            Map.entry(
-                    "put_no_headers_with_query_no_body",
-                    parsePostRequest(Map.of("A", "b", "key", "value"), Collections.emptyMap(), null)),
-            Map.entry(
-                    "put_with_headers_no_query_no_body",
-                    parsePostRequest(
-                            Collections.emptyMap(),
-                            Map.of("x-test", List.of("value"), "x-other", List.of("stuff")),
-                            null)),
-            Map.entry(
-                    "put_with_headers_with_query_with_body",
-                    parsePostRequest(
+                    "post_with_headers_with_query_small_body",
+                    request(
                             Map.of("A", "b", "key", "value"),
                             Map.of("x-test", List.of("value"), "x-other", List.of("stuff")),
-                            "body of the messsssssssssssssage")));
+                            32)),
+            Map.entry(
+                    "put_with_headers_64k_body",
+                    request(Collections.emptyMap(),
+                            Map.of("content-type", List.of("application/octet-stream")),
+                            64 * 1024)));
 
     @Param({
-            "put_no_headers_no_query_no_body",
-            "put_with_headers_no_query_with_body",
-            "put_no_headers_with_query_no_body",
-            "put_with_headers_no_query_no_body",
-            "put_with_headers_with_query_with_body"
+            "post_no_headers_no_query_no_body",
+            "post_with_headers_with_query_small_body",
+            "put_with_headers_64k_body"
     })
     private String testName;
 
-    @Param({"yes", "no"})
+    @Param({"no", "yes"})
+    private String rotateCredentials;
+
+    @Param({"no", "yes"})
     private String useAccpParam;
 
-    private boolean isWindows;
-    private boolean useAccp;
+    @Param({"default", "builtin"})
+    private String hashProviders;
+
     private boolean skipTest;
+    private boolean rotate;
     private HttpRequest request;
-    private Signer<HttpRequest, AwsCredentialsIdentity> signer;
+
+    @State(Scope.Thread)
+    public static class ThreadState {
+        int calls;
+    }
 
     @Setup
     public void setup() throws Exception {
-        useAccp = useAccpParam.equals("yes");
-        isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        // Set the property before SigningResources initializes in this fork.
+        System.setProperty(SigningResources.PREFER_BUILTIN_HASH_PROVIDERS_PROPERTY,
+                Boolean.toString(hashProviders.equals("builtin")));
+        boolean useAccp = useAccpParam.equals("yes");
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         skipTest = useAccp && isWindows;
-
         if (!isWindows) {
             var clazz = Class.forName("com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider");
             if (useAccp) {
@@ -102,38 +104,54 @@ public class SigV4SignerTrials {
                 Security.removeProvider(clazz.getName());
             }
         }
-
+        rotate = rotateCredentials.equals("yes");
         request = CASES.get(testName);
-        signer = SigV4Signer.create();
     }
 
     @Benchmark
-    public void sign() {
-        if (!skipTest) {
-            signer.sign(request, TEST_IDENTITY, TEST_PROPERTIES);
-        } else {
-            System.out.println("Skipping benchmark on Windows");
+    public SignResult<HttpRequest> sign(ThreadState thread) {
+        return signOnce(thread);
+    }
+
+    @Benchmark
+    @Threads(4)
+    public SignResult<HttpRequest> signConcurrently(ThreadState thread) {
+        return signOnce(thread);
+    }
+
+    private SignResult<HttpRequest> signOnce(ThreadState thread) {
+        if (skipTest) {
+            return null;
+        }
+        var identity = rotate ? IDENTITIES[(thread.calls++) & 1] : IDENTITIES[0];
+        try (var signer = SigV4Signer.create()) {
+            return signer.sign(request, identity, TEST_PROPERTIES);
         }
     }
 
-    private static HttpRequest parsePostRequest(
-            Map<String, String> queryParameters,
-            Map<String, List<String>> headers,
-            String body
-    ) {
-        var httpHeaders = HttpHeaders.of(headers);
-        var uriString = "http://example.com";
+    static HttpRequest request(Map<String, String> queryParameters, Map<String, List<String>> headers, int bodySize) {
+        var uriString = "https://example.amazonaws.com/path/to/resource";
         if (!queryParameters.isEmpty()) {
             var queryBuilder = new QueryStringBuilder();
             queryParameters.forEach(queryBuilder::add);
             uriString += "?" + queryBuilder;
         }
-        return HttpRequest.create()
-                .setMethod("POST")
+        var builder = HttpRequest.create()
+                .setMethod(bodySize > 1024 ? "PUT" : "POST")
                 .setHttpVersion(HttpVersion.HTTP_1_1)
                 .setUri(SmithyUri.of(uriString))
-                .setHeaders(httpHeaders)
-                .setBody(body != null ? DataStream.ofBytes(body.getBytes(StandardCharsets.UTF_8)) : null)
-                .toUnmodifiable();
+                .setHeaders(HttpHeaders.of(headers));
+        if (bodySize > 0) {
+            byte[] body = new byte[bodySize];
+            for (int i = 0; i < body.length; i++) {
+                body[i] = (byte) ('a' + (i % 26));
+            }
+            builder.setBody(DataStream.ofBytes(body));
+        }
+        return builder.toUnmodifiable();
+    }
+
+    static byte[] utf8(String s) {
+        return s.getBytes(StandardCharsets.UTF_8);
     }
 }
