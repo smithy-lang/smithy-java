@@ -27,7 +27,14 @@ import software.amazon.smithy.java.context.Context;
  *     <dd>Clock to use to determine the signing instant. If no clock setting is provided then the default system
  *     utc clock is used.
  *     </dd>
+ *     <dt>normalizePath / doubleUrlEncode (optional)</dt>
+ *     <dd>Both default to {@code true} except for S3. See {@link #NORMALIZE_PATH}
+ *     and {@link #DOUBLE_URL_ENCODE}.</dd>
  * </dl>
+ *
+ * <p>Set the system property {@code smithy.java.sigv4.preferBuiltinHashProviders=true}
+ * to use the JDK providers for SHA-256 and HMAC.
+ * The signer uses the default JCA lookup if those providers are unavailable.
  *
  * @implNote To apply this Setting to a client, add the setting to a client plugin that will be applied as a default
  * plugin to your client. For example:
@@ -73,6 +80,19 @@ public interface SigV4Settings<B extends ClientSetting<B>> extends ClockSetting<
      */
     Context.Key<Boolean> OMIT_SECURITY_TOKEN =
             Context.key("Omit x-amz-security-token when signing.");
+
+    /**
+     * Whether the signer collapses dot segments and repeated slashes in the request path before canonicalization.
+     * Defaults to {@code true}, or {@code false} for the {@code s3} and {@code s3express} signing names.
+     */
+    Context.Key<Boolean> NORMALIZE_PATH = Context.key("Normalize the request path when signing.");
+
+    /**
+     * Whether the signer percent-encodes the URI-encoded request path again in the canonical request.
+     * Defaults to {@code true}, or {@code false} for the {@code s3} and {@code s3express} signing names.
+     * The endpoint's {@code disableDoubleEncoding} setting takes precedence when present.
+     */
+    Context.Key<Boolean> DOUBLE_URL_ENCODE = Context.key("Double URI-encode the request path when signing.");
 
     /**
      * Signing name to use for the SigV4 signing process.

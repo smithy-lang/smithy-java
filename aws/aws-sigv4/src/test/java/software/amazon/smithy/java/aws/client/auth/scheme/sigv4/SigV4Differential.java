@@ -18,10 +18,17 @@ import software.amazon.smithy.java.io.datastream.PooledDataStream;
 final class SigV4Differential {
 
     record Outcome(String failure, String signature, Map<String, List<String>> headers) {
-        static Outcome of(Callable<SignResult<HttpRequest>> signing) {
+        static Outcome of(SignResult<HttpRequest> result) {
+            return new Outcome(null, result.signature(), new TreeMap<>(result.signedRequest().headers().map()));
+        }
+
+        static Outcome of(StringSigV4Reference.Expected expected) {
+            return new Outcome(null, expected.signature(), expected.headers());
+        }
+
+        static Outcome capture(Callable<Outcome> outcome) {
             try {
-                var result = signing.call();
-                return new Outcome(null, result.signature(), new TreeMap<>(result.signedRequest().headers().map()));
+                return outcome.call();
             } catch (Exception e) {
                 return new Outcome(e.getClass().getName(), null, null);
             }
@@ -31,14 +38,15 @@ final class SigV4Differential {
     private SigV4Differential() {}
 
     static void check(SigV4CaseGenerator.SignCase c, SigV4Signer signer) {
-        Outcome first = Outcome.of(() -> signer.sign(c.request(), c.identity(), c.properties()));
-        Outcome second = Outcome.of(() -> signer.sign(c.request(), c.identity(), c.properties()));
+        Outcome first = Outcome.capture(() -> Outcome.of(signer.sign(c.request(), c.identity(), c.properties())));
+        Outcome second = Outcome.capture(() -> Outcome.of(signer.sign(c.request(), c.identity(), c.properties())));
         assertThat(second).as("re-signing with the same signer: %s", c).isEqualTo(first);
         if (c.request().body() instanceof PooledDataStream pooled) {
             assertThat(pooled.escaped()).as("signing must not alias a pooled body: %s", c).isFalse();
         }
 
-        Outcome reference = Outcome.of(() -> StringSigV4Reference.sign(c.request(), c.identity(), c.properties()));
+        Outcome reference = Outcome.capture(
+                () -> Outcome.of(StringSigV4Reference.sigV4(c.request(), c.identity(), c.properties())));
         assertThat(first).as("string reference: %s", c).isEqualTo(reference);
     }
 }
