@@ -81,6 +81,11 @@ public sealed interface TextType extends SmithyEnum, SerializableShape {
         }
 
         @Override
+        public void serialize(ShapeSerializer serializer) {
+            throw new UnsupportedOperationException("Cannot serialize enum with unknown value " + this.value);
+        }
+
+        @Override
         public String getValue() {
             return value;
         }
