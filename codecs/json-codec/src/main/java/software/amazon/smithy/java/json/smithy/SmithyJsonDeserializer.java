@@ -606,6 +606,14 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         };
     }
 
+    /**
+     * Converts a failure raised by a member consumer (typically a shape builder rejecting the input, e.g. a union
+     * with more than one member set) into a {@link SerializationException}, matching the Jackson provider.
+     */
+    private static SerializationException callbackFailure(RuntimeException e) {
+        return e instanceof SerializationException se ? se : new SerializationException(e);
+    }
+
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         // Localize hot fields to registers. The JIT cannot promote instance fields across
@@ -764,7 +772,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 } else {
                     // Write pos back before callback, reload after
                     this.pos = p;
-                    structMemberConsumer.accept(state, member, this);
+                    try {
+                        structMemberConsumer.accept(state, member, this);
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                     p = this.pos;
                 }
             } else {
@@ -780,14 +792,22 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 this.pos = p;
 
                 if (schema.type() == ShapeType.STRUCTURE) {
-                    structMemberConsumer.unknownMember(state, fieldName);
+                    try {
+                        structMemberConsumer.unknownMember(state, fieldName);
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                     skipValue();
                 } else if (fieldName.equals("__type")) {
                     skipValue();
                 } else if (settings.forbidUnknownUnionMembers()) {
                     throw new SerializationException("Unknown member " + fieldName + " encountered");
                 } else {
-                    structMemberConsumer.unknownMember(state, fieldName);
+                    try {
+                        structMemberConsumer.unknownMember(state, fieldName);
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                     skipValue();
                 }
                 p = this.pos;
@@ -822,7 +842,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         }
 
         this.pos = p;
-        listMemberConsumer.accept(state, this);
+        try {
+            listMemberConsumer.accept(state, this);
+        } catch (RuntimeException e) {
+            throw callbackFailure(e);
+        }
         p = this.pos;
         while (true) {
             p = JsonReadUtils.skipWhitespace(buf, p, end);
@@ -835,7 +859,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 p++;
                 p = JsonReadUtils.skipWhitespace(buf, p, end);
                 this.pos = p;
-                listMemberConsumer.accept(state, this);
+                try {
+                    listMemberConsumer.accept(state, this);
+                } catch (RuntimeException e) {
+                    throw callbackFailure(e);
+                }
                 p = this.pos;
             } else {
                 this.pos = p;
@@ -903,7 +931,11 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             p = JsonReadUtils.skipWhitespace(buf, p, end);
 
             this.pos = p;
-            mapMemberConsumer.accept(state, key, this);
+            try {
+                mapMemberConsumer.accept(state, key, this);
+            } catch (RuntimeException e) {
+                throw callbackFailure(e);
+            }
             p = this.pos;
         }
     }

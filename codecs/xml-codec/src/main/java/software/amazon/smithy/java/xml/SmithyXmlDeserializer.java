@@ -1277,6 +1277,14 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
         return result;
     }
 
+    /**
+     * Converts a failure raised by a member consumer (typically a shape builder rejecting the input, e.g. a union
+     * with more than one member set) into a {@link SerializationException}.
+     */
+    private static SerializationException callbackFailure(RuntimeException e) {
+        return e instanceof SerializationException se ? se : new SerializationException(e);
+    }
+
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
         enter(schema);
@@ -1341,7 +1349,11 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                     attrValue = getAttributeValue(lookupName);
                 }
                 if (attrValue != null) {
-                    consumer.accept(state, attributeSchema, new AttributeDeserializer(attrValue));
+                    try {
+                        consumer.accept(state, attributeSchema, new AttributeDeserializer(attrValue));
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                 }
             }
         }
@@ -1356,12 +1368,20 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                 Schema memberSchema = lookup.findMember(buf, nameStart, nameLen, lookupHint);
                 if (memberSchema != null) {
                     memberDeserializer.consumed = false;
-                    consumer.accept(state, memberSchema, memberDeserializer);
+                    try {
+                        consumer.accept(state, memberSchema, memberDeserializer);
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                     if (!memberDeserializer.consumed) {
                         skipElement();
                     }
                 } else {
-                    consumer.unknownMember(state, elementName());
+                    try {
+                        consumer.unknownMember(state, elementName());
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                     skipElement();
                 }
             }
@@ -1393,19 +1413,31 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                             .add(new int[] {spanStart, spanEnd});
                 } else {
                     memberDeserializer.consumed = false;
-                    consumer.accept(state, memberSchema, memberDeserializer);
+                    try {
+                        consumer.accept(state, memberSchema, memberDeserializer);
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                     if (!memberDeserializer.consumed) {
                         skipElement();
                     }
                 }
             } else {
-                consumer.unknownMember(state, elementName());
+                try {
+                    consumer.unknownMember(state, elementName());
+                } catch (RuntimeException e) {
+                    throw callbackFailure(e);
+                }
                 skipElement();
             }
         }
         validateContainerEndTag(containerNameStart, containerNameLen);
         for (var entry : flattenedSpans.entrySet()) {
-            consumer.accept(state, entry.getKey(), new FlattenedReplayDeserializer(entry.getValue()));
+            try {
+                consumer.accept(state, entry.getKey(), new FlattenedReplayDeserializer(entry.getValue()));
+            } catch (RuntimeException e) {
+                throw callbackFailure(e);
+            }
         }
     }
 
@@ -1429,7 +1461,11 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                                 + "' but found '" + elementName() + "'");
             }
             itemDeser.consumed = false;
-            consumer.accept(state, itemDeser);
+            try {
+                consumer.accept(state, itemDeser);
+            } catch (RuntimeException e) {
+                throw callbackFailure(e);
+            }
             if (!itemDeser.consumed) {
                 skipElement();
             }
@@ -1485,7 +1521,11 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                 throw new SerializationException("Expected map value but found '" + elementName() + "'");
             }
             MemberDeserializer valueDeser = new MemberDeserializer();
-            consumer.accept(state, key, valueDeser);
+            try {
+                consumer.accept(state, key, valueDeser);
+            } catch (RuntimeException e) {
+                throw callbackFailure(e);
+            }
             if (!valueDeser.consumed) {
                 skipElement();
             }
@@ -1935,7 +1975,11 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                         strictRootElement);
                 if (sub.nextStartElement()) {
                     MemberDeserializer memberDeser = sub.new MemberDeserializer();
-                    consumer.accept(state, memberDeser);
+                    try {
+                        consumer.accept(state, memberDeser);
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                 }
             }
         }
@@ -1974,7 +2018,11 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
                         throw new SerializationException("Expected map value '" + decoder.valueName + "'");
                     }
                     MemberDeserializer valueDeser = sub.new MemberDeserializer();
-                    consumer.accept(state, key, valueDeser);
+                    try {
+                        consumer.accept(state, key, valueDeser);
+                    } catch (RuntimeException e) {
+                        throw callbackFailure(e);
+                    }
                 }
             }
         }
