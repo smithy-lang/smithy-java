@@ -9,6 +9,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
@@ -71,11 +72,20 @@ record StructureSerializerGenerator(
                             || target.isStructureShape()
                             || target.isUnionShape());
             writer.putContext("memberName", memberName);
+            var requiresExplicitNull = symbolProvider.toSymbol(member)
+                    .getProperty(SymbolProperties.REQUIRES_EXPLICIT_NULL)
+                    .orElse(false);
+            writer.putContext("explicitNull", requiresExplicitNull);
+            var generator = new SerializerMemberGenerator(directive, writer, member, memberName);
             writer.writeInline("""
                     ${?nullable}if (${memberName:L} != null) {
                         ${/nullable}${C|};${?nullable}
-                    }${/nullable}
-                    """, new SerializerMemberGenerator(directive, writer, member, memberName));
+                    }${?explicitNull} else {
+                        ${C|};
+                    }${/explicitNull}${/nullable}
+                    """,
+                    generator,
+                    generator.writeNullGenerator());
             writer.popState();
         }
     }
