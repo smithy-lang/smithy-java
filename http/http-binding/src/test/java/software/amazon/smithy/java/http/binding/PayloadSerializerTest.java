@@ -63,6 +63,13 @@ public class PayloadSerializerTest {
         assertThat(body, equalTo("{\"name\":\"Phreddy\"}"));
     }
 
+    @Test
+    public void structPayloadUsesPassedSchemaWhenItDiffersFromValueSchema() {
+        var body = serializeBody(MismatchedStructPayloadInput.OPERATION, new MismatchedStructPayloadInput("Phreddy"));
+
+        assertThat(body, equalTo("{\"title\":\"Phreddy\"}"));
+    }
+
     private static String serializeBody(ApiOperation<?, ?> operation, SerializableStruct input) {
         HttpRequest request = new HttpBinding().requestSerializer()
                 .operation(operation)
@@ -202,6 +209,57 @@ public class PayloadSerializerTest {
             @SuppressWarnings("unchecked")
             public <T> T getMemberValue(Schema member) {
                 return "name".equals(member.memberName()) ? (T) name : null;
+            }
+        }
+    }
+
+    /**
+     * The payload value reports a schema() that differs from the payload member's target but writes members of the
+     * target, as callers that pass a synthetic schema for a value do. The JSON keys must come from the target.
+     */
+    private record MismatchedStructPayloadInput(String title) implements SerializableStruct {
+        static final Schema PAYLOAD = Schema.structureBuilder(ShapeId.from("smithy.example#Payload"))
+                .putMember("title", PreludeSchemas.STRING)
+                .build();
+        static final Schema OTHER = Schema.structureBuilder(ShapeId.from("smithy.example#Other"))
+                .putMember("unrelated", PreludeSchemas.STRING)
+                .build();
+        static final Schema SCHEMA = Schema.structureBuilder(ShapeId.from("smithy.example#MismatchedPayloadInput"))
+                .putMember("payload", PAYLOAD, new HttpPayloadTrait())
+                .build();
+        static final Schema PAYLOAD_MEMBER = SCHEMA.member("payload");
+        static final ApiOperation<?, ?> OPERATION = operation("MismatchedPayloadOperation", SCHEMA);
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            serializer.writeStruct(PAYLOAD_MEMBER, new Value(title));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> T getMemberValue(Schema member) {
+            return "payload".equals(member.memberName()) ? (T) new Value(title) : null;
+        }
+
+        private record Value(String title) implements SerializableStruct {
+            @Override
+            public Schema schema() {
+                return OTHER;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                serializer.writeString(PAYLOAD.member("title"), title);
+            }
+
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                return null;
             }
         }
     }
