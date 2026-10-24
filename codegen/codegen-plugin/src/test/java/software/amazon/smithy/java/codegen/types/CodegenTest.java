@@ -216,6 +216,98 @@ public class CodegenTest {
                 .contains("if ($setMembers != 0x1L)");
     }
 
+    @Test
+    void removesGeneratedDeserializerCallbackClasses() {
+        var generatedModel = Model.assembler()
+                .addUnparsedModel(
+                        "serde.smithy",
+                        """
+                                $version: "2"
+                                namespace smithy.java.codegen.serde
+
+                                list StringList {
+                                    member: String
+                                }
+
+                                map StringMap {
+                                    key: String
+                                    value: String
+                                }
+
+                                structure Container {
+                                    list: StringList
+                                    map: StringMap
+                                }
+
+                                union Choice {
+                                    list: StringList
+                                }
+                                """)
+                .assemble()
+                .unwrap();
+        var settings = settingsBuilder.build();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .model(generatedModel)
+                .settings(settings)
+                .build();
+        plugin.execute(context);
+
+        assertThat(getGeneratedSource("Container.java"))
+                .contains("SharedSerde.StringListSerializer.INSTANCE")
+                .contains("SharedSerde.StringMapSerializer.INSTANCE")
+                .contains("Builder::$deserializeMember")
+                .doesNotContain("class $InnerDeserializer");
+        assertThat(getGeneratedSource("SharedSerde.java"))
+                .contains("class StringListSerializer implements")
+                .contains("static void deserializeStringListMember(")
+                .contains("class StringMapSerializer implements")
+                .contains("static void deserializeStringMapValue(")
+                .doesNotContain("$MemberDeserializer implements")
+                .doesNotContain("$ValueDeserializer implements");
+        assertThat(getGeneratedSource("Choice.java"))
+                .contains("$InnerDeserializer.INSTANCE")
+                .contains("Builder.$deserializeMember(builder, member, de)");
+    }
+
+    @Test
+    void shardsSerdeUsingSchemaPartitions() {
+        var modelSource = new StringBuilder()
+                .append("$version: \"2\"\n")
+                .append("namespace smithy.java.codegen.serde\n\n");
+        for (int i = 0; i < 500; i++) {
+            modelSource.append("list Values")
+                    .append(i)
+                    .append(" {\n    member: String\n}\n\n");
+        }
+        modelSource.append("structure Root {\n");
+        for (int i = 0; i < 500; i++) {
+            modelSource.append("    values")
+                    .append(i)
+                    .append(": Values")
+                    .append(i)
+                    .append('\n');
+        }
+        modelSource.append("}\n");
+        var generatedModel = Model.assembler()
+                .addUnparsedModel("sharded-serde.smithy", modelSource.toString())
+                .assemble()
+                .unwrap();
+        var settings = settingsBuilder.build();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .model(generatedModel)
+                .settings(settings)
+                .build();
+        plugin.execute(context);
+
+        assertThat(manifest.getFiles().stream().map(path -> path.getFileName().toString()))
+                .contains("Schemas.java", "Schemas1.java", "SharedSerde.java", "SharedSerde1.java");
+        assertThat(getGeneratedSource("SharedSerde1.java"))
+                .contains("Schemas1.")
+                .doesNotContain("Schemas.");
+    }
+
     private String generateStructureSource(String modelSource, String fileName) {
         var generatedModel = Model.assembler()
                 .addUnparsedModel("presence.smithy", modelSource)
@@ -228,6 +320,10 @@ public class CodegenTest {
                 .settings(settings)
                 .build();
         plugin.execute(context);
+        return getGeneratedSource(fileName);
+    }
+
+    private String getGeneratedSource(String fileName) {
         var path = manifest.getFiles()
                 .stream()
                 .filter(file -> file.getFileName().toString().equals(fileName))

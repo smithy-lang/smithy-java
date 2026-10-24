@@ -182,7 +182,8 @@ public final class StructureGenerator<
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.getRenames()));
+                            directive.getRenames(),
+                            directive.context().schemaFieldOrder()));
             writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.writeNullMarkedAnnotation();
@@ -662,9 +663,10 @@ public final class StructureGenerator<
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                Map<ShapeId, String> renames
+                Map<ShapeId, String> renames,
+                SchemaFieldOrder schemaFieldOrder
         ) {
-            super(writer, shape, symbolProvider, model, renames);
+            super(writer, shape, symbolProvider, model, renames, schemaFieldOrder);
             this.requiredMembers = shape.members()
                     .stream()
                     .filter(CodegenUtils::isRequiredWithNoDefault)

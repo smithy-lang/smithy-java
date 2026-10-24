@@ -106,16 +106,20 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void listShape(ListShape listShape) {
+        var serdeClass = SharedSerdeGenerator.getClassName(directive.context(), listShape);
         writer.write(
-                "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
+                "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), $L.$USerializer.INSTANCE)",
+                serdeClass,
                 CodegenUtils.getDefaultName(listShape, renames));
         return null;
     }
 
     @Override
     public Void mapShape(MapShape mapShape) {
+        var serdeClass = SharedSerdeGenerator.getClassName(directive.context(), mapShape);
         writer.write(
-                "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
+                "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), $L.$USerializer.INSTANCE)",
+                serdeClass,
                 CodegenUtils.getDefaultName(mapShape, renames));
         return null;
     }

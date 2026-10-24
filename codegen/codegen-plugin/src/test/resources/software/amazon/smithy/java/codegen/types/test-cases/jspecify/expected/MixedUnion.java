@@ -201,18 +201,26 @@ public sealed interface MixedUnion extends SerializableStruct {
             return this;
         }
 
+        @SuppressWarnings("unchecked")
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {
+            switch (member.memberIndex()) {
+                case 0 -> builder.intVariant(de.readInteger(member));
+                case 1 -> builder.stringVariant(de.readString(member));
+                case 2 -> builder.boolVariant(de.readBoolean(member));
+                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+            }
+        }
+
         private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
             private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
 
             @Override
-            @SuppressWarnings("unchecked")
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.intVariant(de.readInteger(member));
-                    case 1 -> builder.stringVariant(de.readString(member));
-                    case 2 -> builder.boolVariant(de.readBoolean(member));
-                    default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
-                }
+                Builder.$deserializeMember(builder, member, de);
             }
 
             @Override

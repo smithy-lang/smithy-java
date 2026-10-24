@@ -337,34 +337,33 @@ public final class NamingStruct implements SerializableStruct {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct($SCHEMA, this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct($SCHEMA, this, Builder::$deserializeMember);
             return this;
         }
 
         @Override
         public Builder deserializeMember(ShapeDeserializer decoder, Schema schema) {
-            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, Builder::$deserializeMember);
             return this;
         }
 
-        private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
-            private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void accept(Builder builder, Schema member, ShapeDeserializer de) {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.other(de.readString(member));
-                    case 1 -> builder.builderMember(BuilderShape.builder().deserializeMember(de, member).build());
-                    case 2 -> builder.type(Type.builder().deserializeMember(de, member).build());
-                    case 3 -> builder.objectMember(ObjectShape.builder().deserializeMember(de, member).build());
-                    case 4 -> builder.union(UnionWithTypeMember.builder().deserializeMember(de, member).build());
-                    case 5 -> builder.map(Map.builder().deserializeMember(de, member).build());
-                    case 6 -> builder.list(List.builder().deserializeMember(de, member).build());
-                    case 7 -> builder.listOfList(SharedSerde.deserializeListOfList(member, de));
-                    case 8 -> builder.mapOfMap(SharedSerde.deserializeMapOfMap(member, de));
-                    default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
-                }
+        @SuppressWarnings("unchecked")
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {
+            switch (member.memberIndex()) {
+                case 0 -> builder.other(de.readString(member));
+                case 1 -> builder.builderMember(BuilderShape.builder().deserializeMember(de, member).build());
+                case 2 -> builder.type(Type.builder().deserializeMember(de, member).build());
+                case 3 -> builder.objectMember(ObjectShape.builder().deserializeMember(de, member).build());
+                case 4 -> builder.union(UnionWithTypeMember.builder().deserializeMember(de, member).build());
+                case 5 -> builder.map(Map.builder().deserializeMember(de, member).build());
+                case 6 -> builder.list(List.builder().deserializeMember(de, member).build());
+                case 7 -> builder.listOfList(SharedSerde.deserializeListOfList(member, de));
+                case 8 -> builder.mapOfMap(SharedSerde.deserializeMapOfMap(member, de));
+                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
             }
         }
     }

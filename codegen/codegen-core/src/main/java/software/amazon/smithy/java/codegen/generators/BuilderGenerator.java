@@ -28,19 +28,22 @@ abstract class BuilderGenerator implements Runnable {
     protected final SymbolProvider symbolProvider;
     protected final Model model;
     protected final Map<ShapeId, String> renames;
+    protected final SchemaFieldOrder schemaFieldOrder;
 
     protected BuilderGenerator(
             JavaWriter writer,
             Shape shape,
             SymbolProvider symbolProvider,
             Model model,
-            Map<ShapeId, String> renames
+            Map<ShapeId, String> renames,
+            SchemaFieldOrder schemaFieldOrder
     ) {
         this.writer = writer;
         this.shape = shape;
         this.symbolProvider = symbolProvider;
         this.model = model;
         this.renames = renames;
+        this.schemaFieldOrder = schemaFieldOrder;
     }
 
     @Override
@@ -112,7 +115,9 @@ abstract class BuilderGenerator implements Runnable {
     }
 
     protected void generateDeserialization(JavaWriter writer) {
-        writer.writeInline("${C|}", new StructureDeserializerGenerator(writer, shape, symbolProvider, model, renames));
+        writer.writeInline(
+                "${C|}",
+                new StructureDeserializerGenerator(writer, shape, symbolProvider, model, renames, schemaFieldOrder));
     }
 
     protected abstract void generateProperties(JavaWriter writer);

@@ -46,24 +46,33 @@ final class SharedSerde {
         }
     }
 
-    static Map<String, String> deserializeSparseMap(Schema schema, ShapeDeserializer deserializer) {
-        var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
-        Map<String, String> result = size == -1 ? new LinkedHashMap<>() : LinkedHashMap.newLinkedHashMap(size);
-        deserializer.readStringMap(schema, result, SparseMap$ValueDeserializer.INSTANCE);
-        return result;
+    static void deserializeSparseMapValue(
+            Map<String, String> state,
+            String key,
+            ShapeDeserializer deserializer
+    ) {
+        if (deserializer.isNull()) {
+            state.put(key, deserializer.readNull());
+            return;
+        }
+        state.put(key, deserializer.readString(Schemas.SPARSE_MAP.mapValueMember()));
     }
 
-    private static final class SparseMap$ValueDeserializer implements ShapeDeserializer.MapMemberConsumer<String, Map<String, String>> {
-        static final SparseMap$ValueDeserializer INSTANCE = new SparseMap$ValueDeserializer();
-
-        @Override
-        public void accept(Map<String, String> state, String key, ShapeDeserializer deserializer) {
-            if (deserializer.isNull()) {
-                state.put(key, deserializer.readNull());
-                return;
-            }
-            state.put(key, deserializer.readString(Schemas.SPARSE_MAP.mapValueMember()));
-        }
+    static Map<String, String> deserializeSparseMap(
+            Schema schema,
+            ShapeDeserializer deserializer
+    ) {
+        var size = Math.min(
+                deserializer.containerSize(),
+                deserializer.containerPreAllocationLimit());
+        Map<String, String> result = size == -1
+                ? new LinkedHashMap<>()
+                : LinkedHashMap.newLinkedHashMap(size);
+        deserializer.readStringMap(
+                schema,
+                result,
+                SharedSerde::deserializeSparseMapValue);
+        return result;
     }
 
     static final class SparseListSerializer implements BiConsumer<List<String>, ShapeSerializer> {
@@ -93,24 +102,32 @@ final class SharedSerde {
         }
     }
 
-    static List<String> deserializeSparseList(Schema schema, ShapeDeserializer deserializer) {
-        var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
-        List<String> result = size == -1 ? new ArrayList<>() : new ArrayList<>(size);
-        deserializer.readList(schema, result, SparseList$MemberDeserializer.INSTANCE);
-        return result;
+    static void deserializeSparseListMember(
+            List<String> state,
+            ShapeDeserializer deserializer
+    ) {
+        if (deserializer.isNull()) {
+            state.add(deserializer.readNull());
+            return;
+        }
+        state.add(deserializer.readString(Schemas.SPARSE_LIST.listMember()));
     }
 
-    private static final class SparseList$MemberDeserializer implements ShapeDeserializer.ListMemberConsumer<List<String>> {
-        static final SparseList$MemberDeserializer INSTANCE = new SparseList$MemberDeserializer();
-
-        @Override
-        public void accept(List<String> state, ShapeDeserializer deserializer) {
-            if (deserializer.isNull()) {
-                state.add(deserializer.readNull());
-                return;
-            }
-            state.add(deserializer.readString(Schemas.SPARSE_LIST.listMember()));
-        }
+    static List<String> deserializeSparseList(
+            Schema schema,
+            ShapeDeserializer deserializer
+    ) {
+        var size = Math.min(
+                deserializer.containerSize(),
+                deserializer.containerPreAllocationLimit());
+        List<String> result = size == -1
+                ? new ArrayList<>()
+                : new ArrayList<>(size);
+        deserializer.readList(
+                schema,
+                result,
+                SharedSerde::deserializeSparseListMember);
+        return result;
     }
 
     static final class DenseMapSerializer implements BiConsumer<Map<String, String>, MapSerializer> {
@@ -137,23 +154,32 @@ final class SharedSerde {
         }
     }
 
-    static Map<String, String> deserializeDenseMap(Schema schema, ShapeDeserializer deserializer) {
-        var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
-        Map<String, String> result = size == -1 ? new LinkedHashMap<>() : LinkedHashMap.newLinkedHashMap(size);
-        deserializer.readStringMap(schema, result, DenseMap$ValueDeserializer.INSTANCE);
-        return result;
+    static void deserializeDenseMapValue(
+            Map<String, String> state,
+            String key,
+            ShapeDeserializer deserializer
+    ) {
+        if (deserializer.isNull()) {
+            throw new SerializationException("Null value found in dense map");
+        }
+        state.put(key, deserializer.readString(Schemas.DENSE_MAP.mapValueMember()));
     }
 
-    private static final class DenseMap$ValueDeserializer implements ShapeDeserializer.MapMemberConsumer<String, Map<String, String>> {
-        static final DenseMap$ValueDeserializer INSTANCE = new DenseMap$ValueDeserializer();
-
-        @Override
-        public void accept(Map<String, String> state, String key, ShapeDeserializer deserializer) {
-            if (deserializer.isNull()) {
-                throw new SerializationException("Null value found in dense map");
-            }
-            state.put(key, deserializer.readString(Schemas.DENSE_MAP.mapValueMember()));
-        }
+    static Map<String, String> deserializeDenseMap(
+            Schema schema,
+            ShapeDeserializer deserializer
+    ) {
+        var size = Math.min(
+                deserializer.containerSize(),
+                deserializer.containerPreAllocationLimit());
+        Map<String, String> result = size == -1
+                ? new LinkedHashMap<>()
+                : LinkedHashMap.newLinkedHashMap(size);
+        deserializer.readStringMap(
+                schema,
+                result,
+                SharedSerde::deserializeDenseMapValue);
+        return result;
     }
 
     static final class DenseListSerializer implements BiConsumer<List<String>, ShapeSerializer> {
@@ -175,23 +201,31 @@ final class SharedSerde {
         }
     }
 
-    static List<String> deserializeDenseList(Schema schema, ShapeDeserializer deserializer) {
-        var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
-        List<String> result = size == -1 ? new ArrayList<>() : new ArrayList<>(size);
-        deserializer.readList(schema, result, DenseList$MemberDeserializer.INSTANCE);
-        return result;
+    static void deserializeDenseListMember(
+            List<String> state,
+            ShapeDeserializer deserializer
+    ) {
+        if (deserializer.isNull()) {
+            throw new SerializationException("Null value found in dense list");
+        }
+        state.add(deserializer.readString(Schemas.DENSE_LIST.listMember()));
     }
 
-    private static final class DenseList$MemberDeserializer implements ShapeDeserializer.ListMemberConsumer<List<String>> {
-        static final DenseList$MemberDeserializer INSTANCE = new DenseList$MemberDeserializer();
-
-        @Override
-        public void accept(List<String> state, ShapeDeserializer deserializer) {
-            if (deserializer.isNull()) {
-                throw new SerializationException("Null value found in dense list");
-            }
-            state.add(deserializer.readString(Schemas.DENSE_LIST.listMember()));
-        }
+    static List<String> deserializeDenseList(
+            Schema schema,
+            ShapeDeserializer deserializer
+    ) {
+        var size = Math.min(
+                deserializer.containerSize(),
+                deserializer.containerPreAllocationLimit());
+        List<String> result = size == -1
+                ? new ArrayList<>()
+                : new ArrayList<>(size);
+        deserializer.readList(
+                schema,
+                result,
+                SharedSerde::deserializeDenseListMember);
+        return result;
     }
 
     private SharedSerde() {}

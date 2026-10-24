@@ -709,51 +709,50 @@ public final class DefaultStructure implements SerializableStruct {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct($SCHEMA, this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct($SCHEMA, this, Builder::$deserializeMember);
             return this;
         }
 
         @Override
         public Builder deserializeMember(ShapeDeserializer decoder, Schema schema) {
-            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, Builder::$deserializeMember);
             return this;
         }
 
-        private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
-            private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void accept(Builder builder, Schema member, ShapeDeserializer de) {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.booleanMember(de.readBoolean(member));
-                    case 1 -> builder.bigDecimal(de.readBigDecimal(member));
-                    case 2 -> builder.bigDecimalWithDoubleDefault(de.readBigDecimal(member));
-                    case 3 -> builder.bigDecimalWithLongDefault(de.readBigDecimal(member));
-                    case 4 -> builder.bigInteger(de.readBigInteger(member));
-                    case 5 -> builder.bigIntegerWithLongDefault(de.readBigInteger(member));
-                    case 6 -> builder.byteMember(de.readByte(member));
-                    case 7 -> builder.doubleMember(de.readDouble(member));
-                    case 8 -> builder.floatMember(de.readFloat(member));
-                    case 9 -> builder.integer(de.readInteger(member));
-                    case 10 -> builder.longMember(de.readLong(member));
-                    case 11 -> builder.shortMember(de.readShort(member));
-                    case 12 -> builder.string(de.readString(member));
-                    case 13 -> builder.blob(de.readBlob(member));
-                    case 14 -> builder.streamingBlob(de.readDataStream(member));
-                    case 15 -> builder.boolDoc(de.readDocument());
-                    case 16 -> builder.stringDoc(de.readDocument());
-                    case 17 -> builder.numberDoc(de.readDocument());
-                    case 18 -> builder.floatingPointnumberDoc(de.readDocument());
-                    case 19 -> builder.listDoc(de.readDocument());
-                    case 20 -> builder.mapDoc(de.readDocument());
-                    case 21 -> builder.list(SharedSerde.deserializeListOfString(member, de));
-                    case 22 -> builder.map(SharedSerde.deserializeStringStringMap(member, de));
-                    case 23 -> builder.timestamp(de.readTimestamp(member));
-                    case 24 -> builder.enumMember(NestedEnum.builder().deserializeMember(de, member).build());
-                    case 25 -> builder.intEnum(NestedIntEnum.builder().deserializeMember(de, member).build());
-                    default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
-                }
+        @SuppressWarnings("unchecked")
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {
+            switch (member.memberIndex()) {
+                case 0 -> builder.booleanMember(de.readBoolean(member));
+                case 1 -> builder.bigDecimal(de.readBigDecimal(member));
+                case 2 -> builder.bigDecimalWithDoubleDefault(de.readBigDecimal(member));
+                case 3 -> builder.bigDecimalWithLongDefault(de.readBigDecimal(member));
+                case 4 -> builder.bigInteger(de.readBigInteger(member));
+                case 5 -> builder.bigIntegerWithLongDefault(de.readBigInteger(member));
+                case 6 -> builder.byteMember(de.readByte(member));
+                case 7 -> builder.doubleMember(de.readDouble(member));
+                case 8 -> builder.floatMember(de.readFloat(member));
+                case 9 -> builder.integer(de.readInteger(member));
+                case 10 -> builder.longMember(de.readLong(member));
+                case 11 -> builder.shortMember(de.readShort(member));
+                case 12 -> builder.string(de.readString(member));
+                case 13 -> builder.blob(de.readBlob(member));
+                case 14 -> builder.streamingBlob(de.readDataStream(member));
+                case 15 -> builder.boolDoc(de.readDocument());
+                case 16 -> builder.stringDoc(de.readDocument());
+                case 17 -> builder.numberDoc(de.readDocument());
+                case 18 -> builder.floatingPointnumberDoc(de.readDocument());
+                case 19 -> builder.listDoc(de.readDocument());
+                case 20 -> builder.mapDoc(de.readDocument());
+                case 21 -> builder.list(SharedSerde.deserializeListOfString(member, de));
+                case 22 -> builder.map(SharedSerde.deserializeStringStringMap(member, de));
+                case 23 -> builder.timestamp(de.readTimestamp(member));
+                case 24 -> builder.enumMember(NestedEnum.builder().deserializeMember(de, member).build());
+                case 25 -> builder.intEnum(NestedIntEnum.builder().deserializeMember(de, member).build());
+                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
             }
         }
     }
