@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import software.amazon.smithy.model.shapes.ShapeId;
+
 /**
  * Represents a modeled Smithy service.
  */
@@ -15,6 +17,18 @@ public interface ApiService {
      * @return Returns the service schema, including the shape ID and relevant traits.
      */
     Schema schema();
+
+    /**
+     * Get an operation contained by this service by its shape ID.
+     *
+     * @param id ID of the operation to get.
+     * @return the operation.
+     * @throws IllegalArgumentException if the operation is not found in this service.
+     */
+    default ApiOperation<?, ?> getOperation(ShapeId id) {
+        throw new IllegalArgumentException(
+                String.format("Operation '%s' not found in service '%s'", id, schema().id()));
+    }
 
     /**
      * Name of the Service.

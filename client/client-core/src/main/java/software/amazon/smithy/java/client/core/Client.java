@@ -154,6 +154,9 @@ public abstract class Client implements Closeable {
                         ? call.pipeline.send(call)
                         : call.pipeline.send(new ClientCall<>(call, h.input()));
             });
+        } catch (CompletionException error) {
+            failure = error;
+            throw unwrapAndThrow(error);
         } catch (RuntimeException | Error error) {
             failure = error;
             throw error;

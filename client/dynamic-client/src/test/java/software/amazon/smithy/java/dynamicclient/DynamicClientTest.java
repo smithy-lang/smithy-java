@@ -338,6 +338,32 @@ public class DynamicClientTest {
     }
 
     @Test
+    public void getsOperationByShapeId() {
+        var client = DynamicClient.builder().model(model).build();
+        var id = ShapeId.from("smithy.example#GetSprocket");
+
+        var operation = client.getOperation(id);
+
+        Assertions.assertSame(client.getOperation("GetSprocket"), operation);
+        Assertions.assertSame(operation, operation.service().getOperation(id));
+        Assertions.assertSame(operation, client.config().service().getOperation(id));
+    }
+
+    @Test
+    public void rejectsUnknownOperationShapeId() {
+        var client = DynamicClient.builder().model(model).build();
+        var id = ShapeId.from("smithy.example#UnknownOperation");
+
+        var error = Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> client.getOperation(id));
+
+        assertThat(
+                error.getMessage(),
+                equalTo("Operation 'smithy.example#UnknownOperation' not found in service 'smithy.example#Sprockets'"));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     public void picksProtocolThatUsesSameTransport() throws Exception {
         // HACK: Inject our fake protocol.
