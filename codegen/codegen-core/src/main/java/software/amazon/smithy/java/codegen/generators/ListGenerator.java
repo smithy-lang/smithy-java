@@ -29,10 +29,11 @@ public final class ListGenerator
 
     @Override
     public void accept(GenerateListDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        var serdeClass = SharedSerdeGenerator.getClassName(directive.context(), directive.shape());
         directive.context()
                 .writerDelegator()
                 .useFileWriter(
-                        CodegenUtils.getSerdeFileName(directive.settings()),
+                        CodegenUtils.getJavaFilePath(directive.settings(), "model", serdeClass),
                         CodegenUtils.getModelNamespace(directive.settings()),
                         writer -> writer.onSection("sharedSerde", t -> {
                             var name = CodegenUtils.getDefaultName(directive.shape(), directive.getRenames());
@@ -72,28 +73,37 @@ public final class ListGenerator
                                                 }
                                             }
 
-                                            static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
-                                                var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
-                                                ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : new ${collectionImpl:T}<>(size);
-                                                deserializer.readList(schema, result, ${name:U}$$MemberDeserializer.INSTANCE);
-                                                return result;
+                                            static void deserialize${name:U}Member(
+                                                    ${shape:B} state,
+                                                    ${shapeDeserializer:T} deserializer
+                                            ) {
+                                                if (deserializer.isNull()) {
+                                                    ${?sparse}state.add(deserializer.readNull());
+                                                    return;${/sparse}${^sparse}throw new ${serdeException:T}("Null value found in dense list");${/sparse}
+                                                }
+                                                state.add($memberDeserializer:C);
                                             }
 
-                                            private static final class ${name:U}$$MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer<${shape:B}> {
-                                                static final ${name:U}$$MemberDeserializer INSTANCE = new ${name:U}$$MemberDeserializer();
-
-                                                @Override
-                                                public void accept(${shape:B} state, ${shapeDeserializer:T} deserializer) {
-                                                    if (deserializer.isNull()) {
-                                                        ${?sparse}state.add(deserializer.readNull());
-                                                        return;${/sparse}${^sparse}throw new ${serdeException:T}("Null value found in dense list");${/sparse}
-                                                    }
-                                                    state.add($memberDeserializer:C);
-                                                }
+                                            static ${shape:T} deserialize${name:U}(
+                                                    ${schema:T} schema,
+                                                    ${shapeDeserializer:T} deserializer
+                                            ) {
+                                                var size = Math.min(
+                                                        deserializer.containerSize(),
+                                                        deserializer.containerPreAllocationLimit());
+                                                ${shape:T} result = size == -1
+                                                        ? new ${collectionImpl:T}<>()
+                                                        : new ${collectionImpl:T}<>(size);
+                                                deserializer.readList(
+                                                        schema,
+                                                        result,
+                                                        ${serdeClass:L}::deserialize${name:U}Member);
+                                                return result;
                                             }
                                             """;
                             writer.putContext("shape", directive.symbol());
                             writer.putContext("name", name);
+                            writer.putContext("serdeClass", serdeClass);
                             writer.putContext(
                                     "collectionImpl",
                                     directive.symbol()
@@ -122,6 +132,7 @@ public final class ListGenerator
                                             directive.symbolProvider(),
                                             directive.model(),
                                             directive.getRenames(),
+                                            directive.context().schemaFieldOrder(),
                                             "deserializer",
                                             valueSchema));
                             writer.write(template);

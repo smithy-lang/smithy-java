@@ -236,29 +236,28 @@ public final class JSpecifyStruct implements SerializableStruct {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct($SCHEMA, this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct($SCHEMA, this, Builder::$deserializeMember);
             return this;
         }
 
         @Override
         public Builder deserializeMember(ShapeDeserializer decoder, Schema schema) {
-            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, Builder::$deserializeMember);
             return this;
         }
 
-        private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
-            private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void accept(Builder builder, Schema member, ShapeDeserializer de) {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.requiredString(de.readString(member));
-                    case 1 -> builder.requiredPrimitive(de.readBoolean(member));
-                    case 2 -> builder.optionalString(de.readString(member));
-                    case 3 -> builder.sparseList(SharedSerde.deserializeSparseStringList(member, de));
-                    default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
-                }
+        @SuppressWarnings("unchecked")
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {
+            switch (member.memberIndex()) {
+                case 0 -> builder.requiredString(de.readString(member));
+                case 1 -> builder.requiredPrimitive(de.readBoolean(member));
+                case 2 -> builder.optionalString(de.readString(member));
+                case 3 -> builder.sparseList(SharedSerde.deserializeSparseStringList(member, de));
+                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
             }
         }
     }

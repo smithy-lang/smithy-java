@@ -21,7 +21,8 @@ record StructureDeserializerGenerator(
         Shape shape,
         SymbolProvider symbolProvider,
         Model model,
-        Map<ShapeId, String> renames) implements Runnable {
+        Map<ShapeId, String> renames,
+        SchemaFieldOrder schemaFieldOrder) implements Runnable {
 
     @Override
     public void run() {
@@ -31,33 +32,41 @@ record StructureDeserializerGenerator(
                         @Override
                         public Builder deserialize(${shapeDeserializer:T} decoder) {${?isError}
                             this.$$deserialized = true;${/isError}
-                            decoder.readStruct($$SCHEMA, this, $$InnerDeserializer.INSTANCE);
+                            decoder.readStruct($$SCHEMA, this, ${consumer:L});
                             return this;
                         }
 
                         @Override
                         public Builder deserializeMember(${shapeDeserializer:T} decoder, ${sdkSchema:T} schema) {
-                            decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, $$InnerDeserializer.INSTANCE);
+                            decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, ${consumer:L});
                             return this;
                         }
+
+                        @SuppressWarnings("unchecked")
+                        private static void $$deserializeMember(
+                                Builder builder,
+                                ${sdkSchema:T} member,
+                                ${shapeDeserializer:T} de
+                        ) {${?hasMembers}
+                            switch (member.memberIndex()) {
+                                ${cases:C|}
+                                default -> throw new ${illegalArg:T}("Unexpected member: " + member.memberName());
+                            }
+                        ${/hasMembers}}${?union}
 
                         private static final class $$InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
                             private static final $$InnerDeserializer INSTANCE = new $$InnerDeserializer();
 
                             @Override
-                            @SuppressWarnings("unchecked")
-                            public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {${?hasMembers}
-                                switch (member.memberIndex()) {
-                                    ${cases:C|}
-                                    default -> throw new ${illegalArg:T}("Unexpected member: " + member.memberName());
-                                }
-                            ${/hasMembers}}${?union}
+                            public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
+                                Builder.$$deserializeMember(builder, member, de);
+                            }
 
                             @Override
                             public void unknownMember(Builder builder, ${string:T} memberName) {
                                 builder.$$unknownMember(memberName);
-                            }${/union}
-                        }""";
+                            }
+                        }${/union}""";
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
         writer.putContext("string", String.class);
@@ -66,6 +75,8 @@ record StructureDeserializerGenerator(
         writer.putContext("union", shape.isUnionShape());
         writer.putContext("illegalArg", IllegalArgumentException.class);
         writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
+        writer.putContext("consumer",
+                shape.isUnionShape() ? "$InnerDeserializer.INSTANCE" : "Builder::$deserializeMember");
         writer.write(template);
         writer.popState();
     }
@@ -79,7 +90,15 @@ record StructureDeserializerGenerator(
             writer.write(
                     "case $L -> builder.${memberName:L}($C);",
                     idx,
-                    new DeserializerGenerator(writer, member, symbolProvider, model, renames, "de", "member"));
+                    new DeserializerGenerator(
+                            writer,
+                            member,
+                            symbolProvider,
+                            model,
+                            renames,
+                            schemaFieldOrder,
+                            "de",
+                            "member"));
             writer.popState();
         }
     }

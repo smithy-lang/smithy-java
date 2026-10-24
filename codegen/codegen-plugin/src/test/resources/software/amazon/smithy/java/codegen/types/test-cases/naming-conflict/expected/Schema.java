@@ -129,26 +129,25 @@ public final class Schema implements SerializableStruct {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct($SCHEMA, this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct($SCHEMA, this, Builder::$deserializeMember);
             return this;
         }
 
         @Override
         public Builder deserializeMember(ShapeDeserializer decoder, software.amazon.smithy.java.core.schema.Schema schema) {
-            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, Builder::$deserializeMember);
             return this;
         }
 
-        private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
-            private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void accept(Builder builder, software.amazon.smithy.java.core.schema.Schema member, ShapeDeserializer de) {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.oneMember(de.readString(member));
-                    default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
-                }
+        @SuppressWarnings("unchecked")
+        private static void $deserializeMember(
+                Builder builder,
+                software.amazon.smithy.java.core.schema.Schema member,
+                ShapeDeserializer de
+        ) {
+            switch (member.memberIndex()) {
+                case 0 -> builder.oneMember(de.readString(member));
+                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
             }
         }
     }

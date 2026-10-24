@@ -639,34 +639,42 @@ public sealed interface UnionType extends SerializableStruct {
             return this;
         }
 
+        @SuppressWarnings("unchecked")
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {
+            switch (member.memberIndex()) {
+                case 0 -> builder.blobValue(de.readBlob(member));
+                case 1 -> builder.booleanValue(de.readBoolean(member));
+                case 2 -> builder.listValue(SharedSerde.deserializeListOfString(member, de));
+                case 3 -> builder.mapValue(SharedSerde.deserializeStringStringMap(member, de));
+                case 4 -> builder.bigDecimalValue(de.readBigDecimal(member));
+                case 5 -> builder.bigIntegerValue(de.readBigInteger(member));
+                case 6 -> builder.byteValue(de.readByte(member));
+                case 7 -> builder.doubleValue(de.readDouble(member));
+                case 8 -> builder.floatValue(de.readFloat(member));
+                case 9 -> builder.integerValue(de.readInteger(member));
+                case 10 -> builder.longValue(de.readLong(member));
+                case 11 -> builder.shortValue(de.readShort(member));
+                case 12 -> builder.stringValue(de.readString(member));
+                case 13 -> builder.structureValue(NestedStruct.builder().deserializeMember(de, member).build());
+                case 14 -> builder.timestampValue(de.readTimestamp(member));
+                case 15 -> builder.unionValue(NestedUnion.builder().deserializeMember(de, member).build());
+                case 16 -> builder.enumValue(NestedEnum.builder().deserializeMember(de, member).build());
+                case 17 -> builder.intEnumValue(NestedIntEnum.builder().deserializeMember(de, member).build());
+                case 18 -> builder.unitValue(Unit.builder().deserializeMember(de, member).build());
+                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+            }
+        }
+
         private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
             private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
 
             @Override
-            @SuppressWarnings("unchecked")
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.blobValue(de.readBlob(member));
-                    case 1 -> builder.booleanValue(de.readBoolean(member));
-                    case 2 -> builder.listValue(SharedSerde.deserializeListOfString(member, de));
-                    case 3 -> builder.mapValue(SharedSerde.deserializeStringStringMap(member, de));
-                    case 4 -> builder.bigDecimalValue(de.readBigDecimal(member));
-                    case 5 -> builder.bigIntegerValue(de.readBigInteger(member));
-                    case 6 -> builder.byteValue(de.readByte(member));
-                    case 7 -> builder.doubleValue(de.readDouble(member));
-                    case 8 -> builder.floatValue(de.readFloat(member));
-                    case 9 -> builder.integerValue(de.readInteger(member));
-                    case 10 -> builder.longValue(de.readLong(member));
-                    case 11 -> builder.shortValue(de.readShort(member));
-                    case 12 -> builder.stringValue(de.readString(member));
-                    case 13 -> builder.structureValue(NestedStruct.builder().deserializeMember(de, member).build());
-                    case 14 -> builder.timestampValue(de.readTimestamp(member));
-                    case 15 -> builder.unionValue(NestedUnion.builder().deserializeMember(de, member).build());
-                    case 16 -> builder.enumValue(NestedEnum.builder().deserializeMember(de, member).build());
-                    case 17 -> builder.intEnumValue(NestedIntEnum.builder().deserializeMember(de, member).build());
-                    case 18 -> builder.unitValue(Unit.builder().deserializeMember(de, member).build());
-                    default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
-                }
+                Builder.$deserializeMember(builder, member, de);
             }
 
             @Override

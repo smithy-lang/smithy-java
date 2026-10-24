@@ -91,22 +91,21 @@ public final class Type implements SerializableStruct {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct($SCHEMA, this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct($SCHEMA, this, Builder::$deserializeMember);
             return this;
         }
 
         @Override
         public Builder deserializeMember(ShapeDeserializer decoder, Schema schema) {
-            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, Builder::$deserializeMember);
             return this;
         }
 
-        private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
-            private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void accept(Builder builder, Schema member, ShapeDeserializer de) {}
-        }
+        @SuppressWarnings("unchecked")
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {}
     }
 }

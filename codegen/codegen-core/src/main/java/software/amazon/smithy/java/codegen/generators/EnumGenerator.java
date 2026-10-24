@@ -97,7 +97,8 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.getRenames()));
+                            directive.getRenames(),
+                            directive.context().schemaFieldOrder()));
             writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
@@ -250,9 +251,10 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                Map<ShapeId, String> renames
+                Map<ShapeId, String> renames,
+                SchemaFieldOrder schemaFieldOrder
         ) {
-            super(writer, shape, symbolProvider, model, renames);
+            super(writer, shape, symbolProvider, model, renames, schemaFieldOrder);
         }
 
         @Override
