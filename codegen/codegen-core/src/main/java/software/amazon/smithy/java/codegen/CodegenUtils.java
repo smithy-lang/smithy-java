@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -24,8 +25,10 @@ import software.amazon.smithy.codegen.core.directed.ShapeDirective;
 import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.NullableIndex;
+import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.selector.PathFinder;
 import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -485,6 +488,21 @@ public final class CodegenUtils {
                 .putProperty(SymbolProperties.IS_PRIMITIVE, false)
                 .declarationFile(filename)
                 .build();
+    }
+
+    /**
+     * Gets the operations contained by a service in stable shape ID order.
+     *
+     * @param model Model containing the service.
+     * @param service Service to inspect.
+     * @return sorted contained operations.
+     */
+    public static List<OperationShape> getContainedOperations(Model model, ServiceShape service) {
+        return TopDownIndex.of(model)
+                .getContainedOperations(service)
+                .stream()
+                .sorted(Comparator.comparing(operation -> operation.getId().toString()))
+                .toList();
     }
 
     /**

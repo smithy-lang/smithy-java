@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
@@ -35,8 +36,13 @@ public class RelativeDeprecationFilteringTest extends AbstractCodegenFileTest {
     @Test
     void expectedUnfilteredDateExist() {
         var fileStr = getFileStringForClass("NotYetDeprecatedDate");
-        var expected = "public final class NotYetDeprecatedDate implements ApiOperation";
+        var expected = "public final class NotYetDeprecatedDate extends AbstractApiOperation";
         assertTrue(fileStr.contains(expected));
+        assertTrue(fileStr.contains("super(Schema.createOperation($ID"));
+        assertFalse(fileStr.contains("static final Schema $SCHEMA"));
+        assertFalse(fileStr.contains("SCHEMES"));
+        assertFalse(fileStr.contains("TYPE_REGISTRY"));
+        assertFalse(fileStr.contains("errorSchemas()"));
     }
 
     @Test
@@ -49,7 +55,7 @@ public class RelativeDeprecationFilteringTest extends AbstractCodegenFileTest {
     @Test
     void expectedUnfilteredVersionExist() {
         var fileStr = getFileStringForClass("NotYetDeprecatedVersion");
-        var expected = "public final class NotYetDeprecatedVersion implements ApiOperation";
+        var expected = "public final class NotYetDeprecatedVersion extends AbstractApiOperation";
         assertTrue(fileStr.contains(expected));
     }
 

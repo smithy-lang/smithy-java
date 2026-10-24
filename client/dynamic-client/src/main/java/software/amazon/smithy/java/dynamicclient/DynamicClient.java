@@ -60,23 +60,31 @@ public final class DynamicClient extends Client {
 
     private final ServiceShape service;
     private final Model model;
-    private final ConcurrentMap<String, ApiOperation<StructDocument, StructDocument>> operations =
+    private final ConcurrentMap<ShapeId, ApiOperation<StructDocument, StructDocument>> operations =
             new ConcurrentHashMap<>();
     private final SchemaConverter schemaConverter;
     private final Map<String, OperationShape> operationNames = new HashMap<>();
+    private final Map<ShapeId, OperationShape> operationIds = new HashMap<>();
     private final TypeRegistry serviceErrorRegistry;
-    private final Schema serviceSchema;
     private final ApiService apiService;
 
-    private DynamicClient(Builder builder, SchemaConverter converter, ServiceShape shape, Model model) {
+    private DynamicClient(
+            Builder builder,
+            SchemaConverter converter,
+            ServiceShape shape,
+            Model model,
+            DynamicApiService apiService
+    ) {
         super(builder);
         this.model = model;
         this.service = shape;
         this.schemaConverter = converter;
+        this.apiService = apiService;
 
         // Create a lookup table of operation names to the operation shape IDs.
         for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
             operationNames.put(operation.getId().getName(), operation);
+            operationIds.put(operation.getId(), operation);
         }
 
         // Build and register service-wide errors.
@@ -86,9 +94,6 @@ public final class DynamicClient extends Client {
         }
         this.serviceErrorRegistry = registryBuilder.build();
 
-        // Create the ApiService.
-        serviceSchema = schemaConverter.getSchema(service);
-        apiService = () -> serviceSchema;
     }
 
     private void registerError(ShapeId e, TypeRegistry.Builder registryBuilder) {
@@ -165,6 +170,16 @@ public final class DynamicClient extends Client {
     }
 
     /**
+     * Get an ApiOperation by shape ID.
+     *
+     * @param id ID of the operation to get.
+     * @return the operation.
+     */
+    public ApiOperation<StructDocument, StructDocument> getOperation(ShapeId id) {
+        return getApiOperation(id);
+    }
+
+    /**
      * Create a {@link SerializableStruct} from a schema and document.
      *
      * @param shape Shape to mimic by the struct. The shape ID must be found in the model.
@@ -177,14 +192,18 @@ public final class DynamicClient extends Client {
     }
 
     private ApiOperation<StructDocument, StructDocument> getApiOperation(String name) {
-        return operations.computeIfAbsent(name, operation -> {
-            var shape = operationNames.get(name);
+        var shape = operationNames.get(name);
+        if (shape == null) {
+            throw operationNotFound(name);
+        }
+        return getApiOperation(shape.getId());
+    }
+
+    private ApiOperation<StructDocument, StructDocument> getApiOperation(ShapeId id) {
+        return operations.computeIfAbsent(id, operation -> {
+            var shape = operationIds.get(id);
             if (shape == null) {
-                throw new IllegalArgumentException(
-                        String.format(
-                                "Operation '%s' not found in service '%s'",
-                                name,
-                                service.getId()));
+                throw operationNotFound(id);
             }
 
             return DynamicOperation.create(
@@ -196,6 +215,14 @@ public final class DynamicClient extends Client {
                     serviceErrorRegistry,
                     this::registerError);
         });
+    }
+
+    private IllegalArgumentException operationNotFound(Object operation) {
+        return new IllegalArgumentException(
+                String.format(
+                        "Operation '%s' not found in service '%s'",
+                        operation,
+                        service.getId()));
     }
 
     /**
@@ -233,12 +260,7 @@ public final class DynamicClient extends Client {
 
             // Create the schema for the service and put it in the config.
             var serviceSchema = converter.getSchema(shape);
-            var apiService = new ApiService() {
-                @Override
-                public Schema schema() {
-                    return serviceSchema;
-                }
-            };
+            var apiService = new DynamicApiService(serviceSchema);
             configBuilder().service(apiService);
 
             // Detecting a transport happens first when building a client. But we need to detect a protocol before
@@ -247,7 +269,9 @@ public final class DynamicClient extends Client {
                 DetectProtocolPlugin.INSTANCE.configureClient(configBuilder());
             }
 
-            return new DynamicClient(this, converter, shape, model);
+            var client = new DynamicClient(this, converter, shape, model, apiService);
+            apiService.bind(client);
+            return client;
         }
 
         /**
@@ -272,6 +296,29 @@ public final class DynamicClient extends Client {
         @Deprecated
         public ShapeId service() {
             return serviceId();
+        }
+    }
+
+    private static final class DynamicApiService implements ApiService {
+        private final Schema schema;
+        private DynamicClient client;
+
+        private DynamicApiService(Schema schema) {
+            this.schema = schema;
+        }
+
+        private void bind(DynamicClient client) {
+            this.client = client;
+        }
+
+        @Override
+        public Schema schema() {
+            return schema;
+        }
+
+        @Override
+        public ApiOperation<StructDocument, StructDocument> getOperation(ShapeId id) {
+            return client.getApiOperation(id);
         }
     }
 }
