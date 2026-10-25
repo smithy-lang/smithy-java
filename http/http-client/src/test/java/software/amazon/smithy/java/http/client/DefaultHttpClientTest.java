@@ -11,20 +11,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.Test;
@@ -504,6 +509,113 @@ class DefaultHttpClientTest {
             assertTrue(ex.getMessage().contains("exceeded request timeout"),
                     "Should indicate timeout: " + ex.getMessage());
         }
+    }
+
+    @Test
+    void requestTimeoutAbandonsAPooledBodyStillBeingWritten() throws Exception {
+        assertTimeoutAbandonsBody(body -> body);
+    }
+
+    @Test
+    void requestTimeoutAbandonsAMetadataWrappedPooledBody() throws Exception {
+        assertTimeoutAbandonsBody(body -> DataStream.withMetadata(body, "application/octet-stream", -1));
+    }
+
+    private void assertTimeoutAbandonsBody(UnaryOperator<DataStream> wrap) throws Exception {
+        var enteredWrite = new CountDownLatch(1);
+        var workerDone = new CountDownLatch(1);
+        var written = new AtomicReference<String>();
+        var recycled = new AtomicBoolean();
+        var pool = new TestConnectionPool() {
+            @Override
+            protected HttpExchange createExchange() {
+                return new TestHttpExchange() {
+                    @Override
+                    public void writeRequestBody(DataStream body) throws IOException {
+                        body.writeTo(new OutputStream() {
+                            @Override
+                            public void write(int b) {
+                                throw new UnsupportedOperationException();
+                            }
+
+                            @Override
+                            public void write(byte[] b, int off, int len) {
+                                // Simulate a kernel write that continues after timeout and ignores interruption.
+                                enteredWrite.countDown();
+                                long deadline = System.nanoTime() + Duration.ofMillis(300).toNanos();
+                                while (System.nanoTime() < deadline) {
+                                    Thread.onSpinWait();
+                                }
+                                written.set(new String(b, off, len, StandardCharsets.US_ASCII));
+                                workerDone.countDown();
+                            }
+                        });
+                    }
+                };
+            }
+        };
+        byte[] array = "pooled body".getBytes(StandardCharsets.US_ASCII);
+        var lease = DataStream.ofLeasedBytes(array, 0, array.length, "text/plain", a -> recycled.set(true));
+        try (var client = HttpClient.builder()
+                .connectionPoolFactory(config -> pool)
+                .requestTimeout(Duration.ofMillis(50))
+                .build()) {
+            var request = HttpRequest.create()
+                    .setMethod("PUT")
+                    .setUri(SmithyUri.of("http://example.com/test"))
+                    .setBody(wrap.apply(lease));
+
+            var ex = assertThrows(IOException.class, () -> client.send(request));
+            assertTrue(ex.getMessage().contains("exceeded request timeout"), ex.getMessage());
+            assertTrue(enteredWrite.await(5, TimeUnit.SECONDS));
+
+            assertTrue(lease.escaped(), "lease still in use by the worker must be abandoned");
+            lease.release();
+            assertFalse(recycled.get(), "array must not be recycled while the worker may still read it");
+
+            assertTrue(workerDone.await(5, TimeUnit.SECONDS));
+            assertEquals("pooled body", written.get());
+        }
+    }
+
+    @Test
+    void pooledBodiesAreWrittenInlineOnH2EvenWhenMarkedNonReplayable() throws Exception {
+        var writerThread = new AtomicReference<Thread>();
+        var written = new AtomicReference<String>();
+        var pool = new TestConnectionPool() {
+            @Override
+            protected HttpExchange createExchange() {
+                return new TestHttpExchange() {
+                    @Override
+                    public boolean supportsBidirectionalStreaming() {
+                        return true;
+                    }
+
+                    @Override
+                    public void writeRequestBody(DataStream body) throws IOException {
+                        writerThread.set(Thread.currentThread());
+                        var out = new ByteArrayOutputStream();
+                        body.writeTo(out);
+                        written.set(out.toString(StandardCharsets.US_ASCII));
+                    }
+                };
+            }
+        };
+        byte[] array = "pooled body".getBytes(StandardCharsets.US_ASCII);
+        var lease = DataStream.ofLeasedBytes(array, 0, array.length, "text/plain", a -> {});
+        var body = DataStream.withMetadata(lease, "text/plain", array.length, false);
+        assertFalse(body.isReplayable());
+
+        try (var client = HttpClient.builder().connectionPoolFactory(config -> pool).build()) {
+            var request = HttpRequest.create()
+                    .setMethod("PUT")
+                    .setUri(SmithyUri.of("http://example.com/test"))
+                    .setBody(body);
+            client.send(request);
+        }
+
+        assertEquals(Thread.currentThread(), writerThread.get(), "pooled body must be written inline");
+        assertEquals("pooled body", written.get());
     }
 
     @Test

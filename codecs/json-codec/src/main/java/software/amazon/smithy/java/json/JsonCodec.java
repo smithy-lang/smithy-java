@@ -7,6 +7,7 @@ package software.amazon.smithy.java.json;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -16,6 +17,7 @@ import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
@@ -57,9 +59,21 @@ public final class JsonCodec implements Codec, MemberSubsetCodec {
     }
 
     @Override
+    public DataStream serializeToDataStream(SerializableShape shape, String contentType) {
+        return settings.provider().serializeToDataStream(shape, settings, contentType);
+    }
+
+    @Override
     public ByteBuffer serialize(SerializableStruct struct, MemberSubset subset) {
         return settings.provider() instanceof CodegenJsonSerdeProvider generated
                 ? generated.serializeMemberSubset(struct, subset, settings)
+                : null;
+    }
+
+    @Override
+    public DataStream serializeToDataStream(SerializableStruct struct, MemberSubset subset, String contentType) {
+        return settings.provider() instanceof CodegenJsonSerdeProvider generated
+                ? generated.serializeMemberSubsetToDataStream(struct, subset, settings, contentType)
                 : null;
     }
 
@@ -261,6 +275,19 @@ public final class JsonCodec implements Codec, MemberSubsetCodec {
         /** Enables runtime-generated codecs when supported by the current JVM. */
         public Builder runtimeCodegen(boolean runtimeCodegen) {
             settingsBuilder.runtimeCodegen(runtimeCodegen);
+            return this;
+        }
+
+        /**
+         * Sets the output buffer pool. The default is {@link OutputBuffers#shared()}.
+         *
+         * <p>Use {@link OutputBuffers#create()} for a pool owned by this codec.
+         *
+         * @param outputBuffers pool for serialization output
+         * @return the builder
+         */
+        public Builder outputBuffers(OutputBuffers outputBuffers) {
+            settingsBuilder.outputBuffers(outputBuffers);
             return this;
         }
 

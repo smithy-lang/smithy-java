@@ -57,7 +57,7 @@ public class AwsQueryDeserializeBenchmark {
     public void setup() {
         protocol = new AwsQueryClientProtocol(SERVICE_ID, VERSION);
         state = DeserializeState
-                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_XML_BODY, CONTENT_TYPE, false);
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_XML_BODY, CONTENT_TYPE);
     }
 
     @Benchmark

@@ -64,7 +64,7 @@ public class AwsJson1_0DeserializeBenchmark {
         System.setProperty("smithy-java.json-provider", "smithy");
         protocol = new AwsJson1Protocol(SERVICE_ID);
         state = DeserializeState
-                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE, false);
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE);
     }
 
     @Benchmark

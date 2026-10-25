@@ -18,7 +18,7 @@ import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 /**
  * Verifies that double/float serialization via the Smithy JSON serializer produces
  * output that roundtrips correctly through {@link Double#parseDouble}/{@link Float#parseFloat}.
- * The Smithy serializer delegates to the Schubfach algorithm for non-integer finite values.
+ * The Smithy serializer delegates to zmij for finite values outside the integer fast path.
  */
 class SchubfachTest {
 

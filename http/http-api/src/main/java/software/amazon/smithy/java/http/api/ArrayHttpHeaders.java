@@ -120,33 +120,7 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
             String headerName = array[i];
             if (headerName == key || headerName.equals(key)) {
                 array[i + 1] = normalizedValue;
-
-                // Happy path: Fast scan for duplicates without tracking write pointers.
-                for (int j = i + 2; j < end; j += 2) {
-                    String otherName = array[j];
-                    if (otherName == key || otherName.equals(key)) {
-
-                        // Unhappy path: Duplicate found. Compact the remainder of the array.
-                        int write = j;
-                        for (int read = j + 2; read < end; read += 2) {
-                            String n = array[read];
-                            if (n != key && !n.equals(key)) {
-                                // Unconditional copy avoids branch prediction misses
-                                // since 'read' is guaranteed to be > 'write' here.
-                                array[write] = n;
-                                array[write + 1] = array[read + 1];
-                                write += 2;
-                            }
-                        }
-
-                        // Null out remaining trailing elements
-                        for (int k = write; k < end; k++) {
-                            array[k] = null;
-                        }
-                        size = write / 2;
-                        return;
-                    }
-                }
+                removeCanonical(key, i + 2);
                 return;
             }
         }
@@ -170,7 +144,7 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
     }
 
     private void setHeaderCanonical(String key, List<String> values) {
-        removeCanonical(key);
+        removeCanonical(key, 0);
         ensureCapacity(values.size());
         for (String v : values) {
             addHeaderCanonical(key, v);
@@ -179,34 +153,44 @@ final class ArrayHttpHeaders extends AbstractArrayHttpHeaders implements Modifia
 
     @Override
     public void removeHeader(String name) {
-        removeCanonical(HeaderName.canonicalize(name));
+        removeCanonical(HeaderName.canonicalize(name), 0);
     }
 
     @Override
     public void removeHeader(HeaderName name) {
-        removeCanonical(name.name());
+        removeCanonical(name.name(), 0);
     }
 
-    private void removeCanonical(String key) {
-        // Compact in-place: copy non-matching entries over matching ones
-        int write = 0;
-        for (int read = 0; read < size; read++) {
-            int idx = read * 2;
-            String n = array[idx];
-            if (n != key && !n.equals(key)) {
-                if (write != read) {
-                    array[write * 2] = n;
-                    array[write * 2 + 1] = array[idx + 1];
+    /**
+     * {@code fromSlot} is an array offset equal to twice the header-pair index.
+     */
+    private void removeCanonical(String key, int fromSlot) {
+        int end = size * 2;
+
+        for (int j = fromSlot; j < end; j += 2) {
+            String n = array[j];
+            if (n == key || n.equals(key)) {
+
+                int write = j;
+                for (int read = j + 2; read < end; read += 2) {
+                    n = array[read];
+                    if (n != key && !n.equals(key)) {
+                        // Unconditional copy avoids branch prediction misses
+                        // since 'read' is guaranteed to be > 'write' here.
+                        array[write] = n;
+                        array[write + 1] = array[read + 1];
+                        write += 2;
+                    }
                 }
-                write++;
+
+                // Null out remaining trailing elements
+                for (int k = write; k < end; k++) {
+                    array[k] = null;
+                }
+                size = write / 2;
+                return;
             }
         }
-
-        // Clear removed slots
-        for (int i = write * 2; i < size * 2; i++) {
-            array[i] = null;
-        }
-        size = write;
     }
 
     @Override

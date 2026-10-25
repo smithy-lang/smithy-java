@@ -111,7 +111,9 @@ final class PayloadSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         serializer.writePayloadContentType();
-        codecResult = codec instanceof MemberSubsetCodec
+        // The fast path serializes with struct.schema(), so only take it when that matches the passed schema.
+        var target = schema.isMember() ? schema.memberTarget() : schema;
+        codecResult = codec instanceof MemberSubsetCodec && struct.schema() == target
                 ? codec.serialize(struct)
                 : codec.serialize(ser -> ser.writeStruct(schema, struct));
     }

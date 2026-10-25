@@ -6,7 +6,7 @@ plugins {
 }
 
 pitest {
-    excludedClasses.add("software.amazon.smithy.java.codecs.commons.Schubfach*")
+    excludedGroups.add("stress")
 }
 
 description = "Shared utilities for Smithy codec implementations (number formatting, timestamps, base64)"

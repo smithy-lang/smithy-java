@@ -5,12 +5,16 @@
 
 package software.amazon.smithy.java.http.api;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.nio.ByteOrder;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 
 /**
  * HTTP header utilities.
  */
 public final class HeaderUtils {
+    private static final VarHandle LONGS = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
     // Header name lookup table: 0=invalid, 1=valid lower, 2=valid upper.
     private static final byte[] HEADER_NAME_TABLE = new byte[128];
 
@@ -101,12 +105,18 @@ public final class HeaderUtils {
             return value;
         }
 
-        for (byte b : latin1) {
-            int c = b & 0xff;
-            if ((c < 0x20 && c != '\t') || c == 0x7f) {
-                throw invalidHeaderValueChar(value);
+        // Detect bytes below 0x20 or equal to 0x7F. Check flagged words byte by byte to allow tabs.
+        int i = 0;
+        for (; i + 8 <= length; i += 8) {
+            long x = (long) LONGS.get(latin1, i);
+            long below = (x - 0x2020202020202020L) & ~x;
+            long xorDel = x ^ 0x7F7F7F7F7F7F7F7FL;
+            long isDel = (xorDel - 0x0101010101010101L) & ~xorDel;
+            if (((below | isDel) & 0x8080808080808080L) != 0L) {
+                checkLatin1Chars(value, latin1, i, i + 8);
             }
         }
+        checkLatin1Chars(value, latin1, i, length);
 
         int start = 0;
         while (start < length && (latin1[start] == ' ' || latin1[start] == '\t')) {
@@ -120,6 +130,15 @@ public final class HeaderUtils {
             end--;
         }
         return start == 0 && end == length - 1 ? value : value.substring(start, end + 1);
+    }
+
+    private static void checkLatin1Chars(String value, byte[] latin1, int from, int to) {
+        for (int i = from; i < to; i++) {
+            int c = latin1[i] & 0xff;
+            if ((c < 0x20 && c != '\t') || c == 0x7f) {
+                throw invalidHeaderValueChar(value);
+            }
+        }
     }
 
     private static String normalizeUtf16Value(String value) {

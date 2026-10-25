@@ -19,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Flow;
+import java.util.function.Consumer;
 
 /**
  * Abstraction for reading streams of data.
@@ -186,6 +187,22 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      */
     default boolean hasByteBuffer() {
         return false;
+    }
+
+    /**
+     * Visits the content as ByteBuffer views in order.
+     *
+     * <p>Views remain valid only during the callback.
+     * Do not retain or change a view. Read only between its position and limit.
+     * The backing array can contain bytes outside that range.
+     * Visiting a pooled stream requires no copy. Visiting a non-replayable stream consumes it.
+     *
+     * <p>The default visits {@link #asByteBuffer()} once.
+     *
+     * @param action callback for each view
+     */
+    default void forEachBuffer(Consumer<ByteBuffer> action) {
+        action.accept(asByteBuffer());
     }
 
     @Override
@@ -390,6 +407,30 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
     }
 
     /**
+     * Creates a replayable stream that owns a borrowed array until {@link PooledDataStream#release()}.
+     *
+     * <p>Release returns the array to {@code recycler}, unless the stream was abandoned.
+     * See {@link PooledDataStream} for read and lifecycle requirements.
+     *
+     * @param array borrowed array
+     * @param offset first content byte
+     * @param length number of content bytes
+     * @param contentType content type, or null
+     * @param recycler receives the array on release unless abandoned
+     * @return the pooled stream
+     * @throws IndexOutOfBoundsException if the range exceeds the array
+     */
+    static PooledDataStream ofLeasedBytes(
+            byte[] array,
+            int offset,
+            int length,
+            String contentType,
+            ByteArrayRecycler recycler
+    ) {
+        return new LeasedDataStream(array, offset, length, contentType, recycler);
+    }
+
+    /**
      * Create a DataStream from a file on disk.
      *
      * <p>This implementation will attempt to probe the content-type of the file using
@@ -495,10 +536,11 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
             return ds;
         }
 
-        return new WrappedDataStream(
-                ds,
-                changeContentLength ? contentLength : ds.contentLength(),
-                changeContentType ? contentType : ds.contentType(),
-                isReplayable);
+        long length = changeContentLength ? contentLength : ds.contentLength();
+        String type = changeContentType ? contentType : ds.contentType();
+        if (ds instanceof PooledDataStream pooled) {
+            return new WrappedPooledDataStream(pooled, length, type, isReplayable);
+        }
+        return new WrappedDataStream(ds, length, type, isReplayable);
     }
 }

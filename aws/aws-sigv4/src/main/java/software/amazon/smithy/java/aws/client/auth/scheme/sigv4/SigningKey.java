@@ -9,19 +9,20 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
-/**
- * Represents a SigningKey with a creation date to be stored in the {@code SigningCache}.
- *
- * <p>This key is considered valid for the same day on which it was created and is considered invalid for any other
- * day.
- */
 final class SigningKey {
     private final byte[] signingKey;
     private final long date;
 
     SigningKey(byte[] signingKey, Instant instant) {
+        this(signingKey, daysSinceEpoch(Objects.requireNonNull(instant, "instant must not be null")));
+    }
+
+    /**
+     * @param daysSinceEpoch whole UTC days since 1970-01-01
+     */
+    SigningKey(byte[] signingKey, long daysSinceEpoch) {
         this.signingKey = Objects.requireNonNull(signingKey, "signingKey must not be null");
-        this.date = daysSinceEpoch(Objects.requireNonNull(instant, "instant must not be null"));
+        this.date = daysSinceEpoch;
     }
 
     byte[] signingKey() {
@@ -30,6 +31,10 @@ final class SigningKey {
 
     boolean isValidFor(Instant other) {
         return date == daysSinceEpoch(other);
+    }
+
+    boolean isValidFor(long daysSinceEpoch) {
+        return date == daysSinceEpoch;
     }
 
     private static long daysSinceEpoch(Instant instant) {

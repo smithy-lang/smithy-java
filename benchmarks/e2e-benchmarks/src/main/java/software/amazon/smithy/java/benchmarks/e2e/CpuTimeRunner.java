@@ -1,0 +1,315 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.benchmarks.e2e;
+
+import java.lang.management.CompilationMXBean;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.util.List;
+import java.util.Locale;
+import software.amazon.smithy.java.benchmarks.ProcessCpuTime;
+
+/** The cross-SDK measurement loop: warm up, System.gc(), then iterate until the stop rule is met. */
+final class CpuTimeRunner {
+
+    static final long MIN_ITERATIONS = 50_000;
+    static final double MIN_CPU_SECONDS = 5.0;
+    static final int CHECK_INTERVAL = 100;
+    /** Linux reports process CPU time in 10 ms ticks; a one-second floor keeps that rounding below 1%. */
+    static final double MIN_MEASURE_CPU_SECONDS = 1.0;
+
+    static final double UNDER_WARMED_JIT_SHARE = 0.05;
+
+    private static final CompilationMXBean COMPILATION = ManagementFactory.getCompilationMXBean();
+    private static final List<GarbageCollectorMXBean> COLLECTORS = ManagementFactory.getGarbageCollectorMXBeans();
+
+    private final Settings settings;
+
+    CpuTimeRunner(Settings settings) {
+        this.settings = settings;
+    }
+
+    Measurement run(Invocation invocation) throws Throwable {
+        WarmupOutcome warmup = settings.warmup().automatic()
+                ? warmupAutomatically(invocation, settings.warmup())
+                : warmupFixed(invocation, settings.warmup().iterations());
+        System.gc();
+
+        long gcCountBefore = gcCount();
+        long gcMillisBefore = gcMillis();
+        long jitMillisBefore = jitMillis();
+        long wallBefore = System.nanoTime();
+        long cpuBefore = ProcessCpuTime.now();
+
+        long minIterations = settings.minIterations();
+        long minCpuNanos = (long) (settings.minCpuSeconds() * 1_000_000_000L);
+        long floorNanos = (long) (settings.minMeasureCpuSeconds() * 1_000_000_000L);
+        boolean readCpu = minCpuNanos > 0 || floorNanos > 0;
+        int checkInterval = settings.checkInterval();
+        long iterations = 0;
+        while (true) {
+            invocation.run();
+            iterations++;
+            if (iterations % checkInterval == 0) {
+                long elapsedCpu = readCpu ? ProcessCpuTime.now() - cpuBefore : 0;
+                boolean reached = iterations >= minIterations || (minCpuNanos > 0 && elapsedCpu >= minCpuNanos);
+                if (reached && elapsedCpu >= floorNanos) {
+                    break;
+                }
+            }
+        }
+
+        long cpuAfter = ProcessCpuTime.now();
+        long wallAfter = System.nanoTime();
+        return new Measurement(
+                iterations,
+                cpuAfter - cpuBefore,
+                wallAfter - wallBefore,
+                jitMillis() - jitMillisBefore,
+                gcCount() - gcCountBefore,
+                gcMillis() - gcMillisBefore,
+                warmup);
+    }
+
+    private static WarmupOutcome warmupFixed(Invocation invocation, long iterations) throws Throwable {
+        long start = System.nanoTime();
+        for (long i = 0; i < iterations; i++) {
+            invocation.run();
+        }
+        return new WarmupOutcome(iterations, System.nanoTime() - start, false, false, 0);
+    }
+
+    /** Uses compiler activity to detect steady state; throughput can look stable before C2 installs its code. */
+    private static WarmupOutcome warmupAutomatically(Invocation invocation, Warmup warmup) throws Throwable {
+        long floorIterations = warmup.iterations();
+        long floorNanos = (long) (warmup.seconds() * 1_000_000_000L);
+        long capIterations = floorIterations * Warmup.AUTO_CAP_MULTIPLE;
+        long capNanos = floorNanos * Warmup.AUTO_CAP_MULTIPLE;
+        long quietNanosRequired = (long) (Warmup.AUTO_QUIET_SECONDS * 1_000_000_000L);
+        long start = System.nanoTime();
+        long iterations = 0;
+        int quietChunks = 0;
+        long quietNanos = 0;
+        double share = 0;
+        while (true) {
+            long jitBefore = jitMillis();
+            long chunkStart = System.nanoTime();
+            for (int i = 0; i < Warmup.AUTO_CHUNK; i++) {
+                invocation.run();
+            }
+            long now = System.nanoTime();
+            long wall = Math.max(1, now - chunkStart);
+            long jit = jitMillis() - jitBefore;
+            iterations += Warmup.AUTO_CHUNK;
+            share = jit * 1_000_000.0 / wall;
+            if (share < Warmup.AUTO_QUIET_JIT_SHARE) {
+                quietChunks++;
+                quietNanos += wall;
+            } else {
+                quietChunks = 0;
+                quietNanos = 0;
+            }
+            long elapsed = now - start;
+            if (iterations < floorIterations || elapsed < floorNanos) {
+                continue;
+            }
+            if (quietChunks >= Warmup.AUTO_QUIET_CHUNKS && quietNanos >= quietNanosRequired) {
+                return new WarmupOutcome(iterations, elapsed, true, false, share);
+            }
+            if (iterations >= capIterations && elapsed >= capNanos) {
+                return new WarmupOutcome(iterations, elapsed, true, true, share);
+            }
+        }
+    }
+
+    static long jitMillis() {
+        return COMPILATION != null && COMPILATION.isCompilationTimeMonitoringSupported()
+                ? COMPILATION.getTotalCompilationTime()
+                : 0;
+    }
+
+    private static long gcCount() {
+        long count = 0;
+        for (var collector : COLLECTORS) {
+            long c = collector.getCollectionCount();
+            if (c > 0) {
+                count += c;
+            }
+        }
+        return count;
+    }
+
+    private static long gcMillis() {
+        long millis = 0;
+        for (var collector : COLLECTORS) {
+            long t = collector.getCollectionTime();
+            if (t > 0) {
+                millis += t;
+            }
+        }
+        return millis;
+    }
+
+    @FunctionalInterface
+    interface Invocation {
+        void run() throws Throwable;
+    }
+
+    /**
+     * Stops at the iteration or CPU limit, subject to the measurement floor.
+     * Zero minCpuSeconds disables the CPU limit. Zero minMeasureCpuSeconds disables the floor.
+     */
+    record Settings(
+            long minIterations,
+            double minCpuSeconds,
+            int checkInterval,
+            double minMeasureCpuSeconds,
+            Warmup warmup) {
+
+        Settings {
+            if (minIterations <= 0) {
+                throw new IllegalArgumentException("minIterations must be positive");
+            }
+            if (!Double.isFinite(minCpuSeconds) || minCpuSeconds < 0) {
+                throw new IllegalArgumentException("minCpuSeconds must be finite and non-negative");
+            }
+            if (checkInterval <= 0) {
+                throw new IllegalArgumentException("checkInterval must be positive");
+            }
+            if (!Double.isFinite(minMeasureCpuSeconds) || minMeasureCpuSeconds < 0) {
+                throw new IllegalArgumentException("minMeasureCpuSeconds must be finite and non-negative");
+            }
+        }
+
+        /** The cross-SDK rule with the one-second floor and automatic warmup. */
+        static Settings standard() {
+            return new Settings(MIN_ITERATIONS,
+                    MIN_CPU_SECONDS,
+                    CHECK_INTERVAL,
+                    MIN_MEASURE_CPU_SECONDS,
+                    Warmup.auto());
+        }
+
+        String stopCondition() {
+            String base;
+            if (minCpuSeconds > 0) {
+                base = String.format(
+                        Locale.ROOT,
+                        "min %d iterations OR %s seconds CPU time (first met wins)",
+                        minIterations,
+                        formatSeconds(minCpuSeconds));
+            } else {
+                base = "fixed " + minIterations + " iterations for every benchmark";
+            }
+            if (minMeasureCpuSeconds > 0) {
+                base += String.format(
+                        Locale.ROOT,
+                        " and at least %s second(s) of CPU time",
+                        formatSeconds(minMeasureCpuSeconds));
+            }
+            if (minCpuSeconds <= 0) {
+                base += ", no time-based stop";
+            }
+            return base;
+        }
+    }
+
+    private static String formatSeconds(double seconds) {
+        return seconds == Math.rint(seconds) ? Long.toString((long) seconds) : Double.toString(seconds);
+    }
+
+    /** Fixed runs exactly {@code iterations}; automatic treats {@code iterations} and {@code seconds} as floors. */
+    record Warmup(boolean automatic, long iterations, double seconds) {
+
+        static final int AUTO_CHUNK = 2_000;
+        static final long AUTO_FLOOR = 100_000;
+        static final double AUTO_FLOOR_SECONDS = 20.0;
+        static final int AUTO_CAP_MULTIPLE = 2;
+        static final int AUTO_QUIET_CHUNKS = 5;
+        static final double AUTO_QUIET_JIT_SHARE = 0.02;
+        static final double AUTO_QUIET_SECONDS = 1.0;
+
+        Warmup {
+            if (iterations < 0) {
+                throw new IllegalArgumentException("warmup iterations must not be negative");
+            }
+            if (!Double.isFinite(seconds) || seconds < 0) {
+                throw new IllegalArgumentException("warmup seconds must be finite and non-negative");
+            }
+        }
+
+        static Warmup auto() {
+            return auto(AUTO_FLOOR, AUTO_FLOOR_SECONDS);
+        }
+
+        static Warmup auto(long floorIterations, double floorSeconds) {
+            return new Warmup(true, floorIterations, floorSeconds);
+        }
+
+        static Warmup fixed(long iterations) {
+            return new Warmup(false, iterations, 0);
+        }
+
+        String policy() {
+            return automatic ? "auto" : "fixed";
+        }
+
+        String detail() {
+            if (automatic) {
+                return String.format(
+                        Locale.ROOT,
+                        "chunks of %d iterations; at least %d iterations and %s second(s), whichever comes later, "
+                                + "then stop once JIT compilation stays below %.0f%% of chunk wall time "
+                                + "for %d consecutive chunks and %.0f second(s); cap %dx the floor",
+                        AUTO_CHUNK,
+                        iterations,
+                        formatSeconds(seconds),
+                        AUTO_QUIET_JIT_SHARE * 100,
+                        AUTO_QUIET_CHUNKS,
+                        AUTO_QUIET_SECONDS,
+                        AUTO_CAP_MULTIPLE);
+            }
+            return "fixed " + iterations + " iterations";
+        }
+    }
+
+    record WarmupOutcome(
+            long iterations,
+            long wallNanos,
+            boolean automatic,
+            boolean hitCap,
+            double finalChunkJitShare) {}
+
+    record Measurement(
+            long iterations,
+            long processCpuNanos,
+            long wallNanos,
+            long jitMillis,
+            long gcCount,
+            long gcMillis,
+            WarmupOutcome warmup) {
+
+        double opsPerCpuSecond() {
+            return ProcessCpuTime.operationsPerSecond(iterations, processCpuNanos);
+        }
+
+        double opsPerWallSecond() {
+            return iterations * 1_000_000_000.0 / wallNanos;
+        }
+
+        double cpuWallRatio() {
+            return (double) processCpuNanos / wallNanos;
+        }
+
+        double jitShareOfWall() {
+            return jitMillis * 1_000_000.0 / wallNanos;
+        }
+
+        boolean underWarmed() {
+            return jitShareOfWall() > UNDER_WARMED_JIT_SHARE;
+        }
+    }
+}

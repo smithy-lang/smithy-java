@@ -25,7 +25,7 @@ dependencies {
     testImplementation(project(":aws:client:aws-client-s3"))
     jmhImplementation(project(":aws:client:aws-client-s3"))
 
-    s3Model("software.amazon.api.models:s3:1.0.24")
+    s3Model("software.amazon.api.models:s3:1.0.25")
     lambdaModel("software.amazon.api.models:lambda:1.0.19")
 }
 

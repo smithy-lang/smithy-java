@@ -246,10 +246,10 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             // Read the payload into a byte buffer to deserialize a shape in the body.
             ByteBuffer bb = bodyAsByteBuffer();
             if (bb.remaining() > 0) {
-                structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
+                structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, bb));
             }
         } else if (body != null && body.contentLength() != 0) {
-            structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
+            structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, bodyAsByteBuffer()));
         }
     }
 

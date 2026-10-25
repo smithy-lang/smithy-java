@@ -10,11 +10,14 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.Authenticator;
 import java.net.CookieHandler;
 import java.net.ProxySelector;
@@ -24,7 +27,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,6 +39,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
@@ -42,10 +48,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.error.TransportException;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class JavaHttpClientTest {
@@ -197,6 +205,26 @@ public class JavaHttpClientTest {
     }
 
     @Test
+    public void abandonsAPooledBodyWhenTheJdkClientFails() {
+        byte[] payload = "{}".getBytes(StandardCharsets.UTF_8);
+        var recycled = new AtomicReference<byte[]>();
+        PooledDataStream body = DataStream.ofLeasedBytes(payload, 0, payload.length, "application/json", recycled::set);
+        var transport = new JavaHttpClientTransport(new FailingHttpClient());
+        var request = software.amazon.smithy.java.http.api.HttpRequest.create()
+                .setUri(URI.create("http://localhost/test"))
+                .setMethod("POST")
+                .setBody(body)
+                .toUnmodifiable();
+
+        assertThrows(TransportException.class, () -> transport.send(Context.create(), request));
+
+        assertThat(body.escaped(), equalTo(true));
+        body.release();
+        assertThat(body.isReleased(), equalTo(true));
+        assertThat(recycled.get(), nullValue());
+    }
+
+    @Test
     public void streamsResponseBodyThroughCustomBodySubscriber() throws Exception {
         byte[] payload = "streamed response body".getBytes();
         var client = new StreamingResponseHttpClient(payload);
@@ -302,7 +330,8 @@ public class JavaHttpClientTest {
         }
 
         @Override
-        public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler) {
+        public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler)
+                throws IOException {
             capturedBytes = collect(request.bodyPublisher().orElseThrow());
             capturedVersion = request.version();
             var responseInfo = new HttpResponse.ResponseInfo() {
@@ -380,7 +409,11 @@ public class JavaHttpClientTest {
                 HttpRequest request,
                 HttpResponse.BodyHandler<T> responseBodyHandler
         ) {
-            return CompletableFuture.completedFuture(send(request, responseBodyHandler));
+            try {
+                return CompletableFuture.completedFuture(send(request, responseBodyHandler));
+            } catch (IOException e) {
+                return CompletableFuture.failedFuture(e);
+            }
         }
 
         @Override
@@ -462,6 +495,14 @@ public class JavaHttpClientTest {
                 public void onComplete() {}
             });
             return out.toByteArray();
+        }
+    }
+
+    private static final class FailingHttpClient extends CapturingHttpClient {
+        @Override
+        public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler)
+                throws IOException {
+            throw new HttpTimeoutException("request timed out");
         }
     }
 

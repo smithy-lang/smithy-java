@@ -26,19 +26,19 @@ dependencies {
 
     // netty-common provides HashedWheelTimer: a single shared timer wheel backs the per-read
     // deadline watchdog in SSLEngineTransport (arm/cancel is O(1), no per-read epoll Selector).
-    implementation("io.netty:netty-common:4.2.18.Final")
+    implementation("io.netty:netty-common:4.2.19.Final")
 
     // Experimental persistent-registration epoll socket backend (opt-in, Linux-only). Provides the
     // io.netty.channel.unix.Socket / io.netty.channel.epoll.{Native,EpollEventArray,Epoll} types the
     // EpollChannel/EpollReactor/EpollAccess classes use. The classes (compile) are cross-platform; the
     // native .so is pulled per-arch at runtime only and gated behind Epoll.isAvailable() so non-Linux
     // hosts (and the default NIO path) never load it.
-    implementation("io.netty:netty-transport-native-epoll:4.2.18.Final")
-    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.18.Final:linux-x86_64")
-    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.18.Final:linux-aarch_64")
+    implementation("io.netty:netty-transport-native-epoll:4.2.19.Final")
+    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.19.Final:linux-x86_64")
+    runtimeOnly("io.netty:netty-transport-native-epoll:4.2.19.Final:linux-aarch_64")
 
     // Netty for HTTP/2 integration tests
-    testImplementation("io.netty:netty-all:4.2.18.Final")
+    testImplementation("io.netty:netty-all:4.2.19.Final")
     testImplementation("org.bouncycastle:bcpkix-jdk18on:1.86")
     // Jackson for HPACK test suite JSON parsing
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.22.3")
@@ -48,14 +48,16 @@ dependencies {
     testImplementation(libs.jazzer.api)
 
     // Add Apache HttpClient for benchmarking comparison
-    jmh("org.apache.httpcomponents.client5:httpclient5:5.6.4")
+    jmh("org.apache.httpcomponents.client5:httpclient5:5.6.5")
 
     // Helidon WebClient for benchmarking comparison
     jmh("io.helidon.webclient:helidon-webclient:4.5.4")
     jmh("io.helidon.webclient:helidon-webclient-http2:4.5.4")
 
     // Netty for raw HTTP/2 benchmarking
-    jmh("io.netty:netty-all:4.2.18.Final")
+    jmh("io.netty:netty-all:4.2.19.Final")
+
+    jmh(project(":benchmarks:benchmark-commons"))
 
     // Productionized smithy transports for benchmarking
     jmh(project(":client:client-http"))
@@ -63,7 +65,7 @@ dependencies {
     jmh(project(":client:client-core"))
 
     // Benchmark server dependencies (Netty runs in separate process)
-    jmhServerImplementation("io.netty:netty-all:4.2.18.Final")
+    jmhServerImplementation("io.netty:netty-all:4.2.19.Final")
     jmhServerImplementation("org.bouncycastle:bcpkix-jdk18on:1.86")
 }
 
@@ -76,6 +78,13 @@ val benchmarkPidFile = layout.buildDirectory.file("benchmark-server.pid")
 
 // Capture classpath at configuration time for config cache compatibility
 val jmhServerClasspath = sourceSets["jmhServer"].runtimeClasspath
+
+// Run this server jar with the JMH jar on the classpath for its dependencies.
+val jmhServerJar by tasks.registering(Jar::class) {
+    from(sourceSets["jmhServer"].output)
+    archiveClassifier.set("jmh-server")
+    manifest { attributes("Main-Class" to "software.amazon.smithy.java.http.client.BenchmarkServer") }
+}
 
 // Task to start the benchmark server in a background process
 val startBenchmarkServer by tasks.registering {
@@ -169,9 +178,6 @@ val externalBenchHost =
     (project.findProperty("jmh.bench.host") as String?)?.takeIf { it.isNotBlank() }
         ?: System.getenv("BENCH_HOST")?.takeIf { it.isNotBlank() }
 
-// Configure JMH
-// Run with: ./gradlew :http:http-client:jmh -Pjmh.includes="H2cScalingBenchmark.smithy"
-// To customize params, edit @Param annotations in benchmark source files
 jmh {
     val includesProp = project.findProperty("jmh.includes")?.toString()
     val jvmArgsProp = project.findProperty("jmh.jvmArgsAppend")?.toString()

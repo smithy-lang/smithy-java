@@ -8,6 +8,8 @@ package software.amazon.smithy.java.dynamicclient;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeAll;
@@ -64,7 +66,7 @@ public class DynamicClientHttpBindingTest {
                             ]
                         )
                         service Widgets {
-                            operations: [GetWidget]
+                            operations: [GetWidget, PutItem]
                         }
 
                         enum Color {
@@ -92,6 +94,30 @@ public class DynamicClientHttpBindingTest {
                                 queryCount: Integer
                             }
                             output := {}
+                        }
+
+                        @http(method: "PUT", uri: "/items/{itemId}")
+                        operation PutItem {
+                            input := {
+                                @required
+                                @httpLabel
+                                itemId: Long
+
+                                @httpQuery("version")
+                                version: Long
+
+                                details: ItemDetails
+                            }
+                            output := {}
+                        }
+
+                        structure ItemDetails {
+                            size: Long
+                            weights: BigDecimalList
+                        }
+
+                        list BigDecimalList {
+                            member: BigDecimal
                         }
                         """)
                 .discoverModels()
@@ -137,7 +163,44 @@ public class DynamicClientHttpBindingTest {
         assertThat(query, equalTo("color=GREEN&count=7"));
     }
 
+    @Test
+    public void coercesUntypedNumbersToModeledTypes() {
+        var captured = new AtomicReference<HttpRequest>();
+        var capturedBody = new AtomicReference<String>();
+        var client = DynamicClient.builder()
+                .serviceId(SERVICE)
+                .model(model)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .transport(capturingTransport(captured, capturedBody))
+                .endpointResolver(EndpointResolver.staticEndpoint("https://example.com"))
+                .build();
+
+        // Untyped documents (e.g. parsed from JSON) carry Integers for small numbers, while the members are
+        // modeled as Long and BigDecimal.
+        client.call("PutItem",
+                Document.ofObject(Map.of(
+                        "itemId",
+                        42,
+                        "version",
+                        7,
+                        "details",
+                        Map.of("size", 3, "weights", List.of(1, 2)))));
+
+        var request = captured.get();
+        assertThat(request.uri().getPath(), equalTo("/items/42"));
+        assertThat(request.uri().getQuery(), equalTo("version=7"));
+        assertThat(capturedBody.get(), equalTo("{\"details\":{\"size\":3,\"weights\":[1.0,2.0]}}"));
+    }
+
     private static ClientTransport<HttpRequest, HttpResponse> capturingTransport(AtomicReference<HttpRequest> sink) {
+        return capturingTransport(sink, null);
+    }
+
+    private static ClientTransport<HttpRequest, HttpResponse> capturingTransport(
+            AtomicReference<HttpRequest> sink,
+            AtomicReference<String> bodySink
+    ) {
         return new ClientTransport<>() {
             @Override
             public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
@@ -147,6 +210,10 @@ public class DynamicClientHttpBindingTest {
             @Override
             public HttpResponse send(Context context, HttpRequest request) {
                 sink.set(request);
+                if (bodySink != null) {
+                    // The request body is pooled and released when the call completes, so copy it now.
+                    bodySink.set(StandardCharsets.UTF_8.decode(request.body().asByteBuffer()).toString());
+                }
                 return HttpResponse.create()
                         .setHttpVersion(HttpVersion.HTTP_1_1)
                         .setStatusCode(200)

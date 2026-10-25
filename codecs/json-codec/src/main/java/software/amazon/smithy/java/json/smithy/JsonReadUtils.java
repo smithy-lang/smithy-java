@@ -39,8 +39,6 @@ final class JsonReadUtils {
     private static final long ASCII_NINES = 0x3939393939393939L;
     private static final long ASCII_HIGH_BITS = 0x8080808080808080L;
 
-    private static final int MAX_SAFE_LONG_DIGITS = 18;
-
     static long readLongLittleEndian(byte[] buf, int pos) {
         return (long) LONG_HANDLE.get(buf, pos);
     }
@@ -172,70 +170,149 @@ final class JsonReadUtils {
      */
     static void parseDouble(byte[] buf, int pos, int end, SmithyJsonDeserializer deser) {
         int start = pos;
-
         boolean negative = pos < end && buf[pos] == '-';
         if (negative) {
             pos++;
         }
-
         if (pos >= end) {
             throw new SerializationException("Unexpected end of input while parsing number");
         }
-
-        int digitStart = pos;
         byte first = buf[pos];
         if (first < '0' || first > '9') {
             throw new SerializationException("Expected digit, found: " + describeChar(first));
         }
+        long unscaled = 0;
+        int digits = 0;
+        int scale = 0;
+        boolean fast = true;
         if (first == '0') {
             pos++;
-            // After leading 0, only allowed: '.', 'e', 'E', or end of number
             if (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
                 throw new SerializationException("Leading zeros not allowed in JSON numbers");
             }
         } else {
-            while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
-                pos++;
+            while (pos < end) {
+                if (pos + Long.BYTES <= end) {
+                    long lanes = NumberCodec.digitLanes(buf, pos);
+                    int count = NumberCodec.leadingDigitLaneCount(lanes);
+                    if (count == 0) {
+                        break;
+                    }
+                    // Skip two SWAR accumulation rounds when 19+ integer digits guarantee fallback.
+                    // Removing this shortcut made 19-digit codec inputs ~33% slower on EC2 m7i.xlarge.
+                    if (digits == 0 && count == Long.BYTES && hasNineteenDigitInteger(buf, pos, end)) {
+                        fast = false;
+                        digits = 19;
+                        pos += 19;
+                        while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
+                            pos++;
+                        }
+                        break;
+                    }
+                    if (digits + count <= NumberCodec.MAX_FAST_DECIMAL_DIGITS) {
+                        unscaled = unscaled * NumberCodec.powerOfTen(count)
+                                + NumberCodec.combineDigitLanes(lanes >>> ((8 - count) << 3));
+                    } else {
+                        fast = false;
+                    }
+                    digits += count;
+                    pos += count;
+                    if (count < Long.BYTES) {
+                        break;
+                    }
+                } else {
+                    int d = buf[pos] - '0';
+                    if (d < 0 || d > 9) {
+                        break;
+                    }
+                    if (digits < NumberCodec.MAX_FAST_DECIMAL_DIGITS) {
+                        unscaled = unscaled * 10 + d;
+                    } else {
+                        fast = false;
+                    }
+                    digits++;
+                    pos++;
+                }
             }
         }
-        boolean wholeNumber = pos - digitStart <= MAX_SAFE_LONG_DIGITS;
-
         if (pos < end && buf[pos] == '.') {
-            wholeNumber = false;
             pos++;
             if (pos >= end || buf[pos] < '0' || buf[pos] > '9') {
                 throw new SerializationException("Expected digit after decimal point");
             }
-            while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
-                pos++;
+            while (pos < end) {
+                if (pos + Long.BYTES <= end) {
+                    long lanes = NumberCodec.digitLanes(buf, pos);
+                    int count = NumberCodec.leadingDigitLaneCount(lanes);
+                    if (count == 0) {
+                        break;
+                    }
+                    if (digits + count <= NumberCodec.MAX_FAST_DECIMAL_DIGITS) {
+                        unscaled = unscaled * NumberCodec.powerOfTen(count)
+                                + NumberCodec.combineDigitLanes(lanes >>> ((8 - count) << 3));
+                    } else {
+                        fast = false;
+                    }
+                    digits += count;
+                    scale += count;
+                    pos += count;
+                    if (count < Long.BYTES) {
+                        break;
+                    }
+                } else {
+                    int d = buf[pos] - '0';
+                    if (d < 0 || d > 9) {
+                        break;
+                    }
+                    if (digits < NumberCodec.MAX_FAST_DECIMAL_DIGITS) {
+                        unscaled = unscaled * 10 + d;
+                    } else {
+                        fast = false;
+                    }
+                    digits++;
+                    scale++;
+                    pos++;
+                }
             }
         }
-
         if (pos < end && (buf[pos] == 'e' || buf[pos] == 'E')) {
-            wholeNumber = false;
             pos++;
+            boolean expNegative = false;
             if (pos < end && (buf[pos] == '+' || buf[pos] == '-')) {
+                expNegative = buf[pos] == '-';
                 pos++;
             }
             if (pos >= end || buf[pos] < '0' || buf[pos] > '9') {
                 throw new SerializationException("Expected digit in exponent");
             }
+            int exponent = 0;
             while (pos < end && buf[pos] >= '0' && buf[pos] <= '9') {
+                if (exponent < 10_000) {
+                    exponent = exponent * 10 + (buf[pos] - '0');
+                }
                 pos++;
             }
+            scale = expNegative ? scale + exponent : scale - exponent;
         }
-
-        if (wholeNumber) {
-            long value = 0;
-            for (int i = digitStart; i < pos; i++) {
-                value = value * 10 + (buf[i] - '0');
-            }
-            // Applying the sign after conversion preserves negative zero.
-            deser.parsedDouble = negative ? -(double) value : (double) value;
-        } else {
-            deser.parsedDouble = NumberCodec.parseDouble(buf, start, pos - start);
+        double value = fast ? NumberCodec.decimalToDouble(unscaled, scale) : Double.NaN;
+        if (Double.isNaN(value)) {
+            value = NumberCodec.parseDouble(buf, start, pos - start);
+        } else if (negative) {
+            value = -value;
         }
+        deser.parsedDouble = value;
         deser.parsedEndPos = pos;
+    }
+
+    private static boolean hasNineteenDigitInteger(byte[] buf, int pos, int end) {
+        return pos + 19 <= end
+                && buf[pos + 18] >= '0'
+                && buf[pos + 18] <= '9'
+                && buf[pos + 17] >= '0'
+                && buf[pos + 17] <= '9'
+                && buf[pos + 16] >= '0'
+                && buf[pos + 16] <= '9'
+                && NumberCodec.leadingDigitLaneCount(NumberCodec.digitLanes(buf, pos + 8)) == Long.BYTES;
     }
 
     /**

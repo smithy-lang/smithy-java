@@ -149,14 +149,17 @@ final class McpDomainOperations implements McpOperations {
                     new McpError(-32602, "Prompt not found: " + call.name(), null));
         }
         var arguments = call.arguments().isEmpty() ? null : Document.of(call.arguments());
+        var remote = prompt.remoteClient();
+        var forwardProtocol = remote == null ? protocol : sources.remoteProtocol(remote, protocol);
+        var metadata = remote == null ? call.metadata() : call.metadata().forwardedTo(forwardProtocol);
         return new McpOutcome.Success(
                 call.id(),
                 Document.of(prompt.prompt()
                         .getPromptResult(
                                 arguments,
                                 call.id(),
-                                call.metadata(),
-                                protocol)));
+                                metadata,
+                                forwardProtocol)));
     }
 
     private Capabilities initializeCapabilities(

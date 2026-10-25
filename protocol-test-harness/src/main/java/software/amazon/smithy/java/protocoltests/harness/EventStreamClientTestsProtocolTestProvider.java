@@ -24,6 +24,7 @@ import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -324,7 +325,7 @@ final class EventStreamClientTestsProtocolTestProvider extends
 
         @Override
         public HttpResponse send(Context context, HttpRequest request) {
-            this.capturedRequest = request;
+            this.capturedRequest = HttpClientProtocol.retainRequest(request);
             return DUMMY_RESPONSE;
         }
 

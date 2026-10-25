@@ -145,6 +145,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
         var builder = operation.outputBuilder();
         var content = response.body();
         if (content.contentLength() == 0) {
+            discardBody(response);
             return builder.build();
         }
 
@@ -159,7 +160,7 @@ public abstract class AbstractRpcV2ClientProtocol extends HttpClientProtocol {
     }
 
     private DataStream getBody(SerializableStruct input) {
-        return DataStream.ofByteBuffer(codec().serialize(input), payloadMediaType);
+        return codec().serializeToDataStream(input, payloadMediaType);
     }
 
     private EventEncoderFactory<AwsEventFrame> getEventEncoderFactory(ApiOperation<?, ?> operation) {

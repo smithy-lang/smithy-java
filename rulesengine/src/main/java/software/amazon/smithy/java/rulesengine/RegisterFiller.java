@@ -54,9 +54,13 @@ abstract class RegisterFiller {
                     registerDefinitions.length));
         }
 
-        // Count key vs provider builtins
+        // Builtins with a default are already filled by the register template, so the runtime
+        // loops can never evaluate them. Leave them out of the dense arrays entirely.
         int keyCount = 0, providerCount = 0;
         for (int regIndex : builtinIndices) {
+            if (registerTemplate[regIndex] != null) {
+                continue;
+            }
             if (registerDefinitions[regIndex].builtinKey() != null) {
                 keyCount++;
             } else {
@@ -76,6 +80,9 @@ abstract class RegisterFiller {
         int ki = 0;
         int pi = 0;
         for (int regIndex : builtinIndices) {
+            if (registerTemplate[regIndex] != null) {
+                continue;
+            }
             RegisterDefinition def = registerDefinitions[regIndex];
             if (def.builtinKey() != null) {
                 keyBuiltinIndices[ki] = regIndex;

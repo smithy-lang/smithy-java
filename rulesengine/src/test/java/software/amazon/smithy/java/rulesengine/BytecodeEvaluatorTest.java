@@ -771,7 +771,8 @@ class BytecodeEvaluatorTest {
     private BytecodeEvaluator createEvaluator(Bytecode bytecode) {
         RegisterFiller filler = RegisterFiller.of(bytecode, Collections.emptyMap());
         BytecodeEvaluator eval = new BytecodeEvaluator(bytecode, new RulesExtension[0], filler);
-        eval.reset(Context.empty(), Collections.emptyMap());
+        eval.prepareRegisters(Context.empty());
+        eval.finishRegisters(Context.empty());
         return eval;
     }
 

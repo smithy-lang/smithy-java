@@ -156,6 +156,22 @@ class McpHttpHandlerTest {
     }
 
     @Test
+    void unversionedRequestsUseTheRestrictedDefaultVersion() {
+        try (var engine = McpEngine.builder().protocolVersions(KnownProtocolVersion.V2025_11_25).build()) {
+            var listTools = JsonRpcRequest.builder()
+                    .jsonrpc("2.0")
+                    .id(Document.of(1))
+                    .method(McpMethod.Standard.TOOLS_LIST.wireName())
+                    .build();
+
+            var response = new McpHttpHandler(engine).handle(listTools, Map.of());
+
+            assertEquals(200, response.statusCode());
+            assertNull(response.body().getError());
+        }
+    }
+
+    @Test
     void httpInitializeDoesNotAdvertiseUnavailableCapabilities() {
         try (var engine = McpEngine.builder().build()) {
             var response = new McpHttpHandler(engine).handle(initializeRequest(), Map.of());

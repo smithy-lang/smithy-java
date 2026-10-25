@@ -7,9 +7,11 @@ package software.amazon.smithy.java.benchmarks.serde;
 
 import java.lang.reflect.Method;
 import software.amazon.smithy.java.benchmarks.serde.BenchmarkTestCases.RequestEntry;
+import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTestDocument;
 import software.amazon.smithy.model.node.Node;
@@ -34,6 +36,10 @@ final class SerializeState {
 
     private static final SmithyUri ENDPOINT = SmithyUri.of("http://localhost/");
 
+    // Disable request release to measure allocation when pooled arrays never return to the pool.
+    static final boolean RELEASE_REQUESTS =
+            Boolean.parseBoolean(System.getProperty("smithy.bench.releaseRequests", "true"));
+
     final ApiOperation<? extends SerializableStruct, ? extends SerializableStruct> operation;
     final SerializableStruct input;
     final Context context;
@@ -47,6 +53,13 @@ final class SerializeState {
         this.input = input;
         this.context = Context.create();
         this.endpoint = ENDPOINT;
+    }
+
+    static void releasePooledBody(HttpClientProtocol protocol, HttpRequest request) {
+        var pooled = protocol.pooledRequestBody(request);
+        if (pooled != null) {
+            pooled.release();
+        }
     }
 
     /**

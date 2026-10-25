@@ -61,7 +61,7 @@ public class RestJson1DeserializeBenchmark {
         System.setProperty("smithy-java.json-provider", "smithy");
         protocol = new RestJsonClientProtocol(SERVICE_ID);
         state = DeserializeState
-                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE, false);
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE);
     }
 
     @Benchmark

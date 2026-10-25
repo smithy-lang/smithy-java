@@ -1,134 +1,148 @@
-# smithy-java end-to-end benchmark runner
+# smithy-java serde E2E benchmarks
 
-A small fixed-workload runner that exercises the smithy-java SDK against live AWS services.
+Measures operations per process CPU-second for complete generated-client calls: serialization,
+endpoint resolution, SigV4 signing, retries and interceptors, and deserialization. Inputs and clients
+are built before measurement and reused. Streaming responses are drained. Live AWS workloads are in
+[`../live-benchmarks`](../live-benchmarks/README.md).
 
-Each measurement reports `ops_per_cpu_sec` using process CPU time. Because
-these benchmarks call live AWS services, their results are not comparable to
-in-process serde benchmarks. Set `-De2e.collectMetrics=false` to exclude
-resource-monitoring overhead.
+The measurement follows the procedure shared by the AWS SDK teams: one loop per benchmark, process
+CPU time, geometric means per protocol and overall, at least three interleaved baseline and current
+samples on bare metal, medians per benchmark.
 
-## Scope
+## Cases
 
-| Service  | Operation | Variant   |
-|----------|-----------|-----------|
-| DynamoDB | GetItem   | Latency   |
-| DynamoDB | PutItem   | Latency   |
-| S3       | PutObject | Throughput|
-| S3       | GetObject | Throughput|
+This module generates five clients from [`../serde-benchmarks/model`](../serde-benchmarks/model)
+and reads its `serde-benchmark`-tagged request and response tests at runtime.
 
-## Build
+| Protocol | Service | Cases |
+|---|---|---:|
+| `awsJson1_0` | AwsJsonRpc10DataPlane | 22 |
+| `rpcv2Cbor` | SmithyRpcV2CborDataPlane | 19 |
+| `awsQuery` | AwsQueryDataPlane | 10 |
+| `restJson1` | AwsRestJsonDataPlane | 10 |
+| `restXml` | AwsRestXmlDataPlane | 10 |
+| Total | | 71 |
 
-```bash
-./gradlew :benchmarks:e2e-benchmarks:shadowJar
-```
+Ids are the model's test-case ids, such as `awsJson1_0_PutItemRequest_ShallowMap_M`. The canonical
+set is checked in as `src/main/resources/.../canonical-benchmarks.txt` and validated at startup.
+`--all-model-cases` adds `WideTypes` and `OutOfOrder` cases outside the canonical set.
 
-The jar lands at `benchmarks/e2e-benchmarks/build/libs/smithy-java-e2e-benchmark-runner.jar`.
-
-The build pulls AWS service models from Maven (`software.amazon.api.models:dynamodb`
-and `software.amazon.api.models:s3`) and codegens the typed DynamoDB and S3
-clients into separate packages so the same shape names from the two services
-don't collide.
+Each request case uses its `params` and receives a minimal valid response: `{}` for JSON, an empty
+map for CBOR, no body for REST-XML, or an `<OpResponse><OpResult/></OpResponse>` wrapper for Query.
+Each response case uses its fixture and sends an input containing only required members and URI
+labels. Response fixtures use the same wire bytes as the serde benchmarks. The harness decodes CBOR
+bodies and `@httpPayload` blobs from base64 and removes JSON whitespace outside strings.
+XML bodies remain unchanged. `Content-Length` describes the bytes served.
+The first call of every case checks that the request body length matches `Content-Length` and that
+the response deserialized into the expected output members.
 
 ## Run
 
 ```bash
-java -jar build/libs/smithy-java-e2e-benchmark-runner.jar \
-     --operation s3-put \
-     --bucket my-bench--use1-az4--x-s3 \
-     --region us-east-1
+./gradlew :benchmarks:e2e-benchmarks:shadowJar
+java -Xbatch -jar benchmarks/e2e-benchmarks/build/libs/smithy-java-e2e-benchmark.jar \
+    --instance-type m7i.metal-24xl --output run1.json
+
+# Gradle adds -Xbatch.
+./gradlew :benchmarks:e2e-benchmarks:run --args="--mode https --protocol rpcv2Cbor"
 ```
 
-Operations:
+One JVM runs the selected cases. For each case, the harness sets the response, checks one call,
+warms up, calls `System.gc()`, and measures. Pass `-Xbatch` to disable background JIT compilation.
+Progress goes to stderr, the summary to stdout, and any failure fails the run.
 
-| Operation | Workload |
-|-----------|----------|
-| `s3-put`  | S3 PutObject, 256 KiB body, concurrent |
-| `s3-get`  | S3 GetObject, 256 KiB body, concurrent |
-| `ddb-put` | DynamoDB PutItem, 1 KiB item, sequential |
-| `ddb-get` | DynamoDB GetItem, 1 KiB item, sequential |
+| Option | Default | Purpose |
+|---|---|---|
+| `--mode stub\|https` | `stub` | See below |
+| `--protocol NAMES` | all | Comma-separated protocol names from the table |
+| `--filter SUBSTRINGS` | none | Case-insensitive substrings of benchmark ids |
+| `--all-model-cases` | off | Include smithy-java-only cases |
+| `--list` | off | List selected ids and exit |
+| `--output PATH` | timestamped JSON | Results file |
+| `--instance-type TYPE` | IMDSv2 lookup | Instance label in metadata |
+| `--notes TEXT` | none | Run annotation |
 
-Flags:
+### Modes
 
-| Flag | Notes |
-|------|-------|
-| `--operation <name>` | One of `s3-put`, `s3-get`, `ddb-put`, `ddb-get` |
-| `--bucket <name>` | S3 Express directory bucket: `<base>--<az>--x-s3` |
-| `--table <name>`  | Must have a `String` partition key named `pk` |
-| `--region <region>` | Use the region the bucket / table lives in |
-| `--client sync\|async` | Accepted for compatibility; smithy-java only supports sync |
-| `--key-prefix <prefix>` | DynamoDB key prefix, default `item-` |
-| `--s3-key-prefix <prefix>` | S3 key prefix, default `objects/256KiB/` |
+**`stub`** is the cross-SDK configuration: an in-process `ClientTransport` returns each case's
+canned response without opening sockets.
 
-Common system properties:
+**`https`** measures the same client calls through smithy-java's HTTP client (HTTP/1.1, BoringSSL,
+TLS 1.3) to a fixture server. The harness starts the server in a child JVM from the same jar, so the
+server's CPU time stays out of the measurement, and tells it which response to serve before each
+case. Certificate verification is disabled: the server makes a self-signed certificate with
+`keytool` at startup.
 
-| Property | Default |
-|----------|---------|
-| `e2e.batch.actions` | `10000` for S3, `1000` for DynamoDB |
-| `e2e.warmup.batches` | `2` |
-| `e2e.measurement.batches` | `3` |
-| `e2e.collectMetrics` | `true` |
-| `e2e.object.size` | `262144` |
-| `e2e.data.length` | `1024` |
-| `e2e.ddb.createTable` | `true` |
-| `e2e.ddb.deleteTable` | `true` |
-| `e2e.ddb.readCapacityUnits` | `5000` |
-| `e2e.ddb.writeCapacityUnits` | `5000` |
+The fixture server (`...benchmarks.fixture.FixtureServer`) frames request headers in a reusable buffer,
+drains the body, and writes the current response bytes. It has two ports. The HTTPS data port serves
+the current fixture. The plaintext control port takes `POST /fixture` with the complete HTTP/1.1
+response as the body, validates it, and swaps it in for every connection. Until the first fixture
+arrives it answers 503.
 
-## Provision the resources
+## Measurement
 
-Run from an EC2 instance in the same AZ as the bucket. The instance role
-needs `s3:CreateSession`, `s3express:*`, and `dynamodb:GetItem`/`PutItem`
-on the resources below.
+```text
+warm up: 2,000-call chunks for at least 100,000 calls and 20 seconds, whichever comes later,
+         then until JIT compilation stays below 2% of chunk wall time for five consecutive
+         chunks and at least one second (give up at twice the floor)
+System.gc()
+cpuBefore = process CPU time
+repeat:
+    client.operation(input)
+    iterations++
+    every 100 iterations:
+        stop if (iterations >= 50,000 OR CPU elapsed >= 5 s) AND CPU elapsed >= 1 s
+ops/CPU-sec = iterations / CPU elapsed
+```
 
-S3 Express directory bucket (replace `my-bench` and `use1-az4` with your
-own base name and availability zone):
+Process CPU time includes user and system time for all threads, including JIT and GC. Linux reads
+it in 10 ms ticks, hence the one-second floor. A measured window that spends more than 5% of its
+wall time compiling is flagged `under_warmed`.
+
+The results schema is `smithy-java/e2e-ops-cpusec/2`. Metadata records the measurement settings,
+mode, transport, commit, instance, JVM, OS and CPU. Each case records iterations, CPU and wall time,
+warmup, JIT and GC activity, and a fingerprint of its inputs. Summary values are geometric means.
+
+## Compare and submit
+
+`scripts/compare-ocs.py` compares baseline and current runs using medians per benchmark.
+Input files require a nonempty `benchmarks` list with `id` and `ops_per_cpu_sec`.
+The report includes shared benchmark ids and records metadata and workload differences as warnings.
+It writes `<out>.json` with `metadata`, `benchmarks`, and `summary`, and prints the summary.
 
 ```bash
-aws s3api create-bucket \
-  --bucket my-bench--use1-az4--x-s3 \
-  --region us-east-1 \
-  --create-bucket-configuration '{
-    "Location": {"Type": "AvailabilityZone", "Name": "use1-az4"},
-    "Bucket":   {"Type": "Directory", "DataRedundancy": "SingleAvailabilityZone"}
-  }'
+python3 scripts/compare-ocs.py \
+    --baseline runs/baseline/*.json --current runs/current/*.json \
+    --out results/smithy-java/m7imetal24xl_ocs_results
 ```
 
-The S3 download workload reads keys named `objects/256KiB/<index>`. Pre-seed
-them by running the upload workload once first.
+## Metal runs
 
-The DynamoDB workloads create a fresh provisioned table by default using
-`--table` as the base name. The actual table name gets a run-specific suffix,
-uses a `String` partition key named `pk`, defaults to `5000` RCU / `5000` WCU,
-and is deleted after the run. The GetItem workload seeds its keys before warmup.
-
-To reuse an existing table instead:
+`scripts/run-metal-benchmarks.py` uploads the jar(s) to S3, launches a metal instance in us-east-1
+with SSM only, and runs a short shell script on it: install Corretto, pin the CPU governor, download
+the jars, run `java -Xbatch -jar` once per sample with baseline and current interleaved, upload the
+results. It then downloads the results and terminates the instance.
 
 ```bash
-java -De2e.ddb.createTable=false -jar build/libs/smithy-java-e2e-benchmark-runner.jar \
-     --operation ddb-get --table my-bench-table --region us-east-1
+python3 scripts/run-metal-benchmarks.py setup-infra            # once per account
+python3 scripts/run-metal-benchmarks.py --dry-run
+python3 scripts/run-metal-benchmarks.py --baseline-jar /path/to/baseline.jar --samples 3
+python3 scripts/run-metal-benchmarks.py --instance-type m7g.metal --e2e-args "--mode https"
+python3 scripts/run-metal-benchmarks.py cleanup                # after a crash
 ```
 
-## Cleanup
+Results land in `build/metal-runs/<run-id>/results/<side>/sample<N>.json` and under
+`s3://<bucket>/ops-cpusec/smithy-java/<arch>/<run-id>/`. `--keep-instance` retains the host; the
+host also shuts itself down after `--max-hours`.
+
+## JMH
+
+The same cases are available in JMH sample mode for latency percentiles over the stub, with
+`OpsPerCpuSecondProfiler` as a secondary metric:
 
 ```bash
-aws s3 rm s3://my-bench--use1-az4--x-s3 --recursive --region us-east-1
-aws s3api delete-bucket --bucket my-bench--use1-az4--x-s3 --region us-east-1
-aws dynamodb delete-table --table-name my-bench-table --region us-east-1
+./gradlew :benchmarks:e2e-benchmarks:jmh
+./gradlew :benchmarks:e2e-benchmarks:jmh -Pjmh.testCaseId=awsJson1_0_GetItemOutput_M -Pjmh.fast
 ```
 
-## Concurrency
-
-Throughput benchmarks dispatch each batch action onto a virtual thread,
-gated by a semaphore. The cap is `cores × multiplier`, where `multiplier`
-defaults to `4` and can be overridden:
-
-```bash
-java -De2e.concurrency.multiplier=16 -jar build/libs/smithy-java-e2e-benchmark-runner.jar \
-     --operation s3-put --bucket my-bench--use1-az4--x-s3 --region us-east-1
-```
-
-## Credentials
-
-Credentials are resolved from EC2 IMDSv2 directly. The benchmark is meant
-to run on EC2 against directory buckets in the same AZ. For local testing
-or non-EC2 hosts, supply credentials by extending the `Clients` factory.
+Results go to `build/results/jmh/results.json`. Cross-SDK submissions use the CPU-time runner.

@@ -42,7 +42,12 @@ final class RateLimiterTokenBucketStore {
         Objects.requireNonNull(scope, "scope");
         lock.lock();
         try {
-            return scopeToTokenBucket.computeIfAbsent(scope, s -> new RateLimiterTokenBucket(clock));
+            RateLimiterTokenBucket bucket = scopeToTokenBucket.get(scope);
+            if (bucket == null) {
+                bucket = new RateLimiterTokenBucket(clock);
+                scopeToTokenBucket.put(scope, bucket);
+            }
+            return bucket;
         } finally {
             lock.unlock();
         }

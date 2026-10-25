@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -163,15 +164,28 @@ public final class BenchmarkSupport {
         }
     }
 
-    /**
-     * Run a benchmark loop with virtual threads until totalRequests is reached.
-     *
-     * @param concurrency number of virtual threads generating load
-     * @param totalRequests total requests to complete before stopping
-     * @param task the task each thread runs in a loop
-     * @param context context passed to task (avoids lambda allocation)
-     * @param counter output counter for requests/errors
-     */
+    private static final boolean PLATFORM_THREADS =
+            "platform".equalsIgnoreCase(System.getProperty("jmh.bench.threads", "virtual"));
+    private static final Map<Integer, ExecutorService> PLATFORM_POOLS = new ConcurrentHashMap<>();
+
+    static {
+        // The metal runner reads this line to check the worker thread mode.
+        System.out.println("BENCH_THREAD_MODE=" + (PLATFORM_THREADS ? "platform" : "virtual")
+                + " (jmh.bench.threads=" + System.getProperty("jmh.bench.threads", "virtual") + ")");
+    }
+
+    private static ExecutorService workers(int concurrency) {
+        if (!PLATFORM_THREADS) {
+            return Executors.newVirtualThreadPerTaskExecutor();
+        }
+        // Reuse platform workers to exclude thread startup from each invocation.
+        return PLATFORM_POOLS.computeIfAbsent(concurrency, n -> Executors.newFixedThreadPool(n, r -> {
+            Thread t = new Thread(r, "bench-worker");
+            t.setDaemon(true);
+            return t;
+        }));
+    }
+
     public static <T> void runBenchmark(
             int concurrency,
             int totalRequests,
@@ -184,7 +198,8 @@ public final class BenchmarkSupport {
         var firstError = new AtomicReference<Throwable>();
         var latch = new CountDownLatch(concurrency);
 
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+        ExecutorService executor = workers(concurrency);
+        try {
             for (int i = 0; i < concurrency; i++) {
                 final int threadId = i;
                 executor.submit(() -> {
@@ -207,19 +222,23 @@ public final class BenchmarkSupport {
             // Safety net only; normal completion releases the latch immediately. Generous enough that a
             // high-concurrency invocation (thousands of 1 MB transfers) never false-times-out.
             if (!latch.await(120, TimeUnit.SECONDS)) {
-                Throwable err = firstError.get();
-                System.err.println("BENCHMARK TIMEOUT: " + (concurrency - (int) latch.getCount())
-                        + "/" + concurrency + " threads completed, errors=" + errors.get()
-                        + (err != null ? ", firstError=" + err : ""));
-                if (err != null) {
-                    err.printStackTrace(System.err);
+                if (PLATFORM_THREADS) {
+                    PLATFORM_POOLS.remove(concurrency, executor);
+                    executor.shutdownNow();
                 }
+                throw new IllegalStateException("BENCHMARK TIMEOUT: " + (concurrency - (int) latch.getCount())
+                        + "/" + concurrency + " threads completed, errors=" + errors.get(), firstError.get());
+            }
+        } finally {
+            if (!PLATFORM_THREADS) {
+                executor.close();
             }
         }
 
         counter.requests = completed.get();
         counter.errors = errors.get();
         counter.firstError = firstError.get();
+        counter.throwIfErrored("Benchmark");
     }
 
     @FunctionalInterface

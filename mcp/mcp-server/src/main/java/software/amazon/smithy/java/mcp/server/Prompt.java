@@ -87,7 +87,7 @@ public final class Prompt {
             McpProtocol protocol
     ) {
         if (proxy != null) {
-            return proxy.usingProtocol(
+            return proxy.forwarding(
                     protocol,
                     () -> delegateToProxy(arguments, requestId, metadata));
         }

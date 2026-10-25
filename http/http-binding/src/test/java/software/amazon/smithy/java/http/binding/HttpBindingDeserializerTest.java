@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -175,6 +176,78 @@ public class HttpBindingDeserializerTest {
         Assertions.assertEquals(1, codec.directCalls);
         Assertions.assertEquals(0, codec.fallbackCalls);
         Assertions.assertEquals("direct", builder.payload.value());
+    }
+
+    @Test
+    void structuredPayloadFromNonReplayableStreamIsReadOnce() {
+        var codec = new WholeShapeCodec();
+        var builder = new PayloadOutput.Builder();
+
+        new ResponseDeserializer()
+                .payloadCodec(codec)
+                .response(response(inputStreamBody("{\"value\":\"direct\"}")))
+                .outputShapeBuilder(builder)
+                .deserialize();
+
+        Assertions.assertEquals(1, codec.directCalls);
+        Assertions.assertEquals("direct", builder.payload.value());
+    }
+
+    @Test
+    void structuredPayloadFallbackFromNonReplayableStreamReceivesBody() {
+        var codec = new EchoCodec();
+        var builder = new PayloadOutput.Builder();
+
+        new ResponseDeserializer()
+                .payloadCodec(codec)
+                .response(response(inputStreamBody("payload bytes")))
+                .outputShapeBuilder(builder)
+                .deserialize();
+
+        Assertions.assertEquals("payload bytes", builder.payload.value());
+    }
+
+    @Test
+    void emptyStructuredPayloadFromNonReplayableStreamIsSkipped() {
+        var builder = new PayloadOutput.Builder();
+
+        new ResponseDeserializer()
+                .payloadCodec(NOOP_CODEC)
+                .response(response(inputStreamBody("")))
+                .outputShapeBuilder(builder)
+                .deserialize();
+
+        Assertions.assertNull(builder.payload);
+    }
+
+    @Test
+    void stringPayloadFromNonReplayableStreamIsRead() {
+        var builder = new StringPayloadOutput.Builder();
+
+        new ResponseDeserializer()
+                .payloadCodec(NOOP_CODEC)
+                .response(response(inputStreamBody("string value")))
+                .outputShapeBuilder(builder)
+                .deserialize();
+
+        Assertions.assertEquals("string value", builder.value);
+    }
+
+    @Test
+    void blobPayloadFromNonReplayableStreamIsRead() {
+        var builder = new BlobPayloadOutput.Builder();
+
+        new ResponseDeserializer()
+                .payloadCodec(NOOP_CODEC)
+                .response(response(inputStreamBody("blob value")))
+                .outputShapeBuilder(builder)
+                .deserialize();
+
+        Assertions.assertEquals("blob value", StandardCharsets.UTF_8.decode(builder.value).toString());
+    }
+
+    private static DataStream inputStreamBody(String value) {
+        return DataStream.ofInputStream(new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8)));
     }
 
     private static HttpResponse response(DataStream body) {
@@ -383,6 +456,116 @@ public class HttpBindingDeserializerTest {
             public Schema schema() {
                 return SCHEMA;
             }
+        }
+    }
+
+    private record StringPayloadOutput(String value) implements SerializableStruct {
+        static final Schema SCHEMA = Schema.structureBuilder(ShapeId.from("smithy.example#StringPayloadOutput"))
+                .putMember("value", PreludeSchemas.STRING, new HttpPayloadTrait())
+                .builderSupplier(Builder::new)
+                .build();
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {}
+
+        @Override
+        public <T> T getMemberValue(Schema member) {
+            return null;
+        }
+
+        private static final class Builder implements ShapeBuilder<StringPayloadOutput> {
+            private String value;
+
+            @Override
+            public StringPayloadOutput build() {
+                return new StringPayloadOutput(value);
+            }
+
+            @Override
+            public ShapeBuilder<StringPayloadOutput> deserialize(ShapeDeserializer decoder) {
+                decoder.readStruct(SCHEMA,
+                        this,
+                        (builder, member, deserializer) -> builder.value = deserializer.readString(member));
+                return this;
+            }
+
+            @Override
+            public Schema schema() {
+                return SCHEMA;
+            }
+        }
+    }
+
+    private record BlobPayloadOutput(ByteBuffer value) implements SerializableStruct {
+        static final Schema SCHEMA = Schema.structureBuilder(ShapeId.from("smithy.example#BlobPayloadOutput"))
+                .putMember("value", PreludeSchemas.BLOB, new HttpPayloadTrait())
+                .builderSupplier(Builder::new)
+                .build();
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {}
+
+        @Override
+        public <T> T getMemberValue(Schema member) {
+            return null;
+        }
+
+        private static final class Builder implements ShapeBuilder<BlobPayloadOutput> {
+            private ByteBuffer value;
+
+            @Override
+            public BlobPayloadOutput build() {
+                return new BlobPayloadOutput(value);
+            }
+
+            @Override
+            public ShapeBuilder<BlobPayloadOutput> deserialize(ShapeDeserializer decoder) {
+                decoder.readStruct(SCHEMA,
+                        this,
+                        (builder, member, deserializer) -> builder.value = deserializer.readBlob(member));
+                return this;
+            }
+
+            @Override
+            public Schema schema() {
+                return SCHEMA;
+            }
+        }
+    }
+
+    /**
+     * A codec without direct builder support that echoes the received bytes as the "value" member.
+     */
+    private static final class EchoCodec implements Codec {
+        @Override
+        public ShapeSerializer createSerializer(OutputStream sink) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer(ByteBuffer source) {
+            var content = StandardCharsets.UTF_8.decode(source.duplicate()).toString();
+            return new SpecificShapeDeserializer() {
+                @Override
+                public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
+                    consumer.accept(state, schema.member("value"), new SpecificShapeDeserializer() {
+                        @Override
+                        public String readString(Schema schema) {
+                            return content;
+                        }
+                    });
+                }
+            };
         }
     }
 

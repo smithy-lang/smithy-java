@@ -82,8 +82,7 @@ class RuntimeCodegenStrictCoverageTest {
                 REST_JSON_PACKAGE,
                 REST_JSON_SERVICE,
                 EMPTY_JSON_BODY,
-                REST_JSON_CONTENT_TYPE,
-                false);
+                REST_JSON_CONTENT_TYPE);
         assertNotNull(protocol.deserializeResponse(
                 operation(state.operation),
                 state.context,
@@ -109,8 +108,7 @@ class RuntimeCodegenStrictCoverageTest {
                 AWS_JSON_PACKAGE,
                 AWS_JSON_SERVICE,
                 EMPTY_JSON_BODY,
-                AWS_JSON_CONTENT_TYPE,
-                false);
+                AWS_JSON_CONTENT_TYPE);
         assertNotNull(protocol.deserializeResponse(
                 operation(state.operation),
                 state.context,

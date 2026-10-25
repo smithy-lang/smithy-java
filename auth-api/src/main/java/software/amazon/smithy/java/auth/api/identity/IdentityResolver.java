@@ -18,6 +18,9 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * <p>Expected errors like missing environment variables are expected to return a result that contains an
      * error string. Unexpected errors like malformed input or networking errors are allowed to throw exceptions.
      *
+     * <p>Implementations must treat the request properties as read-only because the context may be unmodifiable or
+     * shared with other components of the call.
+     *
      * @param requestProperties The request properties used to resolve an Identity.
      * @return the resolved identity result.
      */
@@ -56,8 +59,21 @@ public interface IdentityResolver<IdentityT extends Identity> {
     /**
      * Create an implementation of {@link IdentityResolver} that returns a specific, pre-defined instance of
      * {@link Identity}.
+     *
+     * <p>The resolver reports the runtime class of {@code identity} as its identity type. To report an identity
+     * interface instead, use {@link #of(Class, Identity)}.
      */
     static <I extends Identity> IdentityResolver<I> of(I identity) {
         return new StaticIdentityResolver<>(identity);
+    }
+
+    /**
+     * Create an implementation of {@link IdentityResolver} that returns a specific, pre-defined instance of
+     * {@link Identity} and reports {@code identityType} as its identity type.
+     *
+     * @throws IllegalArgumentException if {@code identity} is not an instance of {@code identityType}.
+     */
+    static <I extends Identity> IdentityResolver<I> of(Class<I> identityType, I identity) {
+        return new StaticIdentityResolver<>(identityType, identity);
     }
 }

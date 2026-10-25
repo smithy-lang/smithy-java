@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 final class DefaultCborSerdeProvider implements CborSerdeProvider {
     @Override
@@ -34,16 +35,31 @@ final class DefaultCborSerdeProvider implements CborSerdeProvider {
 
     @Override
     public ShapeSerializer newSerializer(OutputStream sink, CborSettings settings) {
-        return new CborSerializer(sink);
+        return new CborSerializer(sink, settings.outputBuffers());
     }
 
     @Override
     public ByteBuffer serialize(SerializableShape shape, CborSettings settings) {
-        var serializer = CborSerializer.acquire();
+        var serializer = CborSerializer.acquire(settings.outputBuffers());
         boolean exception = false;
         try {
             shape.serialize(serializer);
             return serializer.extractResult();
+        } catch (Exception t) {
+            exception = true;
+            throw t;
+        } finally {
+            CborSerializer.release(serializer, exception);
+        }
+    }
+
+    @Override
+    public DataStream serializeToDataStream(SerializableShape shape, CborSettings settings, String contentType) {
+        var serializer = CborSerializer.acquire(settings.outputBuffers());
+        boolean exception = false;
+        try {
+            shape.serialize(serializer);
+            return serializer.detach(contentType);
         } catch (Exception t) {
             exception = true;
             throw t;
