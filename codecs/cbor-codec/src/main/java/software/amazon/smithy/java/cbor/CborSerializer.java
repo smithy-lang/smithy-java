@@ -36,12 +36,17 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.RandomAccess;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -807,6 +812,499 @@ final class CborSerializer implements ShapeSerializer {
             System.arraycopy(nameBytes, 0, buf, pos, nameBytes.length);
             pos += nameBytes.length;
         }
+
+        @Override
+        public void writeBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBooleanList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseBooleanList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeBooleanMap(Schema schema, Map<String, Boolean> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBooleanMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseBooleanMap(
+                Schema schema,
+                Map<String, Boolean> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseBooleanMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeByteList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseByteList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeByteMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseByteMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeShortList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseShortList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeShortMap(Schema schema, Map<String, Short> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeShortMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseShortMap(
+                Schema schema,
+                Map<String, Short> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseShortMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeIntegerList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseIntegerList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeIntegerMap(Schema schema, Map<String, Integer> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeIntegerMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseIntegerMap(
+                Schema schema,
+                Map<String, Integer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseIntegerMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeLongList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseLongList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeLongMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseLongMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeFloatList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseFloatList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeFloatMap(Schema schema, Map<String, Float> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeFloatMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseFloatMap(
+                Schema schema,
+                Map<String, Float> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseFloatMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeDoubleList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseDoubleList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeDoubleMap(Schema schema, Map<String, Double> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeDoubleMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseDoubleMap(
+                Schema schema,
+                Map<String, Double> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseDoubleMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBigIntegerList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseBigIntegerList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBigIntegerMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseBigIntegerMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBigDecimalList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseBigDecimalList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBigDecimalMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseBigDecimalMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeStringList(Schema schema, List<String> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeStringList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseStringList(Schema schema, List<String> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseStringList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeStringMap(Schema schema, Map<String, String> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeStringMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseStringMap(
+                Schema schema,
+                Map<String, String> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseStringMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBlobList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseBlobList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeBlobMap(Schema schema, Map<String, ByteBuffer> values, Schema keySchema, Schema valueSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeBlobMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseBlobMap(
+                Schema schema,
+                Map<String, ByteBuffer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseBlobMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeTimestampList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseTimestampList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeTimestampMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseTimestampMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeDocumentList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseDocumentList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeDocumentMap(
+                Schema schema,
+                Map<String, Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeDocumentMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseDocumentMap(
+                Schema schema,
+                Map<String, Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseDocumentMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeEnumList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseEnumList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeEnumMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseEnumMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeIntEnumList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseIntEnumList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeIntEnumMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseIntEnumMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeStructList(Schema schema, List<? extends SerializableStruct> values, Schema memberSchema) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeStructList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeSparseStructList(
+                Schema schema,
+                List<? extends SerializableStruct> values,
+                Schema memberSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseStructList(schema, values, memberSchema);
+        }
+
+        @Override
+        public void writeStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeStructMap(schema, values, keySchema, valueSchema);
+        }
+
+        @Override
+        public void writeSparseStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            writeFieldNameBytes(schema);
+            CborSerializer.this.writeSparseStructMap(schema, values, keySchema, valueSchema);
+        }
     }
 
     private final class CborMapSerializer implements MapSerializer {
@@ -843,5 +1341,1136 @@ final class CborSerializer implements ShapeSerializer {
             struct.serializeMembers(parent.structSerializer);
             parent.endMap();
         }
+    }
+
+    @Override
+    public void writeBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeBoolean(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeBoolean(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeBoolean(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeBoolean(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeBooleanMap(Schema schema, Map<String, Boolean> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeBoolean(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseBooleanMap(
+            Schema schema,
+            Map<String, Boolean> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeBoolean(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeByte(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeByte(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeByte(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeByte(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeByte(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeByte(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeShortList(Schema schema, List<Short> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeShort(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeShort(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseShortList(Schema schema, List<Short> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeShort(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeShort(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeShortMap(Schema schema, Map<String, Short> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeShort(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseShortMap(Schema schema, Map<String, Short> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeShort(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeInteger(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeInteger(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeInteger(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeInteger(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeIntegerMap(Schema schema, Map<String, Integer> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeInteger(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseIntegerMap(
+            Schema schema,
+            Map<String, Integer> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeInteger(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeLongList(Schema schema, List<Long> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeLong(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeLong(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseLongList(Schema schema, List<Long> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeLong(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeLong(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeLong(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeLong(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeFloat(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeFloat(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeFloat(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeFloat(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeFloatMap(Schema schema, Map<String, Float> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeFloat(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseFloatMap(Schema schema, Map<String, Float> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeFloat(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeDouble(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeDouble(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeDouble(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeDouble(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeDoubleMap(Schema schema, Map<String, Double> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeDouble(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseDoubleMap(Schema schema, Map<String, Double> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeDouble(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeBigInteger(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeBigInteger(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeBigInteger(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeBigInteger(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeBigIntegerMap(
+            Schema schema,
+            Map<String, BigInteger> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeBigInteger(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseBigIntegerMap(
+            Schema schema,
+            Map<String, BigInteger> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeBigInteger(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeBigDecimal(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeBigDecimal(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeBigDecimal(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeBigDecimal(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeBigDecimalMap(
+            Schema schema,
+            Map<String, BigDecimal> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeBigDecimal(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseBigDecimalMap(
+            Schema schema,
+            Map<String, BigDecimal> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeBigDecimal(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeStringList(Schema schema, List<String> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeString(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeString(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseStringList(Schema schema, List<String> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeString(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeString(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeStringMap(Schema schema, Map<String, String> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeString(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseStringMap(Schema schema, Map<String, String> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeString(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeBlob(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeBlob(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeBlob(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeBlob(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeBlobMap(Schema schema, Map<String, ByteBuffer> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeBlob(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseBlobMap(
+            Schema schema,
+            Map<String, ByteBuffer> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeBlob(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeTimestamp(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeTimestamp(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeTimestamp(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeTimestamp(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeTimestampMap(Schema schema, Map<String, Instant> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeTimestamp(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseTimestampMap(
+            Schema schema,
+            Map<String, Instant> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeTimestamp(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeDocument(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeDocument(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeDocument(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeDocument(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeDocumentMap(Schema schema, Map<String, Document> values, Schema keySchema, Schema valueSchema) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeDocument(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseDocumentMap(
+            Schema schema,
+            Map<String, Document> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeDocument(valueSchema, v);
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeString(memberSchema, v.getValue());
+            }
+        } else {
+            for (var v : values) {
+                this.writeString(memberSchema, v.getValue());
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeString(memberSchema, v.getValue());
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeString(memberSchema, v.getValue());
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeString(valueSchema, v.getValue());
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeString(valueSchema, v.getValue());
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeInteger(memberSchema, v.getValue());
+            }
+        } else {
+            for (var v : values) {
+                this.writeInteger(memberSchema, v.getValue());
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeInteger(memberSchema, v.getValue());
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeInteger(memberSchema, v.getValue());
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeIntEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyIntEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeInteger(valueSchema, v.getValue());
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseIntEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyIntEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeInteger(valueSchema, v.getValue());
+            }
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeStructList(Schema schema, List<? extends SerializableStruct> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                this.writeStruct(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                this.writeStruct(memberSchema, v);
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeSparseStructList(Schema schema, List<? extends SerializableStruct> values, Schema memberSchema) {
+        startArray(values.size());
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeStruct(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    this.writeNull(memberSchema);
+                } else {
+                    this.writeStruct(memberSchema, v);
+                }
+            }
+        }
+        endArray();
+    }
+
+    @Override
+    public void writeStructMap(
+            Schema schema,
+            Map<String, ? extends SerializableStruct> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            this.writeStruct(valueSchema, v);
+
+        });
+        endMap();
+    }
+
+    @Override
+    public void writeSparseStructMap(
+            Schema schema,
+            Map<String, ? extends SerializableStruct> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        startMap(values.size());
+        values.forEach((k, v) -> {
+            writeStringValue(k);
+            if (v == null) {
+                this.writeNull(valueSchema);
+            } else {
+                this.writeStruct(valueSchema, v);
+            }
+
+        });
+        endMap();
     }
 }

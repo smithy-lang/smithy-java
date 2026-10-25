@@ -21,6 +21,8 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.MapSerializer;
@@ -803,6 +805,1139 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             @Override
             public void writeTimestamp(Schema schema, Instant value) {
                 writeQuery(binding, binding.timestampFormatter().writeString(value));
+            }
+        }
+
+        @Override
+        public void writeBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeBooleanList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeBoolean(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseBooleanList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeBoolean(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeBooleanMap(Schema schema, Map<String, Boolean> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeBooleanMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeBoolean(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseBooleanMap(
+                Schema schema,
+                Map<String, Boolean> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseBooleanMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeBoolean(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeByteList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeByte(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseByteList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeByte(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeByteMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeByte(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseByteMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeByte(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeShortList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeShort(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseShortList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeShort(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeShortMap(Schema schema, Map<String, Short> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeShortMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeShort(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseShortMap(
+                Schema schema,
+                Map<String, Short> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseShortMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeShort(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeIntegerList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeInteger(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseIntegerList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeInteger(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeIntegerMap(Schema schema, Map<String, Integer> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeIntegerMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeInteger(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseIntegerMap(
+                Schema schema,
+                Map<String, Integer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseIntegerMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeInteger(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeLongList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeLong(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseLongList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeLong(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeLongMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeLong(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseLongMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeLong(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeFloatList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeFloat(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseFloatList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeFloat(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeFloatMap(Schema schema, Map<String, Float> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeFloatMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeFloat(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseFloatMap(
+                Schema schema,
+                Map<String, Float> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseFloatMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeFloat(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeDoubleList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeDouble(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseDoubleList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeDouble(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeDoubleMap(Schema schema, Map<String, Double> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeDoubleMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeDouble(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseDoubleMap(
+                Schema schema,
+                Map<String, Double> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseDoubleMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeDouble(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeBigIntegerList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeBigInteger(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseBigIntegerList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeBigInteger(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeBigIntegerMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeBigInteger(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseBigIntegerMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeBigInteger(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeBigDecimalList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeBigDecimal(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseBigDecimalList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeBigDecimal(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeBigDecimalMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeBigDecimal(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseBigDecimalMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeBigDecimal(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeStringList(Schema schema, List<String> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeStringList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeString(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseStringList(Schema schema, List<String> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseStringList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeString(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeStringMap(Schema schema, Map<String, String> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeStringMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeString(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseStringMap(
+                Schema schema,
+                Map<String, String> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseStringMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeString(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeBlobList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeBlob(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseBlobList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeBlob(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeBlobMap(Schema schema, Map<String, ByteBuffer> values, Schema keySchema, Schema valueSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeBlobMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeBlob(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseBlobMap(
+                Schema schema,
+                Map<String, ByteBuffer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseBlobMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeBlob(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeTimestampList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeTimestamp(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseTimestampList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeTimestamp(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeTimestampMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeTimestamp(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseTimestampMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeTimestamp(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeDocumentList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeDocument(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseDocumentList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeDocument(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeDocumentMap(
+                Schema schema,
+                Map<String, Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeDocumentMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeDocument(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseDocumentMap(
+                Schema schema,
+                Map<String, Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseDocumentMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeDocument(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeEnumList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeString(memberSchema, v.getValue());
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseEnumList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeString(memberSchema, v.getValue());
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeEnumMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeString(valueSchema, vv.getValue()));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseEnumMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeString(valueSchema, vv.getValue());
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeIntEnumList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeInteger(memberSchema, v.getValue());
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseIntEnumList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeInteger(memberSchema, v.getValue());
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeIntEnumMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeInteger(valueSchema, vv.getValue()));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseIntEnumMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeInteger(valueSchema, vv.getValue());
+                            }
+                        });
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeStructList(Schema schema, List<? extends SerializableStruct> values, Schema memberSchema) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeStructList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        s.writeStruct(memberSchema, v);
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseStructList(
+                Schema schema,
+                List<? extends SerializableStruct> values,
+                Schema memberSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseStructList(schema, values, memberSchema);
+                case HEADER, QUERY -> writeList(schema, values, values.size(), (list, s) -> {
+                    for (var v : list) {
+                        if (v == null) {
+                            s.writeNull(memberSchema);
+                        } else {
+                            s.writeStruct(memberSchema, v);
+                        }
+                    }
+                });
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeStructMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> s.writeStruct(valueSchema, vv));
+                    }));
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void writeSparseStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            switch (activeBindings[schema.memberIndex()]) {
+                case PAYLOAD -> payload(schema).writeSparseStructMap(schema, values, keySchema, valueSchema);
+                case PREFIX_HEADERS, QUERY_PARAMS ->
+                    writeMap(schema, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                        ms.writeEntry(keySchema, k, v, (vv, s) -> {
+                            if (vv == null) {
+                                s.writeNull(valueSchema);
+                            } else {
+                                s.writeStruct(valueSchema, vv);
+                            }
+                        });
+                    }));
+                default -> {
+                }
             }
         }
     }

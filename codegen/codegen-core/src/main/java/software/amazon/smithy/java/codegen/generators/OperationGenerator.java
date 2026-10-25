@@ -58,6 +58,7 @@ public final class OperationGenerator
                                     public final class ${shape:T} extends ${abstractApiOperation:T}<${inputType:T}, ${outputType:T}> {
 
                                         public static final ${shapeId:T} $$ID = ${shapeId:T}.from(${shapeIdValue:S});
+                                        public static final ${sdkSchema:T} $$SCHEMA = ${operationSchema:C};
 
                                         ${?hasExceptions}${typeRegistrySection:C|}
                                         ${/hasExceptions}
@@ -80,7 +81,7 @@ public final class OperationGenerator
                                         }
 
                                         private ${shape:T}() {
-                                            super(${operationSchema:C}${?hasExceptions}, TYPE_REGISTRY${/hasExceptions}${?singleScheme}, ${shapeId:T}.from(${singleScheme:S})${/singleScheme}${?hasMultipleSchemes}, SCHEMES${/hasMultipleSchemes});
+                                            super($$SCHEMA${?hasExceptions}, TYPE_REGISTRY${/hasExceptions}${?singleScheme}, ${shapeId:T}.from(${singleScheme:S})${/singleScheme}${?hasMultipleSchemes}, SCHEMES${/hasMultipleSchemes});
                                         }
 
                                         @Override

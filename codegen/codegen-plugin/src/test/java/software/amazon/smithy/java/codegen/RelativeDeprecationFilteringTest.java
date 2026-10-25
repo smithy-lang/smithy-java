@@ -38,8 +38,8 @@ public class RelativeDeprecationFilteringTest extends AbstractCodegenFileTest {
         var fileStr = getFileStringForClass("NotYetDeprecatedDate");
         var expected = "public final class NotYetDeprecatedDate extends AbstractApiOperation";
         assertTrue(fileStr.contains(expected));
-        assertTrue(fileStr.contains("super(Schema.createOperation($ID"));
-        assertFalse(fileStr.contains("static final Schema $SCHEMA"));
+        assertTrue(fileStr.contains("public static final Schema $SCHEMA = Schema.createOperation($ID"));
+        assertTrue(fileStr.contains("super($SCHEMA"));
         assertFalse(fileStr.contains("SCHEMES"));
         assertFalse(fileStr.contains("TYPE_REGISTRY"));
         assertFalse(fileStr.contains("errorSchemas()"));

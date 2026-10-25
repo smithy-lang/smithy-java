@@ -27,13 +27,16 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.NullableIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.selector.PathFinder;
+import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.ClientOptionalTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.model.traits.synthetic.OriginalShapeIdTrait;
 import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -209,13 +212,31 @@ public final class CodegenUtils {
      *
      * @param memberName Member shape to generate schema name from
      * @return name to use for static schema property
+     * @deprecated Use {@link #toMemberSchemaName(Shape, MemberShape)} for generated member schema constants.
      */
+    @Deprecated
     public static String toMemberSchemaName(String memberName) {
         return SCHEMA_STATIC_NAME + "_" + CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ENGLISH);
     }
 
     /**
+     * Returns the member schema constant name, such as {@code $0}, based on the member's sorted index.
+     */
+    public static String toMemberSchemaName(Shape container, MemberShape member) {
+        int index = getSortedMembers(container).indexOf(member);
+        if (index < 0) {
+            throw new IllegalArgumentException(member.getId() + " is not a member of " + container.getId());
+        }
+        return "$" + index;
+    }
+
+    /**
      * Sorts shape members to ensure that required members with no default value come before other members.
+     *
+     * <p>The position in this list is the member index that generated code uses to address members
+     * ({@code $SCHEMA.member(n)}, {@code getMemberValue}, {@code setMemberValue}). It must match the order the
+     * runtime computes in {@code SchemaBuilder.sortMembers}, which relies on the {@code @required} and
+     * {@code @default} traits being present on emitted schemas (see {@code CodeGenerationContext.PRELUDE_RUNTIME_TRAITS}).
      *
      * @param shape Shape to sort members of
      * @return list of sorted members
@@ -233,9 +254,50 @@ public final class CodegenUtils {
     }
 
     /**
+     * Returns the kind in a typed {@code ShapeSerializer} collection writer name, such as {@code String} or {@code Struct}.
+     * Returns null if the member requires a generated serializer.
+     *
+     * @param member List member or map value member.
+     */
+    public static String collectionWriterKind(Model model, MemberShape member) {
+        var target = model.expectShape(member.getTarget());
+        return switch (target.getType()) {
+            case BOOLEAN -> "Boolean";
+            case BYTE -> "Byte";
+            case SHORT -> "Short";
+            case INTEGER -> "Integer";
+            case LONG -> "Long";
+            case FLOAT -> "Float";
+            case DOUBLE -> "Double";
+            case BIG_INTEGER -> "BigInteger";
+            case BIG_DECIMAL -> "BigDecimal";
+            case STRING -> "String";
+            case BLOB -> "Blob";
+            case TIMESTAMP -> "Timestamp";
+            case DOCUMENT -> "Document";
+            case ENUM -> "Enum";
+            case INT_ENUM -> "IntEnum";
+            case STRUCTURE -> target.hasTrait(UnitTypeTrait.class) ? null : "Struct";
+            case UNION -> "Struct";
+            default -> null;
+        };
+    }
+
+    /**
+     * Checks whether a map with string keys has a typed {@code ShapeSerializer} writer for its values.
+     */
+    public static boolean usesTypedMapWriter(Model model, MapShape shape) {
+        return model.expectShape(shape.getKey().getTarget()).getType() == ShapeType.STRING
+                && collectionWriterKind(model, shape.getValue()) != null;
+    }
+
+    /**
      * Checks if a member is required and has no default.
      *
      * <p>Required members with no default require presence tracking.
+     *
+     * <p>This predicate must match the runtime's {@code MemberSchemaBuilder#computeIsRequired}.
+     * Otherwise, generated member indices can refer to the wrong schemas.
      *
      * @param memberShape member shape to check
      * @return true if the member has the required trait and does not have a default.
@@ -492,10 +554,6 @@ public final class CodegenUtils {
 
     /**
      * Gets the operations contained by a service in stable shape ID order.
-     *
-     * @param model Model containing the service.
-     * @param service Service to inspect.
-     * @return sorted contained operations.
      */
     public static List<OperationShape> getContainedOperations(Model model, ServiceShape service) {
         return TopDownIndex.of(model)

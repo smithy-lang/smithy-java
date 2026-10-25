@@ -65,6 +65,14 @@ public class CodeGenerationContext
     private static final InternalLogger LOGGER = InternalLogger.getLogger(CodeGenerationContext.class);
 
     // visible for testing
+    //
+    // RequiredTrait and DefaultTrait are load-bearing for correctness, not only validation. Generated code
+    // addresses members by index ($SCHEMA.member(n)), and that index comes from CodegenUtils.getSortedMembers,
+    // which orders required-without-default members first. The runtime applies the same order in
+    // SchemaBuilder.sortMembers based on the traits present on the emitted schema, so dropping either trait
+    // from the emitted schemas would silently shift member indices. Runtime traits are only ever added to this
+    // list (see collectRuntimeTraits), never removed. CodegenUtilsTest.sortedMemberIndexMatchesRuntimeMemberIndex
+    // checks the two orderings agree.
     static final List<ShapeId> PRELUDE_RUNTIME_TRAITS = List.of(
             // Validation Traits
             LengthTrait.ID,

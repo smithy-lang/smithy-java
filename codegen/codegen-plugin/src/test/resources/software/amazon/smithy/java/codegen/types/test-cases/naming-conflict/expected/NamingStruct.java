@@ -8,7 +8,6 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -16,15 +15,15 @@ import software.amazon.smithy.utils.SmithyGenerated;
 public final class NamingStruct implements SerializableStruct {
 
     public static final Schema $SCHEMA = Schemas.NAMING_STRUCT;
-    private static final Schema $SCHEMA_OTHER = $SCHEMA.member("other");
-    private static final Schema $SCHEMA_BUILDER_MEMBER = $SCHEMA.member("builder");
-    private static final Schema $SCHEMA_TYPE = $SCHEMA.member("type");
-    private static final Schema $SCHEMA_OBJECT_MEMBER = $SCHEMA.member("object");
-    private static final Schema $SCHEMA_UNION = $SCHEMA.member("union");
-    private static final Schema $SCHEMA_MAP = $SCHEMA.member("map");
-    private static final Schema $SCHEMA_LIST = $SCHEMA.member("list");
-    private static final Schema $SCHEMA_LIST_OF_LIST = $SCHEMA.member("listOfList");
-    private static final Schema $SCHEMA_MAP_OF_MAP = $SCHEMA.member("mapOfMap");
+    private static final Schema $0 = $SCHEMA.member(0); // other
+    private static final Schema $1 = $SCHEMA.member(1); // builder
+    private static final Schema $2 = $SCHEMA.member(2); // type
+    private static final Schema $3 = $SCHEMA.member(3); // object
+    private static final Schema $4 = $SCHEMA.member(4); // union
+    private static final Schema $5 = $SCHEMA.member(5); // map
+    private static final Schema $6 = $SCHEMA.member(6); // list
+    private static final Schema $7 = $SCHEMA.member(7); // listOfList
+    private static final Schema $8 = $SCHEMA.member(8); // mapOfMap
 
     public static final ShapeId $ID = $SCHEMA.id();
 
@@ -102,7 +101,7 @@ public final class NamingStruct implements SerializableStruct {
 
     @Override
     public String toString() {
-        return ToStringSerializer.serialize(this);
+        return SchemaUtils.toString(this);
     }
 
     @Override
@@ -110,10 +109,9 @@ public final class NamingStruct implements SerializableStruct {
         if (other == this) {
             return true;
         }
-        if (other == null || getClass() != other.getClass()) {
+        if (!(other instanceof NamingStruct that)) {
             return false;
         }
-        NamingStruct that = (NamingStruct) other;
         return Objects.equals(this.other, that.other)
                && Objects.equals(this.union, that.union)
                && Objects.equals(this.builderMember, that.builderMember)
@@ -147,48 +145,49 @@ public final class NamingStruct implements SerializableStruct {
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         if (other != null) {
-            serializer.writeString($SCHEMA_OTHER, other);
+            serializer.writeString($0, other);
         }
         if (builderMember != null) {
-            serializer.writeStruct($SCHEMA_BUILDER_MEMBER, builderMember);
+            serializer.writeStruct($1, builderMember);
         }
         if (type != null) {
-            serializer.writeStruct($SCHEMA_TYPE, type);
+            serializer.writeStruct($2, type);
         }
         if (objectMember != null) {
-            serializer.writeStruct($SCHEMA_OBJECT_MEMBER, objectMember);
+            serializer.writeStruct($3, objectMember);
         }
         if (union != null) {
-            serializer.writeStruct($SCHEMA_UNION, union);
+            serializer.writeStruct($4, union);
         }
         if (map != null) {
-            serializer.writeStruct($SCHEMA_MAP, map);
+            serializer.writeStruct($5, map);
         }
         if (list != null) {
-            serializer.writeStruct($SCHEMA_LIST, list);
+            serializer.writeStruct($6, list);
         }
         if (listOfList != null) {
-            serializer.writeList($SCHEMA_LIST_OF_LIST, listOfList, listOfList.size(), SharedSerde.ListOfListSerializer.INSTANCE);
+            serializer.writeStructList($7, listOfList, $7.listMember());
         }
         if (mapOfMap != null) {
-            serializer.writeMap($SCHEMA_MAP_OF_MAP, mapOfMap, mapOfMap.size(), SharedSerde.MapOfMapSerializer.INSTANCE);
+            serializer.writeStructMap($8, mapOfMap, $8.mapKeyMember(), $8.mapValueMember());
         }
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
+        SchemaUtils.validateMemberOf($SCHEMA, member);
         return switch (member.memberIndex()) {
-            case 0 -> (T) SchemaUtils.validateSameMember($SCHEMA_OTHER, member, other);
-            case 1 -> (T) SchemaUtils.validateSameMember($SCHEMA_BUILDER_MEMBER, member, builderMember);
-            case 2 -> (T) SchemaUtils.validateSameMember($SCHEMA_TYPE, member, type);
-            case 3 -> (T) SchemaUtils.validateSameMember($SCHEMA_OBJECT_MEMBER, member, objectMember);
-            case 4 -> (T) SchemaUtils.validateSameMember($SCHEMA_UNION, member, union);
-            case 5 -> (T) SchemaUtils.validateSameMember($SCHEMA_MAP, member, map);
-            case 6 -> (T) SchemaUtils.validateSameMember($SCHEMA_LIST, member, list);
-            case 7 -> (T) SchemaUtils.validateSameMember($SCHEMA_LIST_OF_LIST, member, listOfList);
-            case 8 -> (T) SchemaUtils.validateSameMember($SCHEMA_MAP_OF_MAP, member, mapOfMap);
-            default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+            case 0 -> (T) other;
+            case 1 -> (T) builderMember;
+            case 2 -> (T) type;
+            case 3 -> (T) objectMember;
+            case 4 -> (T) union;
+            case 5 -> (T) map;
+            case 6 -> (T) list;
+            case 7 -> (T) listOfList;
+            case 8 -> (T) mapOfMap;
+            default -> throw SchemaUtils.unknownMember(member);
         };
     }
 
@@ -321,17 +320,18 @@ public final class NamingStruct implements SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> other((String) SchemaUtils.validateSameMember($SCHEMA_OTHER, member, value));
-                case 1 -> builderMember((BuilderShape) SchemaUtils.validateSameMember($SCHEMA_BUILDER_MEMBER, member, value));
-                case 2 -> type((Type) SchemaUtils.validateSameMember($SCHEMA_TYPE, member, value));
-                case 3 -> objectMember((ObjectShape) SchemaUtils.validateSameMember($SCHEMA_OBJECT_MEMBER, member, value));
-                case 4 -> union((UnionWithTypeMember) SchemaUtils.validateSameMember($SCHEMA_UNION, member, value));
-                case 5 -> map((Map) SchemaUtils.validateSameMember($SCHEMA_MAP, member, value));
-                case 6 -> list((List) SchemaUtils.validateSameMember($SCHEMA_LIST, member, value));
-                case 7 -> listOfList((java.util.List<List>) SchemaUtils.validateSameMember($SCHEMA_LIST_OF_LIST, member, value));
-                case 8 -> mapOfMap((java.util.Map<String, Map>) SchemaUtils.validateSameMember($SCHEMA_MAP_OF_MAP, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> other((String) value);
+                case 1 -> builderMember((BuilderShape) value);
+                case 2 -> type((Type) value);
+                case 3 -> objectMember((ObjectShape) value);
+                case 4 -> union((UnionWithTypeMember) value);
+                case 5 -> map((Map) value);
+                case 6 -> list((List) value);
+                case 7 -> listOfList((java.util.List<List>) value);
+                case 8 -> mapOfMap((java.util.Map<String, Map>) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -347,7 +347,6 @@ public final class NamingStruct implements SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 Schema member,
@@ -363,7 +362,7 @@ public final class NamingStruct implements SerializableStruct {
                 case 6 -> builder.list(List.builder().deserializeMember(de, member).build());
                 case 7 -> builder.listOfList(SharedSerde.deserializeListOfList(member, de));
                 case 8 -> builder.mapOfMap(SharedSerde.deserializeMapOfMap(member, de));
-                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
     }

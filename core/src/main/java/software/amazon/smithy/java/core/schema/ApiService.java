@@ -21,8 +21,6 @@ public interface ApiService {
     /**
      * Get an operation contained by this service by its shape ID.
      *
-     * @param id ID of the operation to get.
-     * @return the operation.
      * @throws IllegalArgumentException if the operation is not found in this service.
      */
     default ApiOperation<?, ?> getOperation(ShapeId id) {

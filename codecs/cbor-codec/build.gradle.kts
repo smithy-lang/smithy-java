@@ -15,4 +15,5 @@ dependencies {
     api(project(":codecs:codec-commons", configuration = "shadow"))
     testFixturesImplementation(libs.assertj.core)
     testImplementation(project(":codecs:json-codec", configuration = "shadow"))
+    testImplementation(testFixtures(project(":core")))
 }

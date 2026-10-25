@@ -20,9 +20,6 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-/**
- * Generates serializers and deserializers for List shapes.
- */
 @SmithyInternalApi
 public final class ListGenerator
         implements Consumer<GenerateListDirective<CodeGenerationContext, JavaCodegenSettings>> {
@@ -46,7 +43,7 @@ public final class ListGenerator
                             writer.pushState();
                             var template =
                                     """
-                                            static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${shapeSerializer:T}> {
+                                            ${?generatedSerializer}static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${shapeSerializer:T}> {
                                                 static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
 
                                                 @Override
@@ -73,7 +70,7 @@ public final class ListGenerator
                                                 }
                                             }
 
-                                            static void deserialize${name:U}Member(
+                                            ${/generatedSerializer}static void deserialize${name:U}Member(
                                                     ${shape:B} state,
                                                     ${shapeDeserializer:T} deserializer
                                             ) {
@@ -103,6 +100,11 @@ public final class ListGenerator
                                             """;
                             writer.putContext("shape", directive.symbol());
                             writer.putContext("name", name);
+                            writer.putContext(
+                                    "generatedSerializer",
+                                    CodegenUtils.collectionWriterKind(
+                                            directive.model(),
+                                            directive.shape().getMember()) == null);
                             writer.putContext("serdeClass", serdeClass);
                             writer.putContext(
                                     "collectionImpl",

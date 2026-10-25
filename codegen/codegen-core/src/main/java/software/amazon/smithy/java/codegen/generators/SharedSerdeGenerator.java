@@ -14,9 +14,6 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-/**
- * Generates sharded {@code SharedSerde} utility classes for list and map serialization and deserialization.
- */
 @SmithyInternalApi
 public final class SharedSerdeGenerator
         implements Consumer<CustomizeDirective<CodeGenerationContext, JavaCodegenSettings>> {
@@ -24,13 +21,9 @@ public final class SharedSerdeGenerator
     @Override
     public void accept(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         var classNames = new LinkedHashSet<String>();
-        classNames.add("SharedSerde");
-        for (var partition : directive.context().schemaFieldOrder().partitions()) {
-            for (var field : partition) {
-                if (field.shape().isListShape() || field.shape().isMapShape()) {
-                    classNames.add(getClassName(directive.context(), field.shape()));
-                    break;
-                }
+        for (var shape : directive.connectedShapes().values()) {
+            if (shape.isListShape() || shape.isMapShape()) {
+                classNames.add(getClassName(directive.context(), shape));
             }
         }
 
@@ -45,9 +38,6 @@ public final class SharedSerdeGenerator
                                 writer.putContext("className", className);
                                 writer.write(
                                         """
-                                                /**
-                                                 * Defines shared serialization and deserialization methods for map and list shapes.
-                                                 */
                                                 final class ${className:L} {
 
                                                     ${L@sharedSerde|}

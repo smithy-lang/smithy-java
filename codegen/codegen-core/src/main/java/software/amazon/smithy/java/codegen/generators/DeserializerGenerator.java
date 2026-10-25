@@ -96,6 +96,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void listShape(ListShape listShape) {
+        // Keep per-shape deserializers so the JIT can inline element consumers at codec call sites.
         writer.write(
                 "$L.deserialize$L(${schemaName:L}, ${deserializer:L})",
                 SharedSerdeGenerator.getClassName(schemaFieldOrder, listShape),
@@ -132,7 +133,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void intEnumShape(IntEnumShape shape) {
-        delegateDeser();
+        writer.write("$T.fromValue(${deserializer:L}.readInteger(${schemaName:L}))", symbolProvider.toSymbol(shape));
         return null;
     }
 
@@ -184,7 +185,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void enumShape(EnumShape shape) {
-        delegateDeser();
+        writer.write("$T.fromValue(${deserializer:L}.readString(${schemaName:L}))", symbolProvider.toSymbol(shape));
         return null;
     }
 

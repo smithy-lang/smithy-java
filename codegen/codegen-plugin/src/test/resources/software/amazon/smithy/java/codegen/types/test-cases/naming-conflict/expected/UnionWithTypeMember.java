@@ -7,7 +7,6 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -31,13 +30,13 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
 
     @SmithyGenerated
     record TypeMember(Type type) implements UnionWithTypeMember {
-        private static final Schema $SCHEMA_TYPE = $SCHEMA.member("type");
+        private static final Schema $0 = $SCHEMA.member(0); // type
         public TypeMember {
             Objects.requireNonNull(type, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeStruct($SCHEMA_TYPE, type);
+            serializer.writeStruct($0, type);
         }
 
         @Override
@@ -47,7 +46,7 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
@@ -55,7 +54,7 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
     record $Unknown(String memberName) implements UnionWithTypeMember {
         @Override
         public void serialize(ShapeSerializer serializer) {
-            throw new UnsupportedOperationException("Cannot serialize union with unknown member " + this.memberName);
+            throw new UnsupportedOperationException("Cannot serialize union with unknown member ".concat(this.memberName));
         }
 
         @Override
@@ -126,9 +125,10 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> type((Type) SchemaUtils.validateSameMember(TypeMember.$SCHEMA_TYPE, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> type((Type) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -144,7 +144,6 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 Schema member,
@@ -152,7 +151,7 @@ public sealed interface UnionWithTypeMember extends SerializableStruct {
         ) {
             switch (member.memberIndex()) {
                 case 0 -> builder.type(Type.builder().deserializeMember(de, member).build());
-                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 

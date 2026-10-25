@@ -2,25 +2,26 @@ package software.amazon.smithy.java.example.standalone.model;
 
 import java.util.List;
 import java.util.Set;
+import software.amazon.smithy.java.core.schema.IntEnumValue;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.SmithyIntEnum;
+import software.amazon.smithy.java.core.schema.UnknownIntEnumValue;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
-public sealed interface IntEnumType extends SmithyIntEnum, SerializableShape {
+public sealed interface IntEnumType extends SmithyIntEnum, SerializableShape permits IntEnumType.FirstType, IntEnumType.SecondType, IntEnumType.FifthType, IntEnumType.$Unknown, $HiddenIntEnum_a50bb5c2 {
     IntEnumType FIRST = new FirstType();
     IntEnumType SECOND = new SecondType();
     IntEnumType FIFTH = new FifthType();
     List<IntEnumType> $TYPES = List.of(FIRST, SECOND, FIFTH);
 
     Schema $SCHEMA = Schema.createIntEnum(ShapeId.from("smithy.java.codegen.types.naming#IntEnumType"),
-        Set.of(FIRST.getValue(), SECOND.getValue(), FIFTH.getValue()), IntEnumType.class
+        Set.of(1, 2, 5), IntEnumType.class
     );
 
     ShapeId $ID = $SCHEMA.id();
@@ -51,80 +52,65 @@ public sealed interface IntEnumType extends SmithyIntEnum, SerializableShape {
     /**
      * Returns a {@link IntEnumType} constant with the specified value.
      *
+     * <p>Use {@link #fromValue} when reading values from a service, since a newer service may
+     * return values that this client does not know.
+     *
      * @param value value to create {@code IntEnumType} from.
      * @throws IllegalArgumentException if value does not match a known value.
      */
     static IntEnumType from(int value) {
+        var result = $lookup(value);
+        if (result == null) {
+            throw new IllegalArgumentException("Unknown value: ".concat(Integer.toString(value)));
+        }
+        return result;
+    }
+
+    /**
+     * Returns the {@link IntEnumType} constant with the specified value, or an unknown variant
+     * if no constant matches.
+     *
+     * <p>This method never throws for unrecognized values. Use it when reading values from a
+     * service, since a newer service may return values that this client does not know.
+     * Use {@link #from} when the value must be one of the known constants.
+     *
+     * @param value value to create {@code IntEnumType} from.
+     */
+    static IntEnumType fromValue(int value) {
+        var result = $lookup(value);
+        return result != null ? result : new $Unknown(value);
+    }
+
+    private static IntEnumType $lookup(int value) {
         return switch (value) {
             case 1 -> FIRST;
             case 2 -> SECOND;
             case 5 -> FIFTH;
-            default -> throw new IllegalArgumentException("Unknown value: " + value);
+            default -> null;
         };
     }
 
-    final class FirstType implements IntEnumType {
-        private FirstType() {}
-
-        @Override
-        public int getValue() {
-            return 1;
+    final class FirstType extends IntEnumValue implements IntEnumType {
+        private FirstType() {
+            super(1);
         }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
     }
 
-    final class SecondType implements IntEnumType {
-        private SecondType() {}
-
-        @Override
-        public int getValue() {
-            return 2;
+    final class SecondType extends IntEnumValue implements IntEnumType {
+        private SecondType() {
+            super(2);
         }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
     }
 
-    final class FifthType implements IntEnumType {
-        private FifthType() {}
-
-        @Override
-        public int getValue() {
-            return 5;
+    final class FifthType extends IntEnumValue implements IntEnumType {
+        private FifthType() {
+            super(5);
         }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
     }
 
-    record $Unknown(int value) implements IntEnumType {
-
-        @Override
-        public int getValue() {
-            return value;
-        }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
-        private final class $Hidden implements IntEnumType {
-            @Override
-            public int getValue() {
-                return 0;
-            }
+    final class $Unknown extends UnknownIntEnumValue implements IntEnumType {
+        public $Unknown(int value) {
+            super(value);
         }
     }
 
@@ -155,12 +141,7 @@ public sealed interface IntEnumType extends SmithyIntEnum, SerializableShape {
 
         @Override
         public IntEnumType build() {
-            return switch (value) {
-                case 1 -> FIRST;
-                case 2 -> SECOND;
-                case 5 -> FIFTH;
-                default -> new $Unknown(value);
-            };
+            return fromValue(value);
         }
 
         @Override

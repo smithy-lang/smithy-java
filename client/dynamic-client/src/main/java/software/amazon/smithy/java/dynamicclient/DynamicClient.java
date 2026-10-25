@@ -171,9 +171,6 @@ public final class DynamicClient extends Client {
 
     /**
      * Get an ApiOperation by shape ID.
-     *
-     * @param id ID of the operation to get.
-     * @return the operation.
      */
     public ApiOperation<StructDocument, StructDocument> getOperation(ShapeId id) {
         return getApiOperation(id);

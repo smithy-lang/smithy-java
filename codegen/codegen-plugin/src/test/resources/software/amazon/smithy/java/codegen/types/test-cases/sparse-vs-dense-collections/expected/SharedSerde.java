@@ -4,47 +4,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.RandomAccess;
-import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.core.serde.ShapeSerializer;
 
 
-/**
- * Defines shared serialization and deserialization methods for map and list shapes.
- */
 final class SharedSerde {
-
-    static final class SparseMapSerializer implements BiConsumer<Map<String, String>, MapSerializer> {
-        static final SparseMapSerializer INSTANCE = new SparseMapSerializer();
-
-        @Override
-        public void accept(Map<String, String> values, MapSerializer serializer) {
-            var $k = Schemas.SPARSE_MAP.mapKeyMember();
-            values.forEach((k, v) -> serializer.writeEntry(
-                $k,
-                k,
-                v,
-                SparseMap$ValueSerializer.INSTANCE
-            ));
-        }
-    }
-
-    private static final class SparseMap$ValueSerializer implements BiConsumer<String, ShapeSerializer> {
-        private static final SparseMap$ValueSerializer INSTANCE = new SparseMap$ValueSerializer();
-
-        @Override
-        public void accept(String values, ShapeSerializer serializer) {
-            if (values == null) {
-                serializer.writeNull(Schemas.SPARSE_MAP.mapValueMember());
-                return;
-            }
-            serializer.writeString(Schemas.SPARSE_MAP.mapValueMember(), values);
-        }
-    }
 
     static void deserializeSparseMapValue(
             Map<String, String> state,
@@ -75,33 +40,6 @@ final class SharedSerde {
         return result;
     }
 
-    static final class SparseListSerializer implements BiConsumer<List<String>, ShapeSerializer> {
-        static final SparseListSerializer INSTANCE = new SparseListSerializer();
-
-        @Override
-        public void accept(List<String> values, ShapeSerializer serializer) {
-            var $m = Schemas.SPARSE_LIST.listMember();
-            if (values instanceof RandomAccess) {
-                for (int i = 0, size = values.size(); i < size; i++) {
-                    var value = values.get(i);
-                    if (value == null) {
-                        serializer.writeNull($m);
-                        continue;
-                    }
-                    serializer.writeString($m, value);
-                }
-            } else {
-                for (var value : values) {
-                    if (value == null) {
-                        serializer.writeNull($m);
-                        continue;
-                    }
-                    serializer.writeString($m, value);
-                }
-            }
-        }
-    }
-
     static void deserializeSparseListMember(
             List<String> state,
             ShapeDeserializer deserializer
@@ -130,30 +68,6 @@ final class SharedSerde {
         return result;
     }
 
-    static final class DenseMapSerializer implements BiConsumer<Map<String, String>, MapSerializer> {
-        static final DenseMapSerializer INSTANCE = new DenseMapSerializer();
-
-        @Override
-        public void accept(Map<String, String> values, MapSerializer serializer) {
-            var $k = Schemas.DENSE_MAP.mapKeyMember();
-            values.forEach((k, v) -> serializer.writeEntry(
-                $k,
-                k,
-                v,
-                DenseMap$ValueSerializer.INSTANCE
-            ));
-        }
-    }
-
-    private static final class DenseMap$ValueSerializer implements BiConsumer<String, ShapeSerializer> {
-        private static final DenseMap$ValueSerializer INSTANCE = new DenseMap$ValueSerializer();
-
-        @Override
-        public void accept(String values, ShapeSerializer serializer) {
-            serializer.writeString(Schemas.DENSE_MAP.mapValueMember(), values);
-        }
-    }
-
     static void deserializeDenseMapValue(
             Map<String, String> state,
             String key,
@@ -180,25 +94,6 @@ final class SharedSerde {
                 result,
                 SharedSerde::deserializeDenseMapValue);
         return result;
-    }
-
-    static final class DenseListSerializer implements BiConsumer<List<String>, ShapeSerializer> {
-        static final DenseListSerializer INSTANCE = new DenseListSerializer();
-
-        @Override
-        public void accept(List<String> values, ShapeSerializer serializer) {
-            var $m = Schemas.DENSE_LIST.listMember();
-            if (values instanceof RandomAccess) {
-                for (int i = 0, size = values.size(); i < size; i++) {
-                    var value = values.get(i);
-                    serializer.writeString($m, value);
-                }
-            } else {
-                for (var value : values) {
-                    serializer.writeString($m, value);
-                }
-            }
-        }
     }
 
     static void deserializeDenseListMember(

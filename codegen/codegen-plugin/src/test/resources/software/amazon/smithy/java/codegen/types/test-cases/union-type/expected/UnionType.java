@@ -15,7 +15,6 @@ import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.Unit;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -39,13 +38,13 @@ public sealed interface UnionType extends SerializableStruct {
 
     @SmithyGenerated
     record BlobValueMember(ByteBuffer blobValue) implements UnionType {
-        private static final Schema $SCHEMA_BLOB_VALUE = $SCHEMA.member("blobValue");
+        private static final Schema $0 = $SCHEMA.member(0); // blobValue
         public BlobValueMember {
             Objects.requireNonNull(blobValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeBlob($SCHEMA_BLOB_VALUE, blobValue);
+            serializer.writeBlob($0, blobValue);
         }
 
         @Override
@@ -55,17 +54,17 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record BooleanValueMember(boolean booleanValue) implements UnionType {
-        private static final Schema $SCHEMA_BOOLEAN_VALUE = $SCHEMA.member("booleanValue");
+        private static final Schema $1 = $SCHEMA.member(1); // booleanValue
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeBoolean($SCHEMA_BOOLEAN_VALUE, booleanValue);
+            serializer.writeBoolean($1, booleanValue);
         }
 
         @Override
@@ -76,20 +75,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record ListValueMember(List<String> listValue) implements UnionType {
-        private static final Schema $SCHEMA_LIST_VALUE = $SCHEMA.member("listValue");
+        private static final Schema $2 = $SCHEMA.member(2); // listValue
         public ListValueMember {
             listValue = Collections.unmodifiableList(Objects.requireNonNull(listValue, "Union value cannot be null"));
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeList($SCHEMA_LIST_VALUE, listValue, listValue.size(), SharedSerde.ListOfStringSerializer.INSTANCE);
+            serializer.writeStringList($2, listValue, $2.listMember());
         }
 
         @Override
@@ -99,20 +98,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record MapValueMember(Map<String, String> mapValue) implements UnionType {
-        private static final Schema $SCHEMA_MAP_VALUE = $SCHEMA.member("mapValue");
+        private static final Schema $3 = $SCHEMA.member(3); // mapValue
         public MapValueMember {
             mapValue = Collections.unmodifiableMap(Objects.requireNonNull(mapValue, "Union value cannot be null"));
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeMap($SCHEMA_MAP_VALUE, mapValue, mapValue.size(), SharedSerde.StringStringMapSerializer.INSTANCE);
+            serializer.writeStringMap($3, mapValue, $3.mapKeyMember(), $3.mapValueMember());
         }
 
         @Override
@@ -122,20 +121,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record BigDecimalValueMember(BigDecimal bigDecimalValue) implements UnionType {
-        private static final Schema $SCHEMA_BIG_DECIMAL_VALUE = $SCHEMA.member("bigDecimalValue");
+        private static final Schema $4 = $SCHEMA.member(4); // bigDecimalValue
         public BigDecimalValueMember {
             Objects.requireNonNull(bigDecimalValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeBigDecimal($SCHEMA_BIG_DECIMAL_VALUE, bigDecimalValue);
+            serializer.writeBigDecimal($4, bigDecimalValue);
         }
 
         @Override
@@ -145,20 +144,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record BigIntegerValueMember(BigInteger bigIntegerValue) implements UnionType {
-        private static final Schema $SCHEMA_BIG_INTEGER_VALUE = $SCHEMA.member("bigIntegerValue");
+        private static final Schema $5 = $SCHEMA.member(5); // bigIntegerValue
         public BigIntegerValueMember {
             Objects.requireNonNull(bigIntegerValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeBigInteger($SCHEMA_BIG_INTEGER_VALUE, bigIntegerValue);
+            serializer.writeBigInteger($5, bigIntegerValue);
         }
 
         @Override
@@ -168,17 +167,17 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record ByteValueMember(byte byteValue) implements UnionType {
-        private static final Schema $SCHEMA_BYTE_VALUE = $SCHEMA.member("byteValue");
+        private static final Schema $6 = $SCHEMA.member(6); // byteValue
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeByte($SCHEMA_BYTE_VALUE, byteValue);
+            serializer.writeByte($6, byteValue);
         }
 
         @Override
@@ -189,17 +188,17 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record DoubleValueMember(double doubleValue) implements UnionType {
-        private static final Schema $SCHEMA_DOUBLE_VALUE = $SCHEMA.member("doubleValue");
+        private static final Schema $7 = $SCHEMA.member(7); // doubleValue
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeDouble($SCHEMA_DOUBLE_VALUE, doubleValue);
+            serializer.writeDouble($7, doubleValue);
         }
 
         @Override
@@ -210,17 +209,17 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record FloatValueMember(float floatValue) implements UnionType {
-        private static final Schema $SCHEMA_FLOAT_VALUE = $SCHEMA.member("floatValue");
+        private static final Schema $8 = $SCHEMA.member(8); // floatValue
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeFloat($SCHEMA_FLOAT_VALUE, floatValue);
+            serializer.writeFloat($8, floatValue);
         }
 
         @Override
@@ -231,17 +230,17 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record IntegerValueMember(int integerValue) implements UnionType {
-        private static final Schema $SCHEMA_INTEGER_VALUE = $SCHEMA.member("integerValue");
+        private static final Schema $9 = $SCHEMA.member(9); // integerValue
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeInteger($SCHEMA_INTEGER_VALUE, integerValue);
+            serializer.writeInteger($9, integerValue);
         }
 
         @Override
@@ -252,17 +251,17 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record LongValueMember(long longValue) implements UnionType {
-        private static final Schema $SCHEMA_LONG_VALUE = $SCHEMA.member("longValue");
+        private static final Schema $10 = $SCHEMA.member(10); // longValue
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeLong($SCHEMA_LONG_VALUE, longValue);
+            serializer.writeLong($10, longValue);
         }
 
         @Override
@@ -273,17 +272,17 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record ShortValueMember(short shortValue) implements UnionType {
-        private static final Schema $SCHEMA_SHORT_VALUE = $SCHEMA.member("shortValue");
+        private static final Schema $11 = $SCHEMA.member(11); // shortValue
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeShort($SCHEMA_SHORT_VALUE, shortValue);
+            serializer.writeShort($11, shortValue);
         }
 
         @Override
@@ -294,20 +293,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record StringValueMember(String stringValue) implements UnionType {
-        private static final Schema $SCHEMA_STRING_VALUE = $SCHEMA.member("stringValue");
+        private static final Schema $12 = $SCHEMA.member(12); // stringValue
         public StringValueMember {
             Objects.requireNonNull(stringValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString($SCHEMA_STRING_VALUE, stringValue);
+            serializer.writeString($12, stringValue);
         }
 
         @Override
@@ -317,20 +316,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record StructureValueMember(NestedStruct structureValue) implements UnionType {
-        private static final Schema $SCHEMA_STRUCTURE_VALUE = $SCHEMA.member("structureValue");
+        private static final Schema $13 = $SCHEMA.member(13); // structureValue
         public StructureValueMember {
             Objects.requireNonNull(structureValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeStruct($SCHEMA_STRUCTURE_VALUE, structureValue);
+            serializer.writeStruct($13, structureValue);
         }
 
         @Override
@@ -340,20 +339,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record TimestampValueMember(Instant timestampValue) implements UnionType {
-        private static final Schema $SCHEMA_TIMESTAMP_VALUE = $SCHEMA.member("timestampValue");
+        private static final Schema $14 = $SCHEMA.member(14); // timestampValue
         public TimestampValueMember {
             Objects.requireNonNull(timestampValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeTimestamp($SCHEMA_TIMESTAMP_VALUE, timestampValue);
+            serializer.writeTimestamp($14, timestampValue);
         }
 
         @Override
@@ -363,20 +362,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record UnionValueMember(NestedUnion unionValue) implements UnionType {
-        private static final Schema $SCHEMA_UNION_VALUE = $SCHEMA.member("unionValue");
+        private static final Schema $15 = $SCHEMA.member(15); // unionValue
         public UnionValueMember {
             Objects.requireNonNull(unionValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeStruct($SCHEMA_UNION_VALUE, unionValue);
+            serializer.writeStruct($15, unionValue);
         }
 
         @Override
@@ -386,20 +385,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record EnumValueMember(NestedEnum enumValue) implements UnionType {
-        private static final Schema $SCHEMA_ENUM_VALUE = $SCHEMA.member("enumValue");
+        private static final Schema $16 = $SCHEMA.member(16); // enumValue
         public EnumValueMember {
             Objects.requireNonNull(enumValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString($SCHEMA_ENUM_VALUE, enumValue.getValue());
+            serializer.writeString($16, enumValue.getValue());
         }
 
         @Override
@@ -409,20 +408,20 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record IntEnumValueMember(NestedIntEnum intEnumValue) implements UnionType {
-        private static final Schema $SCHEMA_INT_ENUM_VALUE = $SCHEMA.member("intEnumValue");
+        private static final Schema $17 = $SCHEMA.member(17); // intEnumValue
         public IntEnumValueMember {
             Objects.requireNonNull(intEnumValue, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeInteger($SCHEMA_INT_ENUM_VALUE, intEnumValue.getValue());
+            serializer.writeInteger($17, intEnumValue.getValue());
         }
 
         @Override
@@ -432,17 +431,17 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record UnitValueMember() implements UnionType {
-        private static final Schema $SCHEMA_UNIT_VALUE = $SCHEMA.member("unitValue");
+        private static final Schema $18 = $SCHEMA.member(18); // unitValue
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeStruct($SCHEMA_UNIT_VALUE, Unit.getInstance());
+            serializer.writeStruct($18, Unit.getInstance());
         }
 
         @Override
@@ -452,7 +451,7 @@ public sealed interface UnionType extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
@@ -460,7 +459,7 @@ public sealed interface UnionType extends SerializableStruct {
     record $Unknown(String memberName) implements UnionType {
         @Override
         public void serialize(ShapeSerializer serializer) {
-            throw new UnsupportedOperationException("Cannot serialize union with unknown member " + this.memberName);
+            throw new UnsupportedOperationException("Cannot serialize union with unknown member ".concat(this.memberName));
         }
 
         @Override
@@ -603,27 +602,28 @@ public sealed interface UnionType extends SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> blobValue((ByteBuffer) SchemaUtils.validateSameMember(BlobValueMember.$SCHEMA_BLOB_VALUE, member, value));
-                case 1 -> booleanValue((boolean) SchemaUtils.validateSameMember(BooleanValueMember.$SCHEMA_BOOLEAN_VALUE, member, value));
-                case 2 -> listValue((List<String>) SchemaUtils.validateSameMember(ListValueMember.$SCHEMA_LIST_VALUE, member, value));
-                case 3 -> mapValue((Map<String, String>) SchemaUtils.validateSameMember(MapValueMember.$SCHEMA_MAP_VALUE, member, value));
-                case 4 -> bigDecimalValue((BigDecimal) SchemaUtils.validateSameMember(BigDecimalValueMember.$SCHEMA_BIG_DECIMAL_VALUE, member, value));
-                case 5 -> bigIntegerValue((BigInteger) SchemaUtils.validateSameMember(BigIntegerValueMember.$SCHEMA_BIG_INTEGER_VALUE, member, value));
-                case 6 -> byteValue((byte) SchemaUtils.validateSameMember(ByteValueMember.$SCHEMA_BYTE_VALUE, member, value));
-                case 7 -> doubleValue((double) SchemaUtils.validateSameMember(DoubleValueMember.$SCHEMA_DOUBLE_VALUE, member, value));
-                case 8 -> floatValue((float) SchemaUtils.validateSameMember(FloatValueMember.$SCHEMA_FLOAT_VALUE, member, value));
-                case 9 -> integerValue((int) SchemaUtils.validateSameMember(IntegerValueMember.$SCHEMA_INTEGER_VALUE, member, value));
-                case 10 -> longValue((long) SchemaUtils.validateSameMember(LongValueMember.$SCHEMA_LONG_VALUE, member, value));
-                case 11 -> shortValue((short) SchemaUtils.validateSameMember(ShortValueMember.$SCHEMA_SHORT_VALUE, member, value));
-                case 12 -> stringValue((String) SchemaUtils.validateSameMember(StringValueMember.$SCHEMA_STRING_VALUE, member, value));
-                case 13 -> structureValue((NestedStruct) SchemaUtils.validateSameMember(StructureValueMember.$SCHEMA_STRUCTURE_VALUE, member, value));
-                case 14 -> timestampValue((Instant) SchemaUtils.validateSameMember(TimestampValueMember.$SCHEMA_TIMESTAMP_VALUE, member, value));
-                case 15 -> unionValue((NestedUnion) SchemaUtils.validateSameMember(UnionValueMember.$SCHEMA_UNION_VALUE, member, value));
-                case 16 -> enumValue((NestedEnum) SchemaUtils.validateSameMember(EnumValueMember.$SCHEMA_ENUM_VALUE, member, value));
-                case 17 -> intEnumValue((NestedIntEnum) SchemaUtils.validateSameMember(IntEnumValueMember.$SCHEMA_INT_ENUM_VALUE, member, value));
-                case 18 -> unitValue((Unit) SchemaUtils.validateSameMember(UnitValueMember.$SCHEMA_UNIT_VALUE, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> blobValue((ByteBuffer) value);
+                case 1 -> booleanValue((boolean) value);
+                case 2 -> listValue((List<String>) value);
+                case 3 -> mapValue((Map<String, String>) value);
+                case 4 -> bigDecimalValue((BigDecimal) value);
+                case 5 -> bigIntegerValue((BigInteger) value);
+                case 6 -> byteValue((byte) value);
+                case 7 -> doubleValue((double) value);
+                case 8 -> floatValue((float) value);
+                case 9 -> integerValue((int) value);
+                case 10 -> longValue((long) value);
+                case 11 -> shortValue((short) value);
+                case 12 -> stringValue((String) value);
+                case 13 -> structureValue((NestedStruct) value);
+                case 14 -> timestampValue((Instant) value);
+                case 15 -> unionValue((NestedUnion) value);
+                case 16 -> enumValue((NestedEnum) value);
+                case 17 -> intEnumValue((NestedIntEnum) value);
+                case 18 -> unitValue((Unit) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -639,7 +639,6 @@ public sealed interface UnionType extends SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 Schema member,
@@ -662,10 +661,10 @@ public sealed interface UnionType extends SerializableStruct {
                 case 13 -> builder.structureValue(NestedStruct.builder().deserializeMember(de, member).build());
                 case 14 -> builder.timestampValue(de.readTimestamp(member));
                 case 15 -> builder.unionValue(NestedUnion.builder().deserializeMember(de, member).build());
-                case 16 -> builder.enumValue(NestedEnum.builder().deserializeMember(de, member).build());
-                case 17 -> builder.intEnumValue(NestedIntEnum.builder().deserializeMember(de, member).build());
+                case 16 -> builder.enumValue(NestedEnum.fromValue(de.readString(member)));
+                case 17 -> builder.intEnumValue(NestedIntEnum.fromValue(de.readInteger(member)));
                 case 18 -> builder.unitValue(Unit.builder().deserializeMember(de, member).build());
-                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 

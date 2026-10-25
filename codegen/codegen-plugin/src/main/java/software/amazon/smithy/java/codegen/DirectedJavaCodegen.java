@@ -28,6 +28,7 @@ import software.amazon.smithy.java.codegen.client.generators.ClientInterfaceGene
 import software.amazon.smithy.java.codegen.client.waiters.WaiterContainerGenerator;
 import software.amazon.smithy.java.codegen.generators.ApiServiceGenerator;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
+import software.amazon.smithy.java.codegen.generators.EnumHiddenVariantGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.OperationGenerator;
@@ -201,6 +202,7 @@ final class DirectedJavaCodegen
         new SchemasGenerator().accept(directive);
         new SharedSerdeGenerator().accept(directive);
         new SchemaIndexGenerator().accept(directive);
+        new EnumHiddenVariantGenerator().accept(directive);
     }
 
     @Override

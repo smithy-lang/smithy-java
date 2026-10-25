@@ -155,7 +155,10 @@ public abstract class Client implements Closeable {
                         : call.pipeline.send(new ClientCall<>(call, h.input()));
             });
         } catch (CompletionException error) {
-            failure = error;
+            // unwrapAndThrow discards the wrapper, so record the cause as the failure. closeResources
+            // attaches close failures to this exception, and they would be lost on the wrapper.
+            Throwable cause = error.getCause();
+            failure = cause != null ? cause : error;
             throw unwrapAndThrow(error);
         } catch (RuntimeException | Error error) {
             failure = error;

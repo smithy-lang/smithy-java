@@ -8,7 +8,6 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -36,10 +35,10 @@ public sealed interface MixedUnion extends SerializableStruct {
 
     @SmithyGenerated
     record IntVariantMember(int intVariant) implements MixedUnion {
-        private static final Schema $SCHEMA_INT_VARIANT = $SCHEMA.member("intVariant");
+        private static final Schema $0 = $SCHEMA.member(0); // intVariant
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeInteger($SCHEMA_INT_VARIANT, intVariant);
+            serializer.writeInteger($0, intVariant);
         }
 
         @Override
@@ -50,20 +49,20 @@ public sealed interface MixedUnion extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record StringVariantMember(String stringVariant) implements MixedUnion {
-        private static final Schema $SCHEMA_STRING_VARIANT = $SCHEMA.member("stringVariant");
+        private static final Schema $1 = $SCHEMA.member(1); // stringVariant
         public StringVariantMember {
             Objects.requireNonNull(stringVariant, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeString($SCHEMA_STRING_VARIANT, stringVariant);
+            serializer.writeString($1, stringVariant);
         }
 
         @Override
@@ -73,17 +72,17 @@ public sealed interface MixedUnion extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record BoolVariantMember(boolean boolVariant) implements MixedUnion {
-        private static final Schema $SCHEMA_BOOL_VARIANT = $SCHEMA.member("boolVariant");
+        private static final Schema $2 = $SCHEMA.member(2); // boolVariant
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeBoolean($SCHEMA_BOOL_VARIANT, boolVariant);
+            serializer.writeBoolean($2, boolVariant);
         }
 
         @Override
@@ -94,7 +93,7 @@ public sealed interface MixedUnion extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
@@ -102,7 +101,7 @@ public sealed interface MixedUnion extends SerializableStruct {
     record $Unknown(String memberName) implements MixedUnion {
         @Override
         public void serialize(ShapeSerializer serializer) {
-            throw new UnsupportedOperationException("Cannot serialize union with unknown member " + this.memberName);
+            throw new UnsupportedOperationException("Cannot serialize union with unknown member ".concat(this.memberName));
         }
 
         @Override
@@ -181,11 +180,12 @@ public sealed interface MixedUnion extends SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> intVariant((int) SchemaUtils.validateSameMember(IntVariantMember.$SCHEMA_INT_VARIANT, member, value));
-                case 1 -> stringVariant((String) SchemaUtils.validateSameMember(StringVariantMember.$SCHEMA_STRING_VARIANT, member, value));
-                case 2 -> boolVariant((boolean) SchemaUtils.validateSameMember(BoolVariantMember.$SCHEMA_BOOL_VARIANT, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> intVariant((int) value);
+                case 1 -> stringVariant((String) value);
+                case 2 -> boolVariant((boolean) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -201,7 +201,6 @@ public sealed interface MixedUnion extends SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 Schema member,
@@ -211,7 +210,7 @@ public sealed interface MixedUnion extends SerializableStruct {
                 case 0 -> builder.intVariant(de.readInteger(member));
                 case 1 -> builder.stringVariant(de.readString(member));
                 case 2 -> builder.boolVariant(de.readBoolean(member));
-                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 

@@ -12,7 +12,6 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -24,10 +23,10 @@ import software.amazon.smithy.utils.SmithyGenerated;
 public final class JSpecifyStruct implements SerializableStruct {
 
     public static final Schema $SCHEMA = Schemas.J_SPECIFY_STRUCT;
-    private static final Schema $SCHEMA_REQUIRED_STRING = $SCHEMA.member("requiredString");
-    private static final Schema $SCHEMA_OPTIONAL_STRING = $SCHEMA.member("optionalString");
-    private static final Schema $SCHEMA_REQUIRED_PRIMITIVE = $SCHEMA.member("requiredPrimitive");
-    private static final Schema $SCHEMA_SPARSE_LIST = $SCHEMA.member("sparseList");
+    private static final Schema $0 = $SCHEMA.member(0); // requiredString
+    private static final Schema $1 = $SCHEMA.member(1); // requiredPrimitive
+    private static final Schema $2 = $SCHEMA.member(2); // optionalString
+    private static final Schema $3 = $SCHEMA.member(3); // sparseList
 
     public static final ShapeId $ID = $SCHEMA.id();
 
@@ -68,7 +67,7 @@ public final class JSpecifyStruct implements SerializableStruct {
 
     @Override
     public String toString() {
-        return ToStringSerializer.serialize(this);
+        return SchemaUtils.toString(this);
     }
 
     @Override
@@ -76,10 +75,9 @@ public final class JSpecifyStruct implements SerializableStruct {
         if (other == this) {
             return true;
         }
-        if (other == null || getClass() != other.getClass()) {
+        if (!(other instanceof JSpecifyStruct that)) {
             return false;
         }
-        JSpecifyStruct that = (JSpecifyStruct) other;
         return this.requiredPrimitive == that.requiredPrimitive
                && Objects.equals(this.requiredString, that.requiredString)
                && Objects.equals(this.optionalString, that.optionalString)
@@ -102,25 +100,26 @@ public final class JSpecifyStruct implements SerializableStruct {
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
-        serializer.writeString($SCHEMA_REQUIRED_STRING, requiredString);
-        serializer.writeBoolean($SCHEMA_REQUIRED_PRIMITIVE, requiredPrimitive);
+        serializer.writeString($0, requiredString);
+        serializer.writeBoolean($1, requiredPrimitive);
         if (optionalString != null) {
-            serializer.writeString($SCHEMA_OPTIONAL_STRING, optionalString);
+            serializer.writeString($2, optionalString);
         }
         if (sparseList != null) {
-            serializer.writeList($SCHEMA_SPARSE_LIST, sparseList, sparseList.size(), SharedSerde.SparseStringListSerializer.INSTANCE);
+            serializer.writeSparseStringList($3, sparseList, $3.listMember());
         }
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
+        SchemaUtils.validateMemberOf($SCHEMA, member);
         return switch (member.memberIndex()) {
-            case 0 -> (T) SchemaUtils.validateSameMember($SCHEMA_REQUIRED_STRING, member, requiredString);
-            case 1 -> (T) SchemaUtils.validateSameMember($SCHEMA_REQUIRED_PRIMITIVE, member, requiredPrimitive);
-            case 2 -> (T) SchemaUtils.validateSameMember($SCHEMA_OPTIONAL_STRING, member, optionalString);
-            case 3 -> (T) SchemaUtils.validateSameMember($SCHEMA_SPARSE_LIST, member, sparseList);
-            default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+            case 0 -> (T) requiredString;
+            case 1 -> (T) (Object) requiredPrimitive;
+            case 2 -> (T) optionalString;
+            case 3 -> (T) sparseList;
+            default -> throw SchemaUtils.unknownMember(member);
         };
     }
 
@@ -169,7 +168,7 @@ public final class JSpecifyStruct implements SerializableStruct {
          * @return this builder.
          */
         public Builder requiredString(String requiredString) {
-            this.requiredString = Objects.requireNonNull(requiredString, "requiredString cannot be null");
+            this.requiredString = SchemaUtils.requireNonNull(requiredString, $0);
             $setMembers |= 0x1L;
             return this;
         }
@@ -211,12 +210,13 @@ public final class JSpecifyStruct implements SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> requiredString((String) SchemaUtils.validateSameMember($SCHEMA_REQUIRED_STRING, member, value));
-                case 1 -> requiredPrimitive((boolean) SchemaUtils.validateSameMember($SCHEMA_REQUIRED_PRIMITIVE, member, value));
-                case 2 -> optionalString((String) SchemaUtils.validateSameMember($SCHEMA_OPTIONAL_STRING, member, value));
-                case 3 -> sparseList((List<@Nullable String>) SchemaUtils.validateSameMember($SCHEMA_SPARSE_LIST, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> requiredString((String) value);
+                case 1 -> requiredPrimitive((boolean) value);
+                case 2 -> optionalString((String) value);
+                case 3 -> sparseList((List<@Nullable String>) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -246,7 +246,6 @@ public final class JSpecifyStruct implements SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 Schema member,
@@ -257,7 +256,7 @@ public final class JSpecifyStruct implements SerializableStruct {
                 case 1 -> builder.requiredPrimitive(de.readBoolean(member));
                 case 2 -> builder.optionalString(de.readString(member));
                 case 3 -> builder.sparseList(SharedSerde.deserializeSparseStringList(member, de));
-                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
     }

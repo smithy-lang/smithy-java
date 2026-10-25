@@ -35,6 +35,7 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.error.ErrorFault;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.PresenceTracker;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -184,7 +185,9 @@ public final class StructureGenerator<
                             directive.model(),
                             directive.getRenames(),
                             directive.context().schemaFieldOrder()));
-            writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
+            writer.putContext(
+                    "getMemberValue",
+                    new GetMemberValueGenerator(writer, directive.symbolProvider(), directive.model(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.writeNullMarkedAnnotation();
             writer.write(template);
@@ -444,15 +447,14 @@ public final class StructureGenerator<
             // If there are no properties to compare, and they are the same non-null
             // type then classes should be considered equal, and we can simplify the return
             if (shape.members().isEmpty()) {
-                writer.writeInlineWithNoFormatting("return other != null && getClass() == other.getClass();");
+                writer.writeInline("return other instanceof $T;", symbolProvider.toSymbol(shape));
                 return;
             }
             writer.write(
                     """
-                            if (other == null || getClass() != other.getClass()) {
+                            if (!(other instanceof $1T that)) {
                                 return false;
                             }
-                            $1T that = ($1T) other;
                             return ${2C|};""",
                     symbolProvider.toSymbol(shape),
                     writer.consumer(this::writePropertyEqualityChecks));
@@ -912,7 +914,7 @@ public final class StructureGenerator<
         @Override
         protected void generateSetters(JavaWriter writer) {
             writer.pushState();
-            writer.putContext("objects", Objects.class);
+            writer.putContext("schemaUtils", SchemaUtils.class);
             writer.putContext("throwable", Throwable.class);
             for (var member : shape.members()) {
                 writer.pushState(new BuilderSetterSection(member));
@@ -921,13 +923,13 @@ public final class StructureGenerator<
                 writer.putContext("tracked", CodegenUtils.isRequiredWithNoDefault(member));
                 writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, member));
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
-                writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
+                writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(shape, member));
                 writer.putContext("setPresence", writer.consumer(w -> writeSetMember(w, member)));
 
                 writer.write(
                         """
                                 public Builder ${memberName:L}(${?isNullable}${memberSymbol:N}${/isNullable}${^isNullable}${memberSymbol:T}${/isNullable} ${memberName:L}) {
-                                    this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
+                                    this.${memberName:L} = ${?check}${schemaUtils:T}.requireNonNull(${/check}${memberName:L}${?check}, ${schemaName:L})${/check};${?tracked}
                                     ${setPresence:C|}${/tracked}
                                     return this;
                                 }
@@ -997,8 +999,7 @@ public final class StructureGenerator<
             if (usesInlinePresence()) {
                 writer.write("$$setMembers |= $L;", memberBitLiteral(member));
             } else {
-                var memberName = symbolProvider.toMemberName(member);
-                writer.write("tracker.setMember($L);", CodegenUtils.toMemberSchemaName(memberName));
+                writer.write("tracker.setMember($L);", CodegenUtils.toMemberSchemaName(shape, member));
             }
         }
 
@@ -1006,8 +1007,7 @@ public final class StructureGenerator<
             if (usesInlinePresence()) {
                 writer.writeInline("($$setMembers & $L) == 0L", memberBitLiteral(member));
             } else {
-                var memberName = symbolProvider.toMemberName(member);
-                writer.writeInline("!tracker.checkMember($L)", CodegenUtils.toMemberSchemaName(memberName));
+                writer.writeInline("!tracker.checkMember($L)", CodegenUtils.toMemberSchemaName(shape, member));
             }
         }
 

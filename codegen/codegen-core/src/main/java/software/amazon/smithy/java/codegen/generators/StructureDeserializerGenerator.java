@@ -10,12 +10,16 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
+/**
+ * Keep the member consumer separate from the builder to preserve codec reader inlining.
+ */
 record StructureDeserializerGenerator(
         JavaWriter writer,
         Shape shape,
@@ -42,7 +46,6 @@ record StructureDeserializerGenerator(
                             return this;
                         }
 
-                        @SuppressWarnings("unchecked")
                         private static void $$deserializeMember(
                                 Builder builder,
                                 ${sdkSchema:T} member,
@@ -50,9 +53,10 @@ record StructureDeserializerGenerator(
                         ) {${?hasMembers}
                             switch (member.memberIndex()) {
                                 ${cases:C|}
-                                default -> throw new ${illegalArg:T}("Unexpected member: " + member.memberName());
-                            }
-                        ${/hasMembers}}${?union}
+                                default -> throw ${schemaUtils:T}.unknownMember(member);
+                            }${/hasMembers}${^hasMembers}
+                            throw ${schemaUtils:T}.unknownMember(member);${/hasMembers}
+                        }${?union}
 
                         private static final class $$InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
                             private static final $$InnerDeserializer INSTANCE = new $$InnerDeserializer();
@@ -69,11 +73,11 @@ record StructureDeserializerGenerator(
                         }${/union}""";
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
+        writer.putContext("schemaUtils", SchemaUtils.class);
         writer.putContext("string", String.class);
         writer.putContext("hasMembers", !shape.members().isEmpty());
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
         writer.putContext("union", shape.isUnionShape());
-        writer.putContext("illegalArg", IllegalArgumentException.class);
         writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
         writer.putContext("consumer",
                 shape.isUnionShape() ? "$InnerDeserializer.INSTANCE" : "Builder::$deserializeMember");

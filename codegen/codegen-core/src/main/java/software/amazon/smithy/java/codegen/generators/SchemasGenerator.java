@@ -69,6 +69,8 @@ public final class SchemasGenerator
                                             ${value:C|}
                                             ${/resolvers}
 
+                                            static final ${schema:T}[] $$ALL = {${#all}${value:L}${^key.last}, ${/key.last}${/all}};
+
                                             private ${className:L}() {}
                                         }
                                         """;
@@ -97,6 +99,13 @@ public final class SchemasGenerator
                         writer.putContext("schemas", schemas);
                         writer.putContext("builders", builders);
                         writer.putContext("resolvers", resolvers);
+                        writer.putContext("schema", Schema.class);
+                        writer.putContext(
+                                "all",
+                                shapeOrder.stream()
+                                        .filter(not(SchemaField::isExternal))
+                                        .map(SchemaField::fieldName)
+                                        .toList());
                         writer.write(template);
                         writer.popState();
                     });
