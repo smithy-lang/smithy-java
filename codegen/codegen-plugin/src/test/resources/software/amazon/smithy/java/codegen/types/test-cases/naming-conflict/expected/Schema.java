@@ -6,7 +6,6 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -14,7 +13,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 public final class Schema implements SerializableStruct {
 
     public static final software.amazon.smithy.java.core.schema.Schema $SCHEMA = Schemas.SCHEMA;
-    private static final software.amazon.smithy.java.core.schema.Schema $SCHEMA_ONE_MEMBER = $SCHEMA.member("oneMember");
+    private static final software.amazon.smithy.java.core.schema.Schema $0 = $SCHEMA.member(0); // oneMember
 
     public static final ShapeId $ID = $SCHEMA.id();
 
@@ -30,7 +29,7 @@ public final class Schema implements SerializableStruct {
 
     @Override
     public String toString() {
-        return ToStringSerializer.serialize(this);
+        return SchemaUtils.toString(this);
     }
 
     @Override
@@ -38,10 +37,9 @@ public final class Schema implements SerializableStruct {
         if (other == this) {
             return true;
         }
-        if (other == null || getClass() != other.getClass()) {
+        if (!(other instanceof Schema that)) {
             return false;
         }
-        Schema that = (Schema) other;
         return Objects.equals(this.oneMember, that.oneMember);
     }
 
@@ -59,16 +57,17 @@ public final class Schema implements SerializableStruct {
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         if (oneMember != null) {
-            serializer.writeString($SCHEMA_ONE_MEMBER, oneMember);
+            serializer.writeString($0, oneMember);
         }
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getMemberValue(software.amazon.smithy.java.core.schema.Schema member) {
+        SchemaUtils.validateMemberOf($SCHEMA, member);
         return switch (member.memberIndex()) {
-            case 0 -> (T) SchemaUtils.validateSameMember($SCHEMA_ONE_MEMBER, member, oneMember);
-            default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+            case 0 -> (T) oneMember;
+            default -> throw SchemaUtils.unknownMember(member);
         };
     }
 
@@ -121,9 +120,10 @@ public final class Schema implements SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(software.amazon.smithy.java.core.schema.Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> oneMember((String) SchemaUtils.validateSameMember($SCHEMA_ONE_MEMBER, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> oneMember((String) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -139,7 +139,6 @@ public final class Schema implements SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 software.amazon.smithy.java.core.schema.Schema member,
@@ -147,7 +146,7 @@ public final class Schema implements SerializableStruct {
         ) {
             switch (member.memberIndex()) {
                 case 0 -> builder.oneMember(de.readString(member));
-                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
     }

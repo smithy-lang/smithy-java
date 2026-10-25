@@ -13,7 +13,6 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -25,14 +24,14 @@ import software.amazon.smithy.utils.SmithyGenerated;
 public final class CollectionStruct implements SerializableStruct {
 
     public static final Schema $SCHEMA = Schemas.COLLECTION_STRUCT;
-    private static final Schema $SCHEMA_NON_SPARSE_LIST = $SCHEMA.member("nonSparseList");
-    private static final Schema $SCHEMA_SPARSE_LIST = $SCHEMA.member("sparseList");
-    private static final Schema $SCHEMA_NON_SPARSE_MAP = $SCHEMA.member("nonSparseMap");
-    private static final Schema $SCHEMA_SPARSE_MAP = $SCHEMA.member("sparseMap");
-    private static final Schema $SCHEMA_NON_SPARSE_LIST_OF_SPARSE_MAP = $SCHEMA.member("nonSparseListOfSparseMap");
-    private static final Schema $SCHEMA_SPARSE_LIST_OF_SPARSE_MAP = $SCHEMA.member("sparseListOfSparseMap");
-    private static final Schema $SCHEMA_SPARSE_MAP_OF_NON_SPARSE_LIST = $SCHEMA.member("sparseMapOfNonSparseList");
-    private static final Schema $SCHEMA_NON_SPARSE_LIST_OF_NON_SPARSE_MAP = $SCHEMA.member("nonSparseListOfNonSparseMap");
+    private static final Schema $0 = $SCHEMA.member(0); // sparseList
+    private static final Schema $1 = $SCHEMA.member(1); // sparseMap
+    private static final Schema $2 = $SCHEMA.member(2); // sparseListOfSparseMap
+    private static final Schema $3 = $SCHEMA.member(3); // nonSparseListOfNonSparseMap
+    private static final Schema $4 = $SCHEMA.member(4); // nonSparseList
+    private static final Schema $5 = $SCHEMA.member(5); // nonSparseMap
+    private static final Schema $6 = $SCHEMA.member(6); // nonSparseListOfSparseMap
+    private static final Schema $7 = $SCHEMA.member(7); // sparseMapOfNonSparseList
 
     public static final ShapeId $ID = $SCHEMA.id();
 
@@ -158,7 +157,7 @@ public final class CollectionStruct implements SerializableStruct {
 
     @Override
     public String toString() {
-        return ToStringSerializer.serialize(this);
+        return SchemaUtils.toString(this);
     }
 
     @Override
@@ -166,10 +165,9 @@ public final class CollectionStruct implements SerializableStruct {
         if (other == this) {
             return true;
         }
-        if (other == null || getClass() != other.getClass()) {
+        if (!(other instanceof CollectionStruct that)) {
             return false;
         }
-        CollectionStruct that = (CollectionStruct) other;
         return Objects.equals(this.nonSparseList, that.nonSparseList)
                && Objects.equals(this.sparseList, that.sparseList)
                && Objects.equals(this.nonSparseListOfSparseMap, that.nonSparseListOfSparseMap)
@@ -200,37 +198,38 @@ public final class CollectionStruct implements SerializableStruct {
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
-        serializer.writeList($SCHEMA_SPARSE_LIST, sparseList, sparseList.size(), SharedSerde.SparseStringListSerializer.INSTANCE);
-        serializer.writeMap($SCHEMA_SPARSE_MAP, sparseMap, sparseMap.size(), SharedSerde.SparseStringMapSerializer.INSTANCE);
-        serializer.writeList($SCHEMA_SPARSE_LIST_OF_SPARSE_MAP, sparseListOfSparseMap, sparseListOfSparseMap.size(), SharedSerde.SparseListOfSparseMapSerializer.INSTANCE);
-        serializer.writeList($SCHEMA_NON_SPARSE_LIST_OF_NON_SPARSE_MAP, nonSparseListOfNonSparseMap, nonSparseListOfNonSparseMap.size(), SharedSerde.NonSparseListOfNonSparseMapSerializer.INSTANCE);
+        serializer.writeSparseStringList($0, sparseList, $0.listMember());
+        serializer.writeSparseStringMap($1, sparseMap, $1.mapKeyMember(), $1.mapValueMember());
+        serializer.writeList($2, sparseListOfSparseMap, sparseListOfSparseMap.size(), SharedSerde.SparseListOfSparseMapSerializer.INSTANCE);
+        serializer.writeList($3, nonSparseListOfNonSparseMap, nonSparseListOfNonSparseMap.size(), SharedSerde.NonSparseListOfNonSparseMapSerializer.INSTANCE);
         if (nonSparseList != null) {
-            serializer.writeList($SCHEMA_NON_SPARSE_LIST, nonSparseList, nonSparseList.size(), SharedSerde.NonSparseStringListSerializer.INSTANCE);
+            serializer.writeStringList($4, nonSparseList, $4.listMember());
         }
         if (nonSparseMap != null) {
-            serializer.writeMap($SCHEMA_NON_SPARSE_MAP, nonSparseMap, nonSparseMap.size(), SharedSerde.NonSparseStringMapSerializer.INSTANCE);
+            serializer.writeStringMap($5, nonSparseMap, $5.mapKeyMember(), $5.mapValueMember());
         }
         if (nonSparseListOfSparseMap != null) {
-            serializer.writeList($SCHEMA_NON_SPARSE_LIST_OF_SPARSE_MAP, nonSparseListOfSparseMap, nonSparseListOfSparseMap.size(), SharedSerde.NonSparseListOfSparseMapSerializer.INSTANCE);
+            serializer.writeList($6, nonSparseListOfSparseMap, nonSparseListOfSparseMap.size(), SharedSerde.NonSparseListOfSparseMapSerializer.INSTANCE);
         }
         if (sparseMapOfNonSparseList != null) {
-            serializer.writeMap($SCHEMA_SPARSE_MAP_OF_NON_SPARSE_LIST, sparseMapOfNonSparseList, sparseMapOfNonSparseList.size(), SharedSerde.SparseMapOfNonSparseListSerializer.INSTANCE);
+            serializer.writeMap($7, sparseMapOfNonSparseList, sparseMapOfNonSparseList.size(), SharedSerde.SparseMapOfNonSparseListSerializer.INSTANCE);
         }
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
+        SchemaUtils.validateMemberOf($SCHEMA, member);
         return switch (member.memberIndex()) {
-            case 0 -> (T) SchemaUtils.validateSameMember($SCHEMA_SPARSE_LIST, member, sparseList);
-            case 1 -> (T) SchemaUtils.validateSameMember($SCHEMA_SPARSE_MAP, member, sparseMap);
-            case 2 -> (T) SchemaUtils.validateSameMember($SCHEMA_SPARSE_LIST_OF_SPARSE_MAP, member, sparseListOfSparseMap);
-            case 3 -> (T) SchemaUtils.validateSameMember($SCHEMA_NON_SPARSE_LIST_OF_NON_SPARSE_MAP, member, nonSparseListOfNonSparseMap);
-            case 4 -> (T) SchemaUtils.validateSameMember($SCHEMA_NON_SPARSE_LIST, member, nonSparseList);
-            case 5 -> (T) SchemaUtils.validateSameMember($SCHEMA_NON_SPARSE_MAP, member, nonSparseMap);
-            case 6 -> (T) SchemaUtils.validateSameMember($SCHEMA_NON_SPARSE_LIST_OF_SPARSE_MAP, member, nonSparseListOfSparseMap);
-            case 7 -> (T) SchemaUtils.validateSameMember($SCHEMA_SPARSE_MAP_OF_NON_SPARSE_LIST, member, sparseMapOfNonSparseList);
-            default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+            case 0 -> (T) sparseList;
+            case 1 -> (T) sparseMap;
+            case 2 -> (T) sparseListOfSparseMap;
+            case 3 -> (T) nonSparseListOfNonSparseMap;
+            case 4 -> (T) nonSparseList;
+            case 5 -> (T) nonSparseMap;
+            case 6 -> (T) nonSparseListOfSparseMap;
+            case 7 -> (T) sparseMapOfNonSparseList;
+            default -> throw SchemaUtils.unknownMember(member);
         };
     }
 
@@ -299,7 +298,7 @@ public final class CollectionStruct implements SerializableStruct {
          * @return this builder.
          */
         public Builder sparseList(List<@Nullable String> sparseList) {
-            this.sparseList = Objects.requireNonNull(sparseList, "sparseList cannot be null");
+            this.sparseList = SchemaUtils.requireNonNull(sparseList, $0);
             $setMembers |= 0x1L;
             return this;
         }
@@ -321,7 +320,7 @@ public final class CollectionStruct implements SerializableStruct {
          * @return this builder.
          */
         public Builder sparseMap(Map<String, @Nullable String> sparseMap) {
-            this.sparseMap = Objects.requireNonNull(sparseMap, "sparseMap cannot be null");
+            this.sparseMap = SchemaUtils.requireNonNull(sparseMap, $1);
             $setMembers |= 0x2L;
             return this;
         }
@@ -343,7 +342,7 @@ public final class CollectionStruct implements SerializableStruct {
          * @return this builder.
          */
         public Builder sparseListOfSparseMap(List<@Nullable Map<String, @Nullable String>> sparseListOfSparseMap) {
-            this.sparseListOfSparseMap = Objects.requireNonNull(sparseListOfSparseMap, "sparseListOfSparseMap cannot be null");
+            this.sparseListOfSparseMap = SchemaUtils.requireNonNull(sparseListOfSparseMap, $2);
             $setMembers |= 0x4L;
             return this;
         }
@@ -365,7 +364,7 @@ public final class CollectionStruct implements SerializableStruct {
          * @return this builder.
          */
         public Builder nonSparseListOfNonSparseMap(List<Map<String, String>> nonSparseListOfNonSparseMap) {
-            this.nonSparseListOfNonSparseMap = Objects.requireNonNull(nonSparseListOfNonSparseMap, "nonSparseListOfNonSparseMap cannot be null");
+            this.nonSparseListOfNonSparseMap = SchemaUtils.requireNonNull(nonSparseListOfNonSparseMap, $3);
             $setMembers |= 0x8L;
             return this;
         }
@@ -381,16 +380,17 @@ public final class CollectionStruct implements SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> sparseList((List<@Nullable String>) SchemaUtils.validateSameMember($SCHEMA_SPARSE_LIST, member, value));
-                case 1 -> sparseMap((Map<String, @Nullable String>) SchemaUtils.validateSameMember($SCHEMA_SPARSE_MAP, member, value));
-                case 2 -> sparseListOfSparseMap((List<@Nullable Map<String, @Nullable String>>) SchemaUtils.validateSameMember($SCHEMA_SPARSE_LIST_OF_SPARSE_MAP, member, value));
-                case 3 -> nonSparseListOfNonSparseMap((List<Map<String, String>>) SchemaUtils.validateSameMember($SCHEMA_NON_SPARSE_LIST_OF_NON_SPARSE_MAP, member, value));
-                case 4 -> nonSparseList((List<String>) SchemaUtils.validateSameMember($SCHEMA_NON_SPARSE_LIST, member, value));
-                case 5 -> nonSparseMap((Map<String, String>) SchemaUtils.validateSameMember($SCHEMA_NON_SPARSE_MAP, member, value));
-                case 6 -> nonSparseListOfSparseMap((List<Map<String, @Nullable String>>) SchemaUtils.validateSameMember($SCHEMA_NON_SPARSE_LIST_OF_SPARSE_MAP, member, value));
-                case 7 -> sparseMapOfNonSparseList((Map<String, @Nullable List<String>>) SchemaUtils.validateSameMember($SCHEMA_SPARSE_MAP_OF_NON_SPARSE_LIST, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> sparseList((List<@Nullable String>) value);
+                case 1 -> sparseMap((Map<String, @Nullable String>) value);
+                case 2 -> sparseListOfSparseMap((List<@Nullable Map<String, @Nullable String>>) value);
+                case 3 -> nonSparseListOfNonSparseMap((List<Map<String, String>>) value);
+                case 4 -> nonSparseList((List<String>) value);
+                case 5 -> nonSparseMap((Map<String, String>) value);
+                case 6 -> nonSparseListOfSparseMap((List<Map<String, @Nullable String>>) value);
+                case 7 -> sparseMapOfNonSparseList((Map<String, @Nullable List<String>>) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -426,7 +426,6 @@ public final class CollectionStruct implements SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 Schema member,
@@ -441,7 +440,7 @@ public final class CollectionStruct implements SerializableStruct {
                 case 5 -> builder.nonSparseMap(SharedSerde.deserializeNonSparseStringMap(member, de));
                 case 6 -> builder.nonSparseListOfSparseMap(SharedSerde.deserializeNonSparseListOfSparseMap(member, de));
                 case 7 -> builder.sparseMapOfNonSparseList(SharedSerde.deserializeSparseMapOfNonSparseList(member, de));
-                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
     }

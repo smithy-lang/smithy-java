@@ -7,7 +7,6 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -15,15 +14,15 @@ import software.amazon.smithy.utils.SmithyGenerated;
 public final class ObjectShape implements SerializableStruct {
 
     public static final Schema $SCHEMA = Schemas.OBJECT;
-    private static final Schema $SCHEMA_CLASS_MEMBER = $SCHEMA.member("class");
-    private static final Schema $SCHEMA_GET_CLASS_MEMBER = $SCHEMA.member("getClass");
-    private static final Schema $SCHEMA_HASH_CODE_MEMBER = $SCHEMA.member("hashCode");
-    private static final Schema $SCHEMA_CLONE_MEMBER = $SCHEMA.member("clone");
-    private static final Schema $SCHEMA_TO_STRING_MEMBER = $SCHEMA.member("toString");
-    private static final Schema $SCHEMA_NOTIFY_MEMBER = $SCHEMA.member("notify");
-    private static final Schema $SCHEMA_NOTIFY_ALL_MEMBER = $SCHEMA.member("notifyAll");
-    private static final Schema $SCHEMA_WAIT_MEMBER = $SCHEMA.member("wait");
-    private static final Schema $SCHEMA_FINALIZE_MEMBER = $SCHEMA.member("finalize");
+    private static final Schema $0 = $SCHEMA.member(0); // class
+    private static final Schema $1 = $SCHEMA.member(1); // getClass
+    private static final Schema $2 = $SCHEMA.member(2); // hashCode
+    private static final Schema $3 = $SCHEMA.member(3); // clone
+    private static final Schema $4 = $SCHEMA.member(4); // toString
+    private static final Schema $5 = $SCHEMA.member(5); // notify
+    private static final Schema $6 = $SCHEMA.member(6); // notifyAll
+    private static final Schema $7 = $SCHEMA.member(7); // wait
+    private static final Schema $8 = $SCHEMA.member(8); // finalize
 
     public static final ShapeId $ID = $SCHEMA.id();
 
@@ -87,7 +86,7 @@ public final class ObjectShape implements SerializableStruct {
 
     @Override
     public String toString() {
-        return ToStringSerializer.serialize(this);
+        return SchemaUtils.toString(this);
     }
 
     @Override
@@ -95,10 +94,9 @@ public final class ObjectShape implements SerializableStruct {
         if (other == this) {
             return true;
         }
-        if (other == null || getClass() != other.getClass()) {
+        if (!(other instanceof ObjectShape that)) {
             return false;
         }
-        ObjectShape that = (ObjectShape) other;
         return Objects.equals(this.classMember, that.classMember)
                && Objects.equals(this.getClassMember, that.getClassMember)
                && Objects.equals(this.hashCodeMember, that.hashCodeMember)
@@ -132,48 +130,49 @@ public final class ObjectShape implements SerializableStruct {
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         if (classMember != null) {
-            serializer.writeString($SCHEMA_CLASS_MEMBER, classMember);
+            serializer.writeString($0, classMember);
         }
         if (getClassMember != null) {
-            serializer.writeString($SCHEMA_GET_CLASS_MEMBER, getClassMember);
+            serializer.writeString($1, getClassMember);
         }
         if (hashCodeMember != null) {
-            serializer.writeString($SCHEMA_HASH_CODE_MEMBER, hashCodeMember);
+            serializer.writeString($2, hashCodeMember);
         }
         if (cloneMember != null) {
-            serializer.writeString($SCHEMA_CLONE_MEMBER, cloneMember);
+            serializer.writeString($3, cloneMember);
         }
         if (toStringMember != null) {
-            serializer.writeString($SCHEMA_TO_STRING_MEMBER, toStringMember);
+            serializer.writeString($4, toStringMember);
         }
         if (notifyMember != null) {
-            serializer.writeString($SCHEMA_NOTIFY_MEMBER, notifyMember);
+            serializer.writeString($5, notifyMember);
         }
         if (notifyAllMember != null) {
-            serializer.writeString($SCHEMA_NOTIFY_ALL_MEMBER, notifyAllMember);
+            serializer.writeString($6, notifyAllMember);
         }
         if (waitMember != null) {
-            serializer.writeString($SCHEMA_WAIT_MEMBER, waitMember);
+            serializer.writeString($7, waitMember);
         }
         if (finalizeMember != null) {
-            serializer.writeString($SCHEMA_FINALIZE_MEMBER, finalizeMember);
+            serializer.writeString($8, finalizeMember);
         }
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
+        SchemaUtils.validateMemberOf($SCHEMA, member);
         return switch (member.memberIndex()) {
-            case 0 -> (T) SchemaUtils.validateSameMember($SCHEMA_CLASS_MEMBER, member, classMember);
-            case 1 -> (T) SchemaUtils.validateSameMember($SCHEMA_GET_CLASS_MEMBER, member, getClassMember);
-            case 2 -> (T) SchemaUtils.validateSameMember($SCHEMA_HASH_CODE_MEMBER, member, hashCodeMember);
-            case 3 -> (T) SchemaUtils.validateSameMember($SCHEMA_CLONE_MEMBER, member, cloneMember);
-            case 4 -> (T) SchemaUtils.validateSameMember($SCHEMA_TO_STRING_MEMBER, member, toStringMember);
-            case 5 -> (T) SchemaUtils.validateSameMember($SCHEMA_NOTIFY_MEMBER, member, notifyMember);
-            case 6 -> (T) SchemaUtils.validateSameMember($SCHEMA_NOTIFY_ALL_MEMBER, member, notifyAllMember);
-            case 7 -> (T) SchemaUtils.validateSameMember($SCHEMA_WAIT_MEMBER, member, waitMember);
-            case 8 -> (T) SchemaUtils.validateSameMember($SCHEMA_FINALIZE_MEMBER, member, finalizeMember);
-            default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+            case 0 -> (T) classMember;
+            case 1 -> (T) getClassMember;
+            case 2 -> (T) hashCodeMember;
+            case 3 -> (T) cloneMember;
+            case 4 -> (T) toStringMember;
+            case 5 -> (T) notifyMember;
+            case 6 -> (T) notifyAllMember;
+            case 7 -> (T) waitMember;
+            case 8 -> (T) finalizeMember;
+            default -> throw SchemaUtils.unknownMember(member);
         };
     }
 
@@ -306,17 +305,18 @@ public final class ObjectShape implements SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> classMember((String) SchemaUtils.validateSameMember($SCHEMA_CLASS_MEMBER, member, value));
-                case 1 -> getClassMember((String) SchemaUtils.validateSameMember($SCHEMA_GET_CLASS_MEMBER, member, value));
-                case 2 -> hashCodeMember((String) SchemaUtils.validateSameMember($SCHEMA_HASH_CODE_MEMBER, member, value));
-                case 3 -> cloneMember((String) SchemaUtils.validateSameMember($SCHEMA_CLONE_MEMBER, member, value));
-                case 4 -> toStringMember((String) SchemaUtils.validateSameMember($SCHEMA_TO_STRING_MEMBER, member, value));
-                case 5 -> notifyMember((String) SchemaUtils.validateSameMember($SCHEMA_NOTIFY_MEMBER, member, value));
-                case 6 -> notifyAllMember((String) SchemaUtils.validateSameMember($SCHEMA_NOTIFY_ALL_MEMBER, member, value));
-                case 7 -> waitMember((String) SchemaUtils.validateSameMember($SCHEMA_WAIT_MEMBER, member, value));
-                case 8 -> finalizeMember((String) SchemaUtils.validateSameMember($SCHEMA_FINALIZE_MEMBER, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> classMember((String) value);
+                case 1 -> getClassMember((String) value);
+                case 2 -> hashCodeMember((String) value);
+                case 3 -> cloneMember((String) value);
+                case 4 -> toStringMember((String) value);
+                case 5 -> notifyMember((String) value);
+                case 6 -> notifyAllMember((String) value);
+                case 7 -> waitMember((String) value);
+                case 8 -> finalizeMember((String) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -332,7 +332,6 @@ public final class ObjectShape implements SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 Schema member,
@@ -348,7 +347,7 @@ public final class ObjectShape implements SerializableStruct {
                 case 6 -> builder.notifyAllMember(de.readString(member));
                 case 7 -> builder.waitMember(de.readString(member));
                 case 8 -> builder.finalizeMember(de.readString(member));
-                default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
     }

@@ -38,6 +38,7 @@ import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 
@@ -106,6 +107,14 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void listShape(ListShape listShape) {
+        var kind = CodegenUtils.collectionWriterKind(model, listShape.getMember());
+        if (kind != null) {
+            writer.write(
+                    "serializer.write$L$LList(${schema:L}, ${state:L}, ${schema:L}.listMember())",
+                    listShape.hasTrait(SparseTrait.class) ? "Sparse" : "",
+                    kind);
+            return null;
+        }
         var serdeClass = SharedSerdeGenerator.getClassName(directive.context(), listShape);
         writer.write(
                 "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), $L.$USerializer.INSTANCE)",
@@ -116,6 +125,14 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void mapShape(MapShape mapShape) {
+        if (CodegenUtils.usesTypedMapWriter(model, mapShape)) {
+            writer.write(
+                    "serializer.write$L$LMap(${schema:L}, ${state:L}, ${schema:L}.mapKeyMember(), "
+                            + "${schema:L}.mapValueMember())",
+                    mapShape.hasTrait(SparseTrait.class) ? "Sparse" : "",
+                    CodegenUtils.collectionWriterKind(model, mapShape.getValue()));
+            return null;
+        }
         var serdeClass = SharedSerdeGenerator.getClassName(directive.context(), mapShape);
         writer.write(
                 "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), $L.$USerializer.INSTANCE)",
@@ -242,7 +259,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
                         schemaFieldOder.getSchemaFieldName(container, writer) + ".mapValueMember()";
                 writer.putContext("schema", memberSchema);
             } else {
-                writer.putContext("schema", CodegenUtils.toMemberSchemaName(memberName));
+                writer.putContext("schema", CodegenUtils.toMemberSchemaName(container, memberShape));
             }
         }
         return model.expectShape(memberShape.getTarget()).accept(this);

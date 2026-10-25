@@ -65,6 +65,8 @@ final class MemberSchemaBuilder {
         }
     }
 
+    // Must stay identical to codegen's CodegenUtils#isRequiredWithNoDefault: SchemaBuilder#sortMembers orders members by
+    // this flag and generated code addresses members by the resulting index ($SCHEMA.member(N)).
     private boolean computeIsRequired() {
         if (!traits.contains(TraitKey.REQUIRED_TRAIT)) {
             return false;

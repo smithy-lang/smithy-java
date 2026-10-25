@@ -27,13 +27,16 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.NullableIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.selector.PathFinder;
+import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.ClientOptionalTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.model.traits.synthetic.OriginalShapeIdTrait;
 import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -209,9 +212,26 @@ public final class CodegenUtils {
      *
      * @param memberName Member shape to generate schema name from
      * @return name to use for static schema property
+     * @deprecated Use {@link #toMemberSchemaName(Shape, MemberShape)} for generated member schema constants.
      */
+    @Deprecated
     public static String toMemberSchemaName(String memberName) {
         return SCHEMA_STATIC_NAME + "_" + CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ENGLISH);
+    }
+
+    /**
+     * Returns the member schema constant name, such as {@code $0}, based on the member's sorted index.
+     *
+     * @param container Shape that contains the member.
+     * @param member Member to get the schema constant name for.
+     * @return name of the static schema constant.
+     */
+    public static String toMemberSchemaName(Shape container, MemberShape member) {
+        int index = getSortedMembers(container).indexOf(member);
+        if (index < 0) {
+            throw new IllegalArgumentException(member.getId() + " is not a member of " + container.getId());
+        }
+        return "$" + index;
     }
 
     /**
@@ -233,11 +253,59 @@ public final class CodegenUtils {
     }
 
     /**
+     * Returns the kind in a typed {@code ShapeSerializer} collection writer name, or null if the member requires
+     * a generated serializer.
+     *
+     * @param model Model containing the member.
+     * @param member List member or map value member.
+     * @return the kind used in the typed writer name (for example "String" or "Struct"), or null.
+     */
+    public static String collectionWriterKind(Model model, MemberShape member) {
+        var target = model.expectShape(member.getTarget());
+        return switch (target.getType()) {
+            case BOOLEAN -> "Boolean";
+            case BYTE -> "Byte";
+            case SHORT -> "Short";
+            case INTEGER -> "Integer";
+            case LONG -> "Long";
+            case FLOAT -> "Float";
+            case DOUBLE -> "Double";
+            case BIG_INTEGER -> "BigInteger";
+            case BIG_DECIMAL -> "BigDecimal";
+            case STRING -> "String";
+            case BLOB -> "Blob";
+            case TIMESTAMP -> "Timestamp";
+            case DOCUMENT -> "Document";
+            case ENUM -> "Enum";
+            case INT_ENUM -> "IntEnum";
+            case STRUCTURE -> target.hasTrait(UnitTypeTrait.class) ? null : "Struct";
+            case UNION -> "Struct";
+            default -> null;
+        };
+    }
+
+    /**
+     * Checks whether a map with string keys has a typed {@code ShapeSerializer} writer for its values.
+     *
+     * @param model Model containing the shape.
+     * @param shape Map shape to check.
+     * @return true if the map is serialized with a typed writer.
+     */
+    public static boolean usesTypedMapWriter(Model model, MapShape shape) {
+        return model.expectShape(shape.getKey().getTarget()).getType() == ShapeType.STRING
+                && collectionWriterKind(model, shape.getValue()) != null;
+    }
+
+    /**
      * Checks if a member is required and has no default.
      *
      * <p>Required members with no default require presence tracking.
      *
      * @param memberShape member shape to check
+     * <p>This predicate must stay identical to the runtime's {@code MemberSchemaBuilder#computeIsRequired}: it drives
+     * {@link #getSortedMembers}, and generated code addresses members by that sorted index ({@code $SCHEMA.member(N)}),
+     * so any divergence would bind a member to another member's schema. {@code CodegenUtilsTest} checks the two agree.
+     *
      * @return true if the member has the required trait and does not have a default.
      */
     public static boolean isRequiredWithNoDefault(MemberShape memberShape) {

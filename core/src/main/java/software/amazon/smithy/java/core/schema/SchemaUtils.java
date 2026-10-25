@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import software.amazon.smithy.java.core.serde.ToStringSerializer;
+
 public final class SchemaUtils {
 
     private SchemaUtils() {}
@@ -49,6 +51,54 @@ public final class SchemaUtils {
         throw new IllegalArgumentException(
                 "Attempted to read or write a non-existent member of " + expected.id()
                         + ": " + actual.id());
+    }
+
+    /**
+     * Validates that {@code member} is a member schema of {@code parent}.
+     *
+     * @param parent Schema that is expected to contain the member.
+     * @param member Member schema to validate.
+     * @throws IllegalArgumentException if the member does not belong to the parent.
+     */
+    public static void validateMemberOf(Schema parent, Schema member) {
+        var members = parent.members();
+        int index = member.memberIndex();
+        if (index >= members.size() || members.get(index) != member) {
+            throw illegalMemberAccess(parent, member);
+        }
+    }
+
+    /**
+     * Creates an {@link IllegalArgumentException} for an unknown member schema.
+     */
+    public static RuntimeException unknownMember(Schema member) {
+        return new IllegalArgumentException("Unknown member: " + member.id());
+    }
+
+    /**
+     * Formats a shape with {@link ToStringSerializer}.
+     *
+     * @param shape Shape to format.
+     * @return the string form of the shape.
+     */
+    public static String toString(SerializableShape shape) {
+        return ToStringSerializer.serialize(shape);
+    }
+
+    /**
+     * Requires that a member value is not null.
+     *
+     * @param value Value to check.
+     * @param member Schema of the member being set.
+     * @return the given value.
+     * @param <T> Value type.
+     * @throws NullPointerException if the value is null.
+     */
+    public static <T> T requireNonNull(T value, Schema member) {
+        if (value == null) {
+            throw new NullPointerException(member.memberName() + " cannot be null");
+        }
+        return value;
     }
 
 }

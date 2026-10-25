@@ -9,7 +9,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -63,15 +65,48 @@ public class PayloadSerializerTest {
         assertThat(body, equalTo("{\"name\":\"Phreddy\"}"));
     }
 
+    @Test
+    public void mapPayloadIsSerializedThroughCodec() {
+        var values = new LinkedHashMap<String, String>();
+        values.put("a", "1");
+        values.put("b", "2");
+
+        var generic = serializeRequest(MapPayloadInput.OPERATION, new MapPayloadInput(values, false));
+        var typed = serializeRequest(MapPayloadInput.OPERATION, new MapPayloadInput(values, true));
+
+        assertThat(body(generic), equalTo("{\"a\":\"1\",\"b\":\"2\"}"));
+        assertThat(body(typed), equalTo(body(generic)));
+    }
+
+    @Test
+    public void codecPayloadsUseTheCodecMediaType() {
+        var map = new LinkedHashMap<String, String>();
+        map.put("a", "1");
+
+        for (var request : List.of(
+                serializeRequest(ListPayloadInput.OPERATION, new ListPayloadInput(List.of("a"))),
+                serializeRequest(StructPayloadInput.OPERATION, new StructPayloadInput("Phreddy")),
+                serializeRequest(MapPayloadInput.OPERATION, new MapPayloadInput(map, false)),
+                serializeRequest(MapPayloadInput.OPERATION, new MapPayloadInput(map, true)))) {
+            assertThat(request.headers().firstValue("content-type"), equalTo("application/json"));
+        }
+    }
+
     private static String serializeBody(ApiOperation<?, ?> operation, SerializableStruct input) {
-        HttpRequest request = new HttpBinding().requestSerializer()
+        return body(serializeRequest(operation, input));
+    }
+
+    private static HttpRequest serializeRequest(ApiOperation<?, ?> operation, SerializableStruct input) {
+        return new HttpBinding().requestSerializer()
                 .operation(operation)
                 .payloadCodec(CODEC)
                 .payloadMediaType("application/json")
                 .shapeValue(input)
                 .endpoint(ENDPOINT)
                 .serializeRequest();
+    }
 
+    private static String body(HttpRequest request) {
         var buffer = request.body().asByteBuffer();
         var bytes = new byte[buffer.remaining()];
         buffer.get(bytes);
@@ -158,6 +193,44 @@ public class PayloadSerializerTest {
         @SuppressWarnings("unchecked")
         public <T> T getMemberValue(Schema member) {
             return "items".equals(member.memberName()) ? (T) items : null;
+        }
+    }
+
+    /**
+     * A string map payload written either through the generic {@code writeMap} consumer (the path generated code
+     * takes for enum-keyed maps and maps of collections) or through the typed {@code writeStringMap} writer.
+     */
+    private record MapPayloadInput(Map<String, String> values, boolean typed) implements SerializableStruct {
+        static final Schema MAP = Schema.mapBuilder(ShapeId.from("smithy.example#StringMap"))
+                .putMember("key", PreludeSchemas.STRING)
+                .putMember("value", PreludeSchemas.STRING)
+                .build();
+        static final Schema SCHEMA = Schema.structureBuilder(ShapeId.from("smithy.example#MapPayloadInput"))
+                .putMember("values", MAP, new HttpPayloadTrait())
+                .build();
+        static final Schema VALUES = SCHEMA.member("values");
+        static final ApiOperation<?, ?> OPERATION = operation("MapPayloadOperation", SCHEMA);
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            if (typed) {
+                serializer.writeStringMap(VALUES, values, MAP.mapKeyMember(), MAP.mapValueMember());
+            } else {
+                serializer.writeMap(VALUES, values, values.size(), (map, ms) -> map.forEach((k, v) -> {
+                    ms.writeEntry(MAP.mapKeyMember(), k, v, (vv, ser) -> ser.writeString(MAP.mapValueMember(), vv));
+                }));
+            }
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> T getMemberValue(Schema member) {
+            return "values".equals(member.memberName()) ? (T) values : null;
         }
     }
 

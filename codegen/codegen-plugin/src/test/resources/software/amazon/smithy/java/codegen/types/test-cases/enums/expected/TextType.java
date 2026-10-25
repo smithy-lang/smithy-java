@@ -3,23 +3,24 @@ package software.amazon.smithy.java.example.standalone.model;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import software.amazon.smithy.java.core.schema.EnumValue;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.UnknownEnumValue;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
-public sealed interface TextType extends SmithyEnum, SerializableShape {
+public sealed interface TextType extends SmithyEnum, SerializableShape permits TextType.TextTypeValue, TextType.$Unknown, $HiddenEnum_6c1c4910 {
     TextType TEXT = new TextTypeValue();
     List<TextType> $TYPES = List.of(TEXT);
 
     Schema $SCHEMA = Schema.createEnum(ShapeId.from("smithy.java.codegen.types.naming#TextType"),
-        Set.of(TEXT.getValue()), TextType.class
+        Set.of("TEXT"), TextType.class
     );
 
     ShapeId $ID = $SCHEMA.id();
@@ -54,47 +55,37 @@ public sealed interface TextType extends SmithyEnum, SerializableShape {
      * @throws IllegalArgumentException if value does not match a known value.
      */
     static TextType from(String value) {
+        var result = $lookup(value);
+        if (result == null) {
+            throw new IllegalArgumentException("Unknown value: ".concat(value));
+        }
+        return result;
+    }
+
+    /**
+     * Returns a {@link TextType} constant for the value, or an unknown variant if no constant matches.
+     */
+    static TextType $from(String value) {
+        var result = $lookup(value);
+        return result != null ? result : new $Unknown(value);
+    }
+
+    private static TextType $lookup(String value) {
         return switch (value) {
             case "TEXT" -> TEXT;
-            default -> throw new IllegalArgumentException("Unknown value: " + value);
+            default -> null;
         };
     }
 
-    final class TextTypeValue implements TextType {
-        private TextTypeValue() {}
-
-        @Override
-        public String getValue() {
-            return "TEXT";
+    final class TextTypeValue extends EnumValue implements TextType {
+        private TextTypeValue() {
+            super("TEXT");
         }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
     }
 
-    record $Unknown(String value) implements TextType {
-        public $Unknown {
-            Objects.requireNonNull(value, "Value cannot be null");
-        }
-
-        @Override
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
-        private final class $Hidden implements TextType {
-            @Override
-            public String getValue() {
-                return null;
-            }
+    final class $Unknown extends UnknownEnumValue implements TextType {
+        public $Unknown(String value) {
+            super(value);
         }
     }
 
@@ -125,10 +116,7 @@ public sealed interface TextType extends SmithyEnum, SerializableShape {
 
         @Override
         public TextType build() {
-            return switch (value) {
-                case "TEXT" -> TEXT;
-                default -> new $Unknown(value);
-            };
+            return $from(value);
         }
 
         @Override

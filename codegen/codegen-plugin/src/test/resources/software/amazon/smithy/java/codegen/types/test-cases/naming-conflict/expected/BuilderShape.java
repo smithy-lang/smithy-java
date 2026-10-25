@@ -1,11 +1,11 @@
 package software.amazon.smithy.java.example.standalone.model;
 
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
@@ -21,7 +21,7 @@ public final class BuilderShape implements SerializableStruct {
 
     @Override
     public String toString() {
-        return ToStringSerializer.serialize(this);
+        return SchemaUtils.toString(this);
     }
 
     @Override
@@ -29,7 +29,7 @@ public final class BuilderShape implements SerializableStruct {
         if (other == this) {
             return true;
         }
-        return other != null && getClass() == other.getClass();
+        return other instanceof BuilderShape;
     }
 
     @Override
@@ -48,9 +48,8 @@ public final class BuilderShape implements SerializableStruct {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+        throw SchemaUtils.unknownMember(member);
     }
 
     /**
@@ -101,11 +100,12 @@ public final class BuilderShape implements SerializableStruct {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         private static void $deserializeMember(
                 Builder builder,
                 Schema member,
                 ShapeDeserializer de
-        ) {}
+        ) {
+            throw SchemaUtils.unknownMember(member);
+        }
     }
 }

@@ -21,7 +21,7 @@ import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
- * Generates serializers and deserializers for Map shapes.
+ * Generates map deserializers and serializers for maps without typed {@code ShapeSerializer} writers.
  */
 @SmithyInternalApi
 public final class MapGenerator
@@ -54,7 +54,7 @@ public final class MapGenerator
                             writer.pushState();
                             var template =
                                     """
-                                            static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${mapSerializer:T}> {
+                                            ${?generatedSerializer}static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${mapSerializer:T}> {
                                                 static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
 
                                                 @Override
@@ -82,7 +82,7 @@ public final class MapGenerator
                                                 }
                                             }
 
-                                            static void deserialize${name:U}Value(
+                                            ${/generatedSerializer}static void deserialize${name:U}Value(
                                                     ${shape:B} state,
                                                     ${string:T} key,
                                                     ${shapeDeserializer:T} deserializer
@@ -113,6 +113,9 @@ public final class MapGenerator
                                             """;
                             writer.putContext("shape", directive.symbol());
                             writer.putContext("name", name);
+                            writer.putContext(
+                                    "generatedSerializer",
+                                    !CodegenUtils.usesTypedMapWriter(directive.model(), directive.shape()));
                             writer.putContext("key", keySymbol);
                             writer.putContext("value", valueSymbol);
                             writer.putContext("serdeClass", serdeClass);

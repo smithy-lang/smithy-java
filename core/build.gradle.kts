@@ -3,6 +3,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.jmh-conventions")
+    `java-test-fixtures`
 }
 
 description = "This module provides the core functionality for Smithy java"
