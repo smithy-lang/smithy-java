@@ -161,7 +161,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
                 "9223372036854775807",
                 "9223372036854775808",
                 "123456789012345678901234567890");
-        for (var provider : List.of(SMITHY, JACKSON)) {
+        for (var provider : providerInstances()) {
             for (var value : values) {
                 result.add(Arguments.of(provider, value));
             }
@@ -1495,7 +1495,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
 
     public static List<Arguments> epochSecondsWithExponentSource() {
         List<Arguments> args = new ArrayList<>();
-        for (var provider : List.of(JACKSON, SMITHY)) {
+        for (var provider : providerInstances()) {
             // Fraction + exponent: 1.5e3 == 1500s. The buggy path returned Instant(1, 500_000_000).
             args.add(Arguments.of(provider, "1.5e3", Instant.ofEpochSecond(1500)));
             // Uppercase exponent.

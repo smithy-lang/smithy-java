@@ -1,6 +1,7 @@
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.fuzz-test")
+    id("smithy-java.jmh-conventions")
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
@@ -13,10 +14,6 @@ dependencies {
     api(project(":core"))
     api(project(":codecs:codec-commons", configuration = "shadow"))
     smithyBuild(project(":codegen:codegen-plugin"))
-}
-
-tasks.named<Test>("test") {
-    systemProperty("smithy-java.xml-provider", "smithy")
 }
 
 afterEvaluate {

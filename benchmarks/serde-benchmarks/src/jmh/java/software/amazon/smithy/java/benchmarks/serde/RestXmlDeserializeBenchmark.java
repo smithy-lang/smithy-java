@@ -36,6 +36,9 @@ public class RestXmlDeserializeBenchmark {
     private static final String CONTENT_TYPE = "application/xml";
 
     @Param({
+            "restXml_WideTypesResponse_S",
+            "restXml_WideTypesResponse_M",
+            "restXml_WideTypesResponse_L",
             "restXml_CopyObjectOutput_Baseline",
             "restXml_CopyObjectOutput_M",
             "restXml_CopyObjectOutput_OutOfOrder",
@@ -52,7 +55,7 @@ public class RestXmlDeserializeBenchmark {
     public void setup() {
         protocol = new RestXmlClientProtocol(SERVICE_ID);
         state = DeserializeState
-                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_XML_BODY, CONTENT_TYPE, false);
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_XML_BODY, CONTENT_TYPE);
     }
 
     @Benchmark

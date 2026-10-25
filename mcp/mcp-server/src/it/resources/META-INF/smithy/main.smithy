@@ -7,7 +7,7 @@ use smithy.mcp#oneOf
 service TestService {
     operations: [
         McpEcho,
-    CalculateArea
+        CalculateArea
     ]
 }
 
@@ -72,6 +72,25 @@ structure CircleWithNested {
     {name: "rectangle", target: Rectangle}
 ])
 document NestedShapeWithOneOf
+
+@oneOf(
+    discriminator: "__type"
+    defaultTarget: CircleWithNested
+    members: [
+        {name: "circleWithNested", target: CircleWithNested}
+        {name: "square", target: Square}
+    ]
+)
+document ShapeWithDefault
+
+list ShapeWithDefaultList {
+    member: ShapeWithDefault
+}
+
+map ShapeWithDefaultMap {
+    key: String
+    value: ShapeWithDefault
+}
 
 /// List of nested @oneOf documents
 list NestedShapeWithOneOfList {
@@ -167,6 +186,10 @@ structure Echo {
     // Nested @oneOf documents (for testing recursive adaptation)
     nestedShapeWithOneOf: NestedShapeWithOneOf
     nestedShapeWithOneOfList: NestedShapeWithOneOfList
+
+    shapeWithDefault: ShapeWithDefault
+    shapeWithDefaultList: ShapeWithDefaultList
+    shapeWithDefaultMap: ShapeWithDefaultMap
 
     // Helper to make CircleWithNested reachable for schema generation
     circleWithNested: CircleWithNested

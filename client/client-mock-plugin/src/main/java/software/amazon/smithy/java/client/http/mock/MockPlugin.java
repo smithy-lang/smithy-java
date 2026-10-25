@@ -18,6 +18,7 @@ import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.MessageExchange;
+import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -28,6 +29,7 @@ import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
@@ -214,6 +216,11 @@ public final class MockPlugin implements ClientPlugin {
         }
 
         @Override
+        public PooledDataStream pooledRequestBody(HttpRequest request) {
+            return delegate.pooledRequestBody(request);
+        }
+
+        @Override
         public <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
                 ApiOperation<I, O> operation,
                 Context context,
@@ -242,7 +249,7 @@ public final class MockPlugin implements ClientPlugin {
             // Track the request here rather than when the request is created because this method is called
             // more often than the request creation method when retries happen.
             if (trackRequests) {
-                requests.add(currentRequest.request().withRequest(request.toUnmodifiable()));
+                requests.add(currentRequest.request().withRequest(HttpClientProtocol.retainRequest(request)));
             }
 
             MockedResult result = null;

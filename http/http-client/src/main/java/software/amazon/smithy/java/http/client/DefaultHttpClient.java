@@ -32,6 +32,7 @@ import software.amazon.smithy.java.http.client.connection.ConnectionPool;
 import software.amazon.smithy.java.http.client.connection.HttpConnection;
 import software.amazon.smithy.java.http.client.connection.Route;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -194,7 +195,8 @@ final class DefaultHttpClient implements HttpClient {
     }
 
     private static boolean shouldWriteH2BodyInline(DataStream body) {
-        return body.isReplayable() && body.hasKnownLength();
+        // Write pooled bodies inline so no background reader remains when the caller releases them.
+        return body instanceof PooledDataStream || (body.isReplayable() && body.hasKnownLength());
     }
 
     /**
@@ -479,16 +481,25 @@ final class DefaultHttpClient implements HttpClient {
             return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             future.cancel(true);
+            abandonPooledBody(request);
             throw new IOException(String.format(
                     "Request to `%s` exceeded request timeout of %s seconds",
                     request.uri().getHost(),
                     timeout.toSeconds()), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            abandonPooledBody(request);
             throw new IOException("Interrupted while waiting for HTTP request to complete to `"
                     + request.uri().getHost() + '`', e);
         } catch (ExecutionException e) {
             throw unwrap(e);
+        }
+    }
+
+    // The upload worker may continue after send() returns. Prevent recycling while it can still read.
+    private static void abandonPooledBody(HttpRequest request) {
+        if (request.body() instanceof PooledDataStream pooled) {
+            pooled.abandon();
         }
     }
 

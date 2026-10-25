@@ -24,6 +24,8 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.MapSerializer;
+import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
+import software.amazon.smithy.java.core.serde.RuntimeCodegenMode;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -49,6 +51,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private static final String DEFAULT_STRING_CONTENT_TYPE = "text/plain";
 
     private final Codec payloadCodec;
+    // Preserves the concrete struct type for codecs that support member subsets.
+    private final MemberSubsetCodec subsetCodec;
     private final String payloadMediaType;
     private final boolean omitEmptyPayload;
     private final boolean isFailure;
@@ -72,14 +76,17 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     // Initialized in writeStruct. Empty until writeStruct is called.
     private Set<String> namesFromHttpHeader = Set.of();
 
-    // Body bytes from the pooled codec.serialize() path.
-    private ByteBuffer shapeBodyBuffer;
+    private DataStream shapeBody;
     private DataStream httpPayload;
     private EventStream<? extends SerializableStruct> eventStream;
+    private Schema payloadMember;
+    private PayloadSerializer payloadSerializer;
+    private Schema payloadSchema;
     private int responseStatus;
     private boolean contentTypeHeaderInInput;
 
     private final boolean isResponse;
+    private final RuntimeCodegenMode runtimeCodegen;
     private final HttpBindingSchemaExtensions.OperationBinding operationBinding;
 
     HttpBindingSerializer(
@@ -91,11 +98,14 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             boolean isFailure,
             boolean allowEmptyStructPayload,
             HeaderErrorSerializer headerErrorSerializer,
-            Context context
+            Context context,
+            RuntimeCodegenMode runtimeCodegen
     ) {
         this.operationBinding = operationBinding;
+        this.runtimeCodegen = runtimeCodegen;
         responseStatus = operationBinding.defaultResponseStatus();
         this.payloadCodec = payloadCodec;
+        this.subsetCodec = payloadCodec instanceof MemberSubsetCodec c ? c : null;
         this.isResponse = isResponse;
         this.payloadMediaType = payloadMediaType;
         this.omitEmptyPayload = omitEmptyPayload;
@@ -113,11 +123,24 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         boolean writeBody;
         boolean hasBodyMembers;
         int headerCount;
+        // Generated writers cast to the schema's concrete shape class.
+        boolean canGenerate = runtimeCodegen != RuntimeCodegenMode.DISABLED && struct.schema() == schema;
+        if (runtimeCodegen == RuntimeCodegenMode.STRICT && !canGenerate) {
+            throw new IllegalStateException(
+                    "Strict HTTP binding runtime codegen requires the value's schema to be the operation schema: "
+                            + struct.schema().id()
+                            + " != "
+                            + schema.id());
+        }
+        boolean strictCodegen = runtimeCodegen == RuntimeCodegenMode.STRICT;
+        HttpBindingWriter generatedWriter;
         if (isResponse) {
             var resp = bindings.response();
+            generatedWriter = canGenerate ? resp.bindingWriter(schema, strictCodegen) : null;
             activeBindings = resp.bindings;
             memberBindings = resp.memberBindings;
             namesFromHttpHeader = resp.headerWireNames;
+            payloadMember = resp.payloadMember;
             headerCount = resp.headerCount;
             hasBodyMembers = resp.hasBody;
             if (resp.defaultStatus != -1) {
@@ -126,20 +149,22 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             writeBody = allowEmptyStructPayload || resp.writeBody(omitEmptyPayload);
             if (writeBody && !hasBodyMembers) {
                 // No body members: fixed empty struct bytes, cached on the binding.
-                shapeBodyBuffer = resp.emptyBody(payloadCodec, schema);
+                shapeBody = DataStream.ofByteBuffer(resp.emptyBody(payloadCodec, schema), payloadMediaType);
             }
         } else {
             var req = bindings.request();
+            generatedWriter = canGenerate ? req.bindingWriter(schema, strictCodegen) : null;
             activeBindings = req.bindings;
             memberBindings = req.memberBindings;
             namesFromHttpHeader = req.headerWireNames;
+            payloadMember = req.payloadMember;
             headerCount = req.headerCount;
             hasBodyMembers = req.hasBody;
             contentTypeHeaderInInput = req.inputContentTypeHeader;
             pathSerializer = req.pathSerializer(operationBinding.httpTrait(), schema);
             writeBody = allowEmptyStructPayload || req.writeBody(omitEmptyPayload);
             if (writeBody && !hasBodyMembers) {
-                shapeBodyBuffer = req.emptyBody(payloadCodec, schema);
+                shapeBody = DataStream.ofByteBuffer(req.emptyBody(payloadCodec, schema), payloadMediaType);
             }
         }
 
@@ -157,9 +182,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
         if (writeBody) {
             if (hasBodyMembers) {
-                shapeBodyBuffer = payloadCodec.serialize(new StructBodyProxy(struct, activeBindings));
+                shapeBody = serializeBody(schema, struct);
             }
-            // Empty-body case (shapeBodyBuffer was set above from the cached empty bytes).
             headers.setHeader(HeaderName.CONTENT_TYPE, payloadMediaType);
         }
 
@@ -167,9 +191,131 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             prepareError(schema);
         }
 
-        var bindingSerializer = new BindingSerializer();
-        struct.serializeMembers(bindingSerializer);
-        bindingSerializer.flushPayload();
+        if (generatedWriter != null) {
+            generatedWriter.write(struct, this);
+        } else {
+            struct.serializeMembers(new BindingSerializer());
+        }
+        flushPayload();
+    }
+
+    void bindHeader(String name, String value) {
+        if (value != null) {
+            headers.addHeaderCanonical(name, value);
+        }
+    }
+
+    // Only values produced by the writer may bypass header validation.
+    void bindHeaderTrusted(String name, String value) {
+        if (value != null) {
+            headers.addHeaderTrusted(name, value);
+        }
+    }
+
+    void bindQuery(String name, String value) {
+        queryStringParams().add(name, value);
+    }
+
+    void bindPrefixHeaders(String prefix, Map<?, ?> values) {
+        for (var entry : values.entrySet()) {
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+            if (key == null || value == null) {
+                bindNull();
+            }
+            String headerName = prefix + (String) key;
+            // A statically named @httpHeader member takes precedence over a prefix-header entry.
+            if (!namesFromHttpHeader.contains(headerName)) {
+                headers.addHeader(headerName, (String) value);
+            }
+        }
+    }
+
+    void bindQueryParams(Map<?, ?> values) {
+        QueryStringBuilder builder = queryStringParams();
+        for (var entry : values.entrySet()) {
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+            if (key == null || value == null) {
+                bindNull();
+            }
+            String name = (String) key;
+            if (value instanceof List<?> list) {
+                for (Object element : list) {
+                    if (element == null) {
+                        bindNull();
+                    }
+                    builder.addForQueryParams(name, (String) element);
+                }
+            } else {
+                builder.addForQueryParams(name, (String) value);
+            }
+        }
+    }
+
+    void bindStatus(int status) {
+        responseStatus = status;
+    }
+
+    void bindPayload(String value) {
+        payload(payloadMember).writeString(payloadMember, value);
+    }
+
+    void bindPayload(ByteBuffer value) {
+        payload(payloadMember).writeBlob(payloadMember, value);
+    }
+
+    void bindPayload(byte[] value) {
+        payload(payloadMember).writeBlob(payloadMember, value);
+    }
+
+    void bindPayload(Instant value) {
+        payload(payloadMember).writeTimestamp(payloadMember, value);
+    }
+
+    void bindPayload(SerializableStruct value) {
+        payload(payloadMember).writeStruct(payloadMember, value);
+    }
+
+    void bindPayload(Document value) {
+        payload(payloadMember).writeDocument(payloadMember, value);
+    }
+
+    void bindPayload(DataStream value) {
+        setHttpPayload(payloadMember, value);
+    }
+
+    void bindPayload(EventStream<? extends SerializableStruct> value) {
+        setEventStream(value);
+    }
+
+    void bindNull() {
+        throw new IllegalStateException("Unexpected null value written for an HTTP binding");
+    }
+
+    private DataStream serializeBody(Schema schema, SerializableStruct struct) {
+        if (isResponse) {
+            // Server response bodies have no lease owner. Return an unpooled copy.
+            return DataStream.ofByteBuffer(serializeBodyBuffer(schema, struct), payloadMediaType);
+        }
+        if (subsetCodec != null && struct.schema() == schema) {
+            DataStream body =
+                    subsetCodec.serializeToDataStream(struct, BodyMemberSubset.of(false), payloadMediaType);
+            if (body != null) {
+                return body;
+            }
+        }
+        return payloadCodec.serializeToDataStream(new StructBodyProxy(struct, activeBindings), payloadMediaType);
+    }
+
+    private ByteBuffer serializeBodyBuffer(Schema schema, SerializableStruct struct) {
+        if (subsetCodec != null && struct.schema() == schema) {
+            ByteBuffer body = subsetCodec.serialize(struct, BodyMemberSubset.of(true));
+            if (body != null) {
+                return body;
+            }
+        }
+        return payloadCodec.serialize(new StructBodyProxy(struct, activeBindings));
     }
 
     private void prepareError(Schema schema) {
@@ -232,14 +378,14 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     }
 
     boolean hasBody() {
-        return shapeBodyBuffer != null || httpPayload != null;
+        return shapeBody != null || httpPayload != null;
     }
 
     DataStream getBody() {
         if (httpPayload != null) {
             return httpPayload;
-        } else if (shapeBodyBuffer != null) {
-            return DataStream.ofByteBuffer(shapeBodyBuffer, payloadMediaType);
+        } else if (shapeBody != null) {
+            return shapeBody;
         } else {
             return DataStream.ofEmpty();
         }
@@ -269,11 +415,23 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         headers.setHeader(HeaderName.CONTENT_TYPE, contentType);
     }
 
+    private PayloadSerializer payload(Schema schema) {
+        if (payloadSerializer == null) {
+            payloadSerializer = new PayloadSerializer(this, payloadCodec);
+            payloadSchema = schema;
+        }
+        return payloadSerializer;
+    }
+
+    private void flushPayload() {
+        if (payloadSerializer != null && !payloadSerializer.isPayloadWritten()) {
+            payloadSerializer.flush();
+            setHttpPayload(payloadSchema, DataStream.ofByteBuffer(payloadSerializer.toByteBuffer()));
+        }
+    }
+
     @SuppressWarnings("resource")
     private final class BindingSerializer extends SpecificShapeSerializer {
-        private PayloadSerializer payloadSerializer;
-        private Schema payloadSchema;
-
         @Override
         public void writeBoolean(Schema schema, boolean value) {
             int idx = schema.memberIndex();
@@ -505,29 +663,6 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
         private void writeQuery(HttpBindingSchemaExtensions.MemberBinding binding, String value) {
             queryStringParams().add(binding.wireName(), value);
-        }
-
-        /**
-         * Lazy-allocate the payload buffer the first time we hit a non-streaming PAYLOAD member.
-         * The buffered bytes are flushed and attached to the request/response in {@link #flushPayload()}.
-         */
-        private PayloadSerializer payload(Schema schema) {
-            if (payloadSerializer == null) {
-                payloadSerializer = new PayloadSerializer(HttpBindingSerializer.this, payloadCodec);
-                payloadSchema = schema;
-            }
-            return payloadSerializer;
-        }
-
-        /**
-         * If a PAYLOAD member was buffered, attach the bytes to the request/response.
-         * Called once after {@code serializeMembers}.
-         */
-        void flushPayload() {
-            if (payloadSerializer != null && !payloadSerializer.isPayloadWritten()) {
-                payloadSerializer.flush();
-                setHttpPayload(payloadSchema, DataStream.ofByteBuffer(payloadSerializer.toByteBuffer()));
-            }
         }
 
         /**

@@ -33,15 +33,13 @@ sealed interface ContextProvider {
     void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params);
 
     final class RegisterSink {
-        private final Object[] values;
+        private final Object[] registers;
         final Map<String, Integer> registerMap;
         long filled;
-        private final int registerCount;
 
-        RegisterSink(int registerCount, Map<String, Integer> registerMap) {
-            this.values = new Object[registerCount];
+        RegisterSink(Object[] registers, Map<String, Integer> registerMap) {
+            this.registers = registers;
             this.registerMap = registerMap;
-            this.registerCount = registerCount;
         }
 
         void put(String name, Object value) {
@@ -52,7 +50,7 @@ sealed interface ContextProvider {
         }
 
         void putIndex(int i, Object value) {
-            values[i] = value;
+            registers[i] = value;
             if (i < 64) {
                 filled |= 1L << i;
             }
@@ -69,24 +67,8 @@ sealed interface ContextProvider {
             }
         }
 
-        /** Copy staged values into the target register array, then reset. */
-        void drainTo(Object[] registers) {
-            // Fast path: use bitmask for registers 0-63
-            long mask = filled;
-            while (mask != 0) {
-                int i = Long.numberOfTrailingZeros(mask);
-                registers[i] = values[i];
-                values[i] = null;
-                mask &= mask - 1;
-            }
+        void reset() {
             filled = 0;
-            // Slow path: scan registers 64+ for non-null values
-            for (int i = 64; i < registerCount; i++) {
-                if (values[i] != null) {
-                    registers[i] = values[i];
-                    values[i] = null;
-                }
-            }
         }
     }
 
@@ -99,7 +81,8 @@ sealed interface ContextProvider {
     }
 
     final class OrchestratingProvider implements ContextProvider {
-        private final ConcurrentMap<ShapeId, ContextProvider> providers = new ConcurrentHashMap<>();
+        private final ConcurrentMap<ShapeId, BoundProvider> providers = new ConcurrentHashMap<>();
+        private volatile BoundProvider lastProvider;
 
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
@@ -112,16 +95,25 @@ sealed interface ContextProvider {
         }
 
         private ContextProvider getProvider(ApiOperation<?, ?> operation) {
-            var provider = providers.get(operation.schema().id());
-            if (provider == null) {
-                provider = createProvider(operation);
-                var fresh = providers.putIfAbsent(operation.schema().id(), provider);
+            var last = lastProvider;
+            if (last != null && last.operation == operation) {
+                return last.provider;
+            }
+
+            var operationId = operation.schema().id();
+            var bound = providers.get(operationId);
+            if (bound == null) {
+                bound = new BoundProvider(operation, createProvider(operation));
+                var fresh = providers.putIfAbsent(operationId, bound);
                 if (fresh != null) {
-                    provider = fresh;
+                    bound = fresh;
                 }
             }
-            return provider;
+            lastProvider = bound;
+            return bound.provider;
         }
+
+        private record BoundProvider(ApiOperation<?, ?> operation, ContextProvider provider) {}
 
         private ContextProvider createProvider(ApiOperation<?, ?> operation) {
             List<ContextProvider> providers = new ArrayList<>(3);
@@ -246,7 +238,16 @@ sealed interface ContextProvider {
     }
 
     // Find the smithy.rules#operationContextParams trait on the operation and each JMESPath to extract.
-    record ContextPathProvider(String name, JmespathExpression jp) implements ContextProvider {
+    static final class ContextPathProvider implements ContextProvider {
+        private final String name;
+        private final JmespathExpression jp;
+        private volatile int cachedIndex = -2; // -2 = not resolved yet
+
+        ContextPathProvider(String name, JmespathExpression jp) {
+            this.name = name;
+            this.jp = jp;
+        }
+
         @Override
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, Map<String, Object> params) {
             var result = evaluateJmesPath(input);
@@ -259,7 +260,14 @@ sealed interface ContextProvider {
         public void addContext(ApiOperation<?, ?> operation, SerializableStruct input, RegisterSink sink) {
             var result = evaluateJmesPath(input);
             if (result != null) {
-                sink.put(name, result);
+                int idx = cachedIndex;
+                if (idx == -2) {
+                    idx = sink.resolveIndex(name);
+                    cachedIndex = idx;
+                }
+                if (idx >= 0) {
+                    sink.putIndex(idx, result);
+                }
             }
         }
 

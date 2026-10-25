@@ -16,6 +16,7 @@ import software.amazon.smithy.java.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.client.http.binding.HttpBindingClientProtocol;
 import software.amazon.smithy.java.client.http.binding.HttpBindingErrorFactory;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -48,6 +49,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
                 .useJsonName(true)
                 .useTimestampFormat(true)
                 .defaultNamespace(service.getNamespace())
+                .outputBuffers(OutputBuffers.create())
                 .build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()

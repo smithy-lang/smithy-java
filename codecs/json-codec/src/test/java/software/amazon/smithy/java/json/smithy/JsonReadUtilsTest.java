@@ -6,12 +6,16 @@
 package software.amazon.smithy.java.json.smithy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.smithy.java.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.json.JsonSettings;
 
 public class JsonReadUtilsTest {
 
@@ -119,5 +123,122 @@ public class JsonReadUtilsTest {
     private static long parse(String value) {
         var bytes = value.getBytes(StandardCharsets.US_ASCII);
         return JsonReadUtils.tryParseTenDigitEpochSecond(bytes, 0, bytes.length);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "0",
+            "-0",
+            "-0.0",
+            "-0e999999999",
+            "0e-999999999",
+            "9",
+            "10",
+            "1234567",
+            "999999999999999999",
+            "9007199254740992",
+            "9007199254740993",
+            "12345678901234567",
+            "1.12345678",
+            "0.12345678901234567",
+            "3.141592653589793",
+            "101.125",
+            "1e0",
+            "1e+22",
+            "1E-22",
+            "1.5E+3",
+            "-1.5e-3",
+            "1.123456789012345678",
+            "1.1234567890123456789",
+            "1.12345678901234567890123456",
+            "1e40000",
+            "1e-40000",
+            "1e23",
+            "1e-23",
+            "9007199254740993.0",
+            "5662220690607.36792",
+            "12345678",
+            "123456789",
+            "123456789012345678",
+            "1234567890123456789",
+            "123456789012345678901234567890",
+            "1234567890123456.78",
+            "12345678901234567.89",
+            "123456789012345678.90",
+            "1234567.89",
+            "12345678.12345678",
+            "12345678.12345678901",
+            "0.12345678",
+            "0.123456789012345678",
+            "0.30000000000000004",
+            "1.5e+3",
+            "-1.5E-3",
+            "1e400",
+            "1e-400",
+            "1e000000000000000001"
+    })
+    void doubleTokensRespectSlicesAndTerminators(String text) {
+        for (int offset = 0; offset < 9; offset++) {
+            for (String suffix : new String[] {"", ",12345678", "]", "}", " \r\n\t"}) {
+                byte[] bytes = ("x".repeat(offset) + text + suffix).getBytes(StandardCharsets.US_ASCII);
+                var deser = new SmithyJsonDeserializer(bytes, offset, bytes.length, JsonSettings.builder().build());
+                JsonReadUtils.parseDouble(bytes, offset, bytes.length, deser);
+                assertThat(Double.doubleToRawLongBits(deser.parsedDouble))
+                        .as(text)
+                        .isEqualTo(Double.doubleToRawLongBits(Double.parseDouble(text)));
+                assertThat(deser.parsedEndPos).isEqualTo(offset + text.length());
+            }
+            byte[] bytes = ("x".repeat(offset) + text + "99999999").getBytes(StandardCharsets.US_ASCII);
+            var deser =
+                    new SmithyJsonDeserializer(bytes, offset, offset + text.length(), JsonSettings.builder().build());
+            JsonReadUtils.parseDouble(bytes, offset, offset + text.length(), deser);
+            assertThat(Double.doubleToRawLongBits(deser.parsedDouble))
+                    .isEqualTo(Double.doubleToRawLongBits(Double.parseDouble(text)));
+            assertThat(deser.parsedEndPos).isEqualTo(offset + text.length());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"",
+            "-",
+            "01",
+            "-01",
+            "1.",
+            "1.e2",
+            "1.x12345678",
+            "x12345678",
+            "1e",
+            "1e+",
+            "1e-",
+            "1ex",
+            "+1",
+            ".5",
+            "E1Infinity",
+            "e-1NaN",
+            "Infinity"})
+    void rejectsMalformedDoubleTokens(String text) {
+        byte[] bytes = text.getBytes(StandardCharsets.US_ASCII);
+        var deser = new SmithyJsonDeserializer(bytes, 0, bytes.length, JsonSettings.builder().build());
+        assertThrows(SerializationException.class, () -> JsonReadUtils.parseDouble(bytes, 0, bytes.length, deser));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "0x8751174795846425706p0",
+            "1e1x",
+            "12345678x",
+            "1.12345678x",
+            "12345678x0123456789",
+            "1234567890123456x89",
+            "12345678901234567x9",
+            "123456789012345678x"
+    })
+    void rejectsTrailingNonJsonNumberContent(String text) {
+        byte[] bytes = text.getBytes(StandardCharsets.US_ASCII);
+        assertThrows(SerializationException.class, () -> {
+            try (var deser = new SmithyJsonDeserializer(bytes, 0, bytes.length, JsonSettings.builder().build())) {
+                deser.readDouble(PreludeSchemas.DOUBLE);
+            }
+        });
     }
 }

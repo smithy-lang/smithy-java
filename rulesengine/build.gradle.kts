@@ -15,6 +15,9 @@ dependencies {
     api(libs.smithy.rules)
     implementation(project(":io"))
     implementation(project(":logging"))
+    // CompactStringAccess: zero-copy access to a String's Latin1 bytes, so host-label and bucket-name
+    // validation can scan eight bytes at a time instead of one char at a time.
+    implementation(project(":codecs:codec-commons", configuration = "shadow"))
 
     // Jazzer for fuzz testing
     testImplementation(libs.jazzer.junit)

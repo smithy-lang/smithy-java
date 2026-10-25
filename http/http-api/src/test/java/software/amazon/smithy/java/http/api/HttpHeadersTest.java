@@ -79,4 +79,97 @@ public class HttpHeadersTest {
         assertThat(headers.firstValue("content-type"), equalTo("text/plain"));
         assertThat(headers.firstValue("x-other"), equalTo("value2"));
     }
+
+    @Test
+    public void setHeaderReplacesSingleExistingValue() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeader("x", "1");
+        headers.addHeader("y", "2");
+        headers.setHeader("X", "9");
+
+        assertThat(headers.size(), equalTo(2));
+        assertThat(headers.allValues("x"), contains("9"));
+        assertThat(headers.map().keySet(), contains("x", "y"));
+    }
+
+    @Test
+    public void setHeaderAppendsWhenAbsent() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeader("x", "1");
+        headers.setHeader("y", "2");
+
+        assertThat(headers.size(), equalTo(2));
+        assertThat(headers.map().keySet(), contains("x", "y"));
+        assertThat(headers.firstValue("y"), equalTo("2"));
+    }
+
+    @Test
+    public void setHeaderCollapsesDuplicatesAndPreservesOrder() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeader("x", "1");
+        headers.addHeader("x", "2");
+        headers.addHeader("y", "3");
+        headers.addHeader("x", "4");
+        headers.setHeader("x", "9");
+
+        assertThat(headers.size(), equalTo(2));
+        assertThat(headers.allValues("x"), contains("9"));
+        assertThat(headers.allValues("y"), contains("3"));
+        assertThat(headers.map().keySet(), contains("x", "y"));
+    }
+
+    @Test
+    public void setHeaderCollapsesDuplicateInLastSlot() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeader("x", "1");
+        headers.addHeader("y", "2");
+        headers.addHeader("x", "3");
+        headers.setHeader("x", "9");
+
+        assertThat(headers.size(), equalTo(2));
+        assertThat(headers.allValues("x"), contains("9"));
+        assertThat(headers.map().keySet(), contains("x", "y"));
+
+        headers.addHeader("z", "4");
+        assertThat(headers.size(), equalTo(3));
+        assertThat(headers.map().keySet(), contains("x", "y", "z"));
+    }
+
+    @Test
+    public void setHeaderWithListReplacesAllOccurrences() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeader("x", "1");
+        headers.addHeader("y", "2");
+        headers.addHeader("x", "3");
+        headers.setHeader("x", List.of("8", "9"));
+
+        assertThat(headers.size(), equalTo(3));
+        assertThat(headers.allValues("x"), contains("8", "9"));
+        assertThat(headers.map().keySet(), contains("y", "x"));
+    }
+
+    @Test
+    public void removeHeaderRemovesAllOccurrencesAndPreservesOrder() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeader("x", "1");
+        headers.addHeader("y", "2");
+        headers.addHeader("x", "3");
+        headers.addHeader("z", "4");
+        headers.removeHeader("X");
+
+        assertThat(headers.size(), equalTo(2));
+        assertThat(headers.hasHeader("x"), equalTo(false));
+        assertThat(headers.map().keySet(), contains("y", "z"));
+    }
+
+    @Test
+    public void removeHeaderIsNoOpWhenAbsent() {
+        var headers = new ArrayHttpHeaders();
+        headers.addHeader("x", "1");
+        headers.addHeader("y", "2");
+        headers.removeHeader("z");
+
+        assertThat(headers.size(), equalTo(2));
+        assertThat(headers.map().keySet(), contains("x", "y"));
+    }
 }

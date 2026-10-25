@@ -18,6 +18,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.MapSerializer;
+import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
@@ -110,7 +111,11 @@ final class PayloadSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         serializer.writePayloadContentType();
-        codecResult = codec.serialize(ser -> ser.writeStruct(schema, struct));
+        // The fast path serializes with struct.schema(), so only take it when that matches the passed schema.
+        var target = schema.isMember() ? schema.memberTarget() : schema;
+        codecResult = codec instanceof MemberSubsetCodec && struct.schema() == target
+                ? codec.serialize(struct)
+                : codec.serialize(ser -> ser.writeStruct(schema, struct));
     }
 
     @Override

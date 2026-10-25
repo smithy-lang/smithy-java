@@ -12,12 +12,14 @@ import static org.hamcrest.Matchers.equalTo;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,11 +28,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
@@ -319,6 +323,37 @@ public class JsonSerializerTest extends ProviderTestBase {
     }
 
     @PerProvider
+    public void writesModeledStructureDocumentInsideStructure(JsonSerdeProvider provider) throws Exception {
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Outer"))
+                .putMember("payload", PreludeSchemas.DOCUMENT)
+                .build();
+        var value = new SerializableStruct() {
+            @Override
+            public Schema schema() {
+                return schema;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                serializer.writeDocument(schema.member("payload"), Document.of(new NestedStruct()));
+            }
+
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                return null;
+            }
+        };
+
+        try (var codec = codecBuilder(provider).serializeTypeInDocuments(false).build();
+                var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeStruct(schema, value);
+            }
+            assertThat(output.toString(StandardCharsets.UTF_8), equalTo("{\"payload\":{\"number\":10}}"));
+        }
+    }
+
+    @PerProvider
     public void writesDunderTypeForEmptyStruct(JsonSerdeProvider provider) throws Exception {
         var struct = new EmptyStruct();
         var document = Document.of(struct);
@@ -334,7 +369,8 @@ public class JsonSerializerTest extends ProviderTestBase {
     @Test
     public void testPrettyPrinting() throws Exception {
         // Pretty printing delegates to Jackson regardless of provider, so test once
-        try (var codec = JsonCodec.builder().prettyPrint(true).build(); var output = new ByteArrayOutputStream()) {
+        try (var codec = JsonCodec.builder().runtimeCodegen(false).prettyPrint(true).build();
+                var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
                         JsonTestData.BIRD,
@@ -364,6 +400,55 @@ public class JsonSerializerTest extends ProviderTestBase {
                     }""";
             assertThat(result.replace("\r", ""), equalTo(expectedFormat));
         }
+    }
+
+    @Test
+    public void leasedBodiesReturnToTheCodecsOwnPool() throws IOException {
+        var pool = OutputBuffers.create();
+        try (var codec = JsonCodec.builder().runtimeCodegen(false).outputBuffers(pool).build()) {
+            var body = Assertions.assertInstanceOf(PooledDataStream.class,
+                    codec.serializeToDataStream(new NestedStruct(), "application/json"));
+            var out = new ByteArrayOutputStream();
+            body.writeTo(out);
+            String json = out.toString(StandardCharsets.UTF_8);
+            assertThat(json, equalTo("{\"number\":10}"));
+
+            body.release();
+            Assertions.assertTrue(poolHoldsArrayStartingWith(pool, json), "array returned to the codec's pool");
+        }
+    }
+
+    @Test
+    public void idleSerializersDoNotPinACodecsPool() throws Exception {
+        WeakReference<OutputBuffers> pool = serializeWithADedicatedPoolThenDropIt();
+        for (int i = 0; i < 50 && pool.get() != null; i++) {
+            System.gc();
+            Thread.sleep(20);
+        }
+        Assertions.assertNull(pool.get(), "a codec's pool must be collectible once the codec is gone");
+    }
+
+    private static WeakReference<OutputBuffers> serializeWithADedicatedPoolThenDropIt() {
+        var pool = OutputBuffers.create();
+        try (var codec = JsonCodec.builder().runtimeCodegen(false).outputBuffers(pool).build()) {
+            ((PooledDataStream) codec.serializeToDataStream(new NestedStruct(), "application/json")).release();
+            codec.serialize(new NestedStruct());
+        }
+        return new WeakReference<>(pool);
+    }
+
+    private static boolean poolHoldsArrayStartingWith(OutputBuffers pool, String prefix) {
+        byte[] expected = prefix.getBytes(StandardCharsets.UTF_8);
+        for (int shift = 12; shift <= 20; shift++) {
+            for (int i = 0; i < 8; i++) {
+                byte[] candidate = pool.acquire(1 << shift);
+                if (candidate.length >= expected.length
+                        && Arrays.equals(candidate, 0, expected.length, expected, 0, expected.length)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static final class NestedStruct implements SerializableStruct {
@@ -590,7 +675,17 @@ public class JsonSerializerTest extends ProviderTestBase {
     public void smithyProviderNameAndPriority() {
         var provider = new SmithyJsonSerdeProvider();
         assertThat(provider.getName(), equalTo("smithy"));
-        assertThat(provider.getPriority(), equalTo(5));
+        assertThat(provider.getPriority(), equalTo(10));
+    }
+
+    @Test
+    public void defaultsToSmithyProvider() {
+        var provider = JsonSettings.builder().build().provider();
+        if (provider instanceof CodegenJsonSerdeProvider codegen) {
+            // Runtime codegen decorates the default provider rather than replacing it.
+            provider = codegen.delegate();
+        }
+        Assertions.assertInstanceOf(SmithyJsonSerdeProvider.class, provider);
     }
 
     @Test
@@ -740,6 +835,7 @@ public class JsonSerializerTest extends ProviderTestBase {
                     try (var codec = JsonCodec.builder()
                             .overrideSerdeProvider(
                                     new SmithyJsonSerdeProvider())
+                            .runtimeCodegen(false)
                             .build();
                             var output = new ByteArrayOutputStream()) {
                         try (var serializer = codec.createSerializer(output)) {

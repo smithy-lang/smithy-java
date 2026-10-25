@@ -195,6 +195,8 @@ public sealed interface Context permits ChunkedArrayStorageContext, OverlayConte
     /**
      * Get an empty and unmodifiable Context.
      *
+     * <p>Always returns the same instance.
+     *
      * @return the empty and unmodifiable context.
      */
     static Context empty() {

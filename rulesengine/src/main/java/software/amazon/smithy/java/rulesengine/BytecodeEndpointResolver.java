@@ -25,8 +25,8 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
     private static final int MAX_PROBE = 3;
 
     private final Bytecode bytecode;
-    private final RulesExtension[] extensions;
     private final RegisterFiller registerFiller;
+    private final EndpointFactory endpointFactory;
     private final ContextProvider ctxProvider = new ContextProvider.OrchestratingProvider();
     private final AtomicReferenceArray<BytecodeEvaluator> pool;
     private final int poolMask;
@@ -37,7 +37,7 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
             Map<String, Function<Context, Object>> builtinProviders
     ) {
         this.bytecode = bytecode;
-        this.extensions = extensions.toArray(new RulesExtension[0]);
+        this.endpointFactory = new EndpointFactory(bytecode, extensions.toArray(new RulesExtension[0]));
 
         // Create and reuse this register filler across pooled evaluators.
         this.registerFiller = RegisterFiller.of(bytecode, builtinProviders);
@@ -64,12 +64,14 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
 
         BytecodeEvaluator evaluator = acquire(base);
         try {
-            // Write endpoint params into the register sink
+            // Reset registers before writing parameters so the binding can write directly into the
+            // evaluator rather than staging values in a second array and copying them back.
+            evaluator.prepareRegisters(ctx);
             var sink = evaluator.registerSink;
             ContextProvider.createEndpointParams(sink, ctxProvider, ctx, operation, params.inputValue());
 
-            // Reset the evaluator and prepare new registers from the sink.
-            evaluator.resetFromSink(ctx);
+            // Fill any builtins not supplied by the operation binding and validate required inputs.
+            evaluator.finishRegisters(ctx);
 
             LOGGER.debug("Resolving endpoint of {} using VM", operation);
 
@@ -78,7 +80,7 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
                     ? evaluator.evaluateBddTraced(traceSink)
                     : evaluator.evaluateBdd();
         } finally {
-            // Recycle for the next resolve. resetFromSink fully reinitializes per-resolve state, so a
+            // Recycle for the next resolve. prepareRegisters fully reinitializes per-resolve state, so a
             // stale evaluator carries nothing across uses; the Endpoint just returned holds no
             // reference into it.
             release(evaluator, base);
@@ -94,7 +96,7 @@ public final class BytecodeEndpointResolver implements EndpointResolver {
                 return e;
             }
         }
-        return new BytecodeEvaluator(bytecode, extensions, registerFiller);
+        return new BytecodeEvaluator(bytecode, registerFiller, endpointFactory);
     }
 
     private void release(BytecodeEvaluator evaluator, int base) {

@@ -37,6 +37,9 @@ public class RpcV2CborDeserializeBenchmark {
     private static final String CONTENT_TYPE = "application/cbor";
 
     @Param({
+            "rpcv2Cbor_WideTypesResponse_S",
+            "rpcv2Cbor_WideTypesResponse_M",
+            "rpcv2Cbor_WideTypesResponse_L",
             "rpcv2Cbor_GetItemOutput_Baseline",
             "rpcv2Cbor_GetItemOutput_S",
             "rpcv2Cbor_GetItemOutput_M",
@@ -55,7 +58,7 @@ public class RpcV2CborDeserializeBenchmark {
     public void setup() {
         protocol = new RpcV2CborProtocol(SERVICE_ID);
         state = DeserializeState
-                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_CBOR_BODY, CONTENT_TYPE, true);
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_CBOR_BODY, CONTENT_TYPE);
     }
 
     @Benchmark

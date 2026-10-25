@@ -14,6 +14,7 @@ service AwsRestJsonDataPlane {
     version: "1999-12-31"
     operations: [
         Healthcheck
+        WideTypes
     ]
     resources: [
         S3Object

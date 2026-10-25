@@ -9,9 +9,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,6 +34,14 @@ import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 public class XmlCodecTest extends ProviderTestBase {
+
+    @Test
+    public void defaultsToSmithyProvider() {
+        try (var codec = XmlCodec.builder().build();
+                var serializer = codec.createSerializer(new ByteArrayOutputStream())) {
+            assertInstanceOf(LazyXmlSerializer.class, serializer);
+        }
+    }
 
     @PerProvider
     public void deserializesXml(boolean useNative) {
@@ -157,6 +168,65 @@ public class XmlCodecTest extends ProviderTestBase {
                         nativeResult.value.get(entry.getKey()),
                         "Mismatch for key=" + entry.getKey());
             }
+        }
+    }
+
+    @Test
+    public void failedSerializationDoesNotPoisonThePooledSerializer() {
+        var poison = new SerializableStruct() {
+            @Override
+            public Schema schema() {
+                return TestPojo.SCHEMA;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                throw new IllegalStateException("boom");
+            }
+
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        var builder = new TestPojo.Builder();
+        builder.name = "Hello";
+        var good = builder.build();
+
+        try (var codec = XmlCodec.builder().useNative(true).build()) {
+            assertThrows(IllegalStateException.class, () -> codec.serializeToDataStream(poison, "application/xml"));
+            var leased = codec.serializeToDataStream(good, "application/xml");
+            assertThat(StandardCharsets.UTF_8.decode(leased.asByteBuffer()).toString(),
+                    equalTo("<Foo><name>Hello</name><numbers></numbers></Foo>"));
+
+            assertThrows(IllegalStateException.class, () -> codec.serialize(poison));
+            assertThat(codec.serializeToString(good), equalTo("<Foo><name>Hello</name><numbers></numbers></Foo>"));
+        }
+    }
+
+    @Test
+    public void closingTheLazySerializerTwiceReleasesItsDelegateOnce() throws Exception {
+        try (var codec = XmlCodec.builder().useNative(true).build()) {
+            var builder = new TestPojo.Builder();
+            builder.name = "Hello";
+            var pojo = builder.build();
+
+            var out = new ByteArrayOutputStream();
+            var serializer = codec.createSerializer(out);
+            pojo.serialize(serializer);
+            serializer.close();
+            serializer.close();
+            assertThat(out.toString(StandardCharsets.UTF_8),
+                    equalTo("<Foo><name>Hello</name><numbers></numbers></Foo>"));
+            assertThrows(IllegalStateException.class, () -> pojo.serialize(serializer));
+
+            var first = (LazyXmlSerializer) codec.createSerializer(new ByteArrayOutputStream());
+            var second = (LazyXmlSerializer) codec.createSerializer(new ByteArrayOutputStream());
+            pojo.serialize(first);
+            pojo.serialize(second);
+            assertThat(first.delegateForTest() == second.delegateForTest(), equalTo(false));
+            first.close();
+            second.close();
         }
     }
 

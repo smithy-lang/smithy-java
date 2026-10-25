@@ -18,6 +18,7 @@ import software.amazon.smithy.java.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.client.http.binding.HttpBindingClientProtocol;
 import software.amazon.smithy.java.client.http.binding.HttpBindingErrorFactory;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
@@ -64,6 +65,7 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
         this.codec = XmlCodec.builder()
                 .defaultNamespace(xmlNamespace)
                 .strictRootElement(false)
+                .outputBuffers(OutputBuffers.create())
                 .build();
         this.errorDeserializer = HttpErrorDeserializer.builder()
                 .codec(codec)

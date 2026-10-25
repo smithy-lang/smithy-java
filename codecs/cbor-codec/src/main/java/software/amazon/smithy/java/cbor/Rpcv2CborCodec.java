@@ -7,10 +7,12 @@ package software.amazon.smithy.java.cbor;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 public final class Rpcv2CborCodec implements Codec {
     private final CborSettings settings;
@@ -26,6 +28,11 @@ public final class Rpcv2CborCodec implements Codec {
     @Override
     public ByteBuffer serialize(SerializableShape shape) {
         return settings.provider().serialize(shape, settings);
+    }
+
+    @Override
+    public DataStream serializeToDataStream(SerializableShape shape, String contentType) {
+        return settings.provider().serializeToDataStream(shape, settings, contentType);
     }
 
     @Override
@@ -67,6 +74,19 @@ public final class Rpcv2CborCodec implements Codec {
          */
         public Builder defaultNamespace(String defaultNamespace) {
             settings().defaultNamespace(defaultNamespace);
+            return this;
+        }
+
+        /**
+         * Sets the output buffer pool. The default is {@link OutputBuffers#shared()}.
+         *
+         * <p>Use {@link OutputBuffers#create()} for a pool owned by this codec.
+         *
+         * @param outputBuffers pool for serialization output
+         * @return the builder
+         */
+        public Builder outputBuffers(OutputBuffers outputBuffers) {
+            settings().outputBuffers(outputBuffers);
             return this;
         }
 

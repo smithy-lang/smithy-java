@@ -87,7 +87,7 @@ final class S3ExpressChecksumInterceptor implements ClientInterceptor {
             return hook.request();
         }
 
-        var chunked = new AwsChunkedDataStream(body);
+        var chunked = AwsChunkedDataStream.of(body);
         var modifiable = req.toModifiable();
         modifiable.setBody(chunked);
         var headers = modifiable.headers();

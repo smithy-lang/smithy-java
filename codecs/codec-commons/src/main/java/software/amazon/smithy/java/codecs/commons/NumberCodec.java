@@ -21,6 +21,21 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 @SmithyInternalApi
 public final class NumberCodec {
 
+    /** Maximum digit count for the decimal fast path. */
+    public static final int MAX_FAST_DECIMAL_DIGITS = DecimalToBinary.MAX_DIGITS;
+
+    /**
+     * Required capacity from the starting position for float formatting, including packed stores
+     * beyond the returned end. Also covers non-finite values, with or without quotes.
+     */
+    public static final int FLOAT_MAX_BYTES = 15;
+
+    /**
+     * Required capacity from the starting position for double formatting, including packed stores
+     * beyond the returned end. Also covers non-finite values, with or without quotes.
+     */
+    public static final int DOUBLE_MAX_BYTES = 24;
+
     private NumberCodec() {}
 
     private static final VarHandle INT_HANDLE =
@@ -234,7 +249,23 @@ public final class NumberCodec {
         if ((((sub + 0x7676767676767676L) | sub) & 0x8080808080808080L) != 0) {
             return -1;
         }
-        // SWAR: combine pairs -> quads -> final 8-digit value
+        return combineDigitLanes(sub);
+    }
+
+    /** Returns eight big-endian byte lanes XORed with '0', without inter-lane borrowing. */
+    public static long digitLanes(byte[] buf, int i) {
+        return (long) LONG_HANDLE.get(buf, i) ^ 0x3030303030303030L;
+    }
+
+    /** Counts the leading digit lanes (0..8). */
+    public static int leadingDigitLaneCount(long lanes) {
+        long bad = (lanes & 0xF0F0F0F0F0F0F0F0L)
+                | (((lanes & 0x0F0F0F0F0F0F0F0FL) + 0x0606060606060606L) & 0x1010101010101010L);
+        return bad == 0 ? 8 : Long.numberOfLeadingZeros(bad) >>> 3;
+    }
+
+    /** Combines up to eight big-endian lanes containing digits 0..9; unused leading lanes must be zero. */
+    public static long combineDigitLanes(long sub) {
         long lo = sub & 0x000F000F000F000FL;
         long hi = (sub >>> 8) & 0x000F000F000F000FL;
         long pairs = hi * 10 + lo;
@@ -246,18 +277,24 @@ public final class NumberCodec {
         return (long) upper * 10000 + lower;
     }
 
-    /**
-     * Parse a double from a byte array span using FastDoubleParser (no String allocation).
-     */
+    /** Parses a double directly from a byte span using FastDoubleParser. */
     public static double parseDouble(byte[] buf, int offset, int length) {
         return JavaDoubleParser.parseDouble(buf, offset, length);
     }
 
-    /**
-     * Parse a float from a byte array span using FastDoubleParser (no String allocation).
-     */
+    /** Parses a float directly from a byte span using FastDoubleParser. */
     public static float parseFloat(byte[] buf, int offset, int length) {
         return JavaFloatParser.parseFloat(buf, offset, length);
+    }
+
+    /** Converts a validated nonnegative significand and scale; NaN requests a general parse. */
+    public static double decimalToDouble(long unscaled, int scale) {
+        return DecimalToBinary.toDouble(unscaled, scale);
+    }
+
+    /** Returns 10^exponent for an exponent from 0 through 18. */
+    public static long powerOfTen(int exponent) {
+        return POWERS_OF_10[exponent];
     }
 
     public static int writeBoolean(byte[] buf, int pos, boolean value) {
@@ -345,20 +382,34 @@ public final class NumberCodec {
         return writeAsciiString(buf, pos, s);
     }
 
+    /**
+     * Writes a finite double and returns the end position.
+     * Reserve {@link #DOUBLE_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     *
+     * @throws AssertionError if {@code value} is non-finite and assertions are enabled
+     */
     public static int writeDouble(byte[] buf, int pos, double value) {
         long longValue = (long) value;
         if (value == (double) longValue) {
             return writeLong(buf, pos, longValue);
         }
-        return Schubfach.writeDouble(buf, pos, value);
+        return Zmij.writeDouble(buf, pos, value);
     }
 
+    /**
+     * Writes a finite float and returns the end position.
+     * Reserve {@link #FLOAT_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     *
+     * @throws AssertionError if {@code value} is non-finite and assertions are enabled
+     */
     public static int writeFloat(byte[] buf, int pos, float value) {
         int intValue = (int) value;
         if (value == (float) intValue) {
             return writeInt(buf, pos, intValue);
         }
-        return Schubfach.writeFloat(buf, pos, value);
+        return Zmij.writeFloat(buf, pos, value);
     }
 
     public static int writeNonFiniteFloat(byte[] buf, int pos, float value) {
@@ -405,6 +456,11 @@ public final class NumberCodec {
         return pos + bytes.length;
     }
 
+    /**
+     * Writes a float, including non-finite values, and returns the end position.
+     * Reserve {@link #FLOAT_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     */
     public static int writeFloatFull(byte[] buf, int pos, float value) {
         if (Float.isFinite(value)) {
             return writeFloat(buf, pos, value);
@@ -412,6 +468,11 @@ public final class NumberCodec {
         return writeNonFiniteFloat(buf, pos, value);
     }
 
+    /**
+     * Writes a double, including non-finite values, and returns the end position.
+     * Reserve {@link #DOUBLE_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     */
     public static int writeDoubleFull(byte[] buf, int pos, double value) {
         if (Double.isFinite(value)) {
             return writeDouble(buf, pos, value);
@@ -419,6 +480,11 @@ public final class NumberCodec {
         return writeNonFiniteDouble(buf, pos, value);
     }
 
+    /**
+     * Writes a float, quoting non-finite values, and returns the end position.
+     * Reserve {@link #FLOAT_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     */
     public static int writeFloatFullQuoted(byte[] buf, int pos, float value) {
         if (Float.isFinite(value)) {
             return writeFloat(buf, pos, value);
@@ -426,6 +492,11 @@ public final class NumberCodec {
         return writeNonFiniteFloatQuoted(buf, pos, value);
     }
 
+    /**
+     * Writes a double, quoting non-finite values, and returns the end position.
+     * Reserve {@link #DOUBLE_MAX_BYTES} bytes from {@code pos}; packed stores may modify bytes
+     * beyond the returned end within that capacity.
+     */
     public static int writeDoubleFullQuoted(byte[] buf, int pos, double value) {
         if (Double.isFinite(value)) {
             return writeDouble(buf, pos, value);
@@ -434,6 +505,7 @@ public final class NumberCodec {
     }
 
     public static int writeBigDecimal(byte[] buf, int pos, BigDecimal value) {
+        // TODO: Bound plain-notation expansion before calling BigDecimal.toPlainString.
         int scale = value.scale();
         if (value.unscaledValue().bitLength() < 64) {
             if (scale == 0) {

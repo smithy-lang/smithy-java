@@ -8,15 +8,19 @@ package software.amazon.smithy.java.xml;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Objects;
 import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 
 /**
@@ -27,7 +31,7 @@ import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 public final class XmlCodec implements Codec {
 
     private static final boolean USE_SMITHY_NATIVE =
-            "smithy".equals(System.getProperty("smithy-java.xml-provider"));
+            !"stax".equals(System.getProperty("smithy-java.xml-provider"));
 
     private volatile XMLInputFactory xmlInputFactory;
     private volatile XMLOutputFactory xmlOutputFactory;
@@ -37,11 +41,13 @@ public final class XmlCodec implements Codec {
     private final XmlNamespaceTrait defaultNamespace;
     private final boolean useNative;
     private final boolean strictRootElement;
+    private final OutputBuffers outputBuffers;
 
     private XmlCodec(Builder builder) {
         this.wrapperElements = builder.wrapperElements;
         this.defaultNamespace = builder.defaultNamespace;
         this.strictRootElement = builder.strictRootElement;
+        this.outputBuffers = builder.outputBuffers;
         this.useNative = builder.useNative != null ? builder.useNative : USE_SMITHY_NATIVE;
         if (!useNative) {
             initStax();
@@ -67,10 +73,28 @@ public final class XmlCodec implements Codec {
         return new Builder();
     }
 
+    public OutputBuffers outputBuffers() {
+        return outputBuffers;
+    }
+
+    @Override
+    public DataStream serializeToDataStream(SerializableShape shape, String contentType) {
+        if (!useNative) {
+            return Codec.super.serializeToDataStream(shape, contentType);
+        }
+        var serializer = SmithyXmlSerializer.acquire(defaultNamespace, xmlInfo, null, outputBuffers);
+        try {
+            shape.serialize(serializer);
+            return serializer.detach(contentType);
+        } finally {
+            SmithyXmlSerializer.release(serializer);
+        }
+    }
+
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
         if (useNative) {
-            return new LazyXmlSerializer(defaultNamespace, xmlInfo, sink);
+            return new LazyXmlSerializer(defaultNamespace, xmlInfo, sink, outputBuffers);
         }
         try {
             return new XmlSerializer(xmlOutputFactory.createXMLStreamWriter(sink), xmlInfo, defaultNamespace);
@@ -126,6 +150,7 @@ public final class XmlCodec implements Codec {
         private XmlNamespaceTrait defaultNamespace;
         private Boolean useNative;
         private boolean strictRootElement = true;
+        private OutputBuffers outputBuffers = OutputBuffers.shared();
 
         private Builder() {}
 
@@ -176,9 +201,22 @@ public final class XmlCodec implements Codec {
         }
 
         /**
-         * Override the native provider selection for testing. When set to true, the native
-         * (high-performance) implementation is used regardless of system property. When false,
-         * the StAX implementation is used.
+         * Sets the output buffer pool. The default is {@link OutputBuffers#shared()}.
+         *
+         * <p>Use {@link OutputBuffers#create()} for a pool owned by this codec.
+         *
+         * @param outputBuffers pool for serialization output
+         * @return the builder
+         */
+        public Builder outputBuffers(OutputBuffers outputBuffers) {
+            this.outputBuffers = Objects.requireNonNull(outputBuffers, "outputBuffers");
+            return this;
+        }
+
+        /**
+         * Override the native provider selection for testing. When set to true, the Smithy
+         * implementation is used regardless of system property. When false, the StAX
+         * implementation is used.
          */
         Builder useNative(boolean useNative) {
             this.useNative = useNative;

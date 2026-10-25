@@ -55,6 +55,7 @@ structure InitializeResult with [BaseResult] {
 }
 
 structure Capabilities {
+    completions: Document
     logging: Document
     prompts: Prompts
     tools: Tools
@@ -125,6 +126,10 @@ structure JsonObjectSchema {
 
     description: String
 
+    /// Present when the object is a discriminated polymorphic type (see the smithy.mcp#oneOf
+    /// trait): the instance must additionally match exactly one of these variant schemas.
+    oneOf: JsonSchemaList
+
     @jsonName("$schema")
     schema: String = "http://json-schema.org/draft-07/schema#"
 }
@@ -156,6 +161,10 @@ structure JsonPrimitiveSchema {
 
     /// JSON Schema format annotation (e.g., "date-time" for timestamps)
     format: String
+
+    /// MCP HTTP parameter header suffix from smithy.ai#mcpHeader.
+    @jsonName("x-mcp-header")
+    mcpHeader: String
 }
 
 structure JsonDocumentSchema {
@@ -300,6 +309,10 @@ structure oneOf {
     /// List of possible variant types
     @required
     members: OneOfMemberList
+
+    /// Output variant for an absent or null discriminator; must target exactly one member.
+    /// If omitted, untagged documents pass through unchanged.
+    defaultTarget: OneOfTargetShape
 }
 
 list OneOfMemberList {

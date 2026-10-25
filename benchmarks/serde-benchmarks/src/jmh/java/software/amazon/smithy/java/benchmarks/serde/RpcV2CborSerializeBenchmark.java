@@ -29,6 +29,9 @@ public class RpcV2CborSerializeBenchmark {
             ShapeId.from("com.amazonaws.sdk.benchmark#SmithyRpcV2CborDataPlane");
 
     @Param({
+            "rpcv2Cbor_WideTypesRequest_S",
+            "rpcv2Cbor_WideTypesRequest_M",
+            "rpcv2Cbor_WideTypesRequest_L",
             "rpcv2Cbor_PutItemRequest_Baseline",
             "rpcv2Cbor_PutItemRequest_ShallowMap_S",
             "rpcv2Cbor_PutItemRequest_ShallowMap_M",
@@ -58,6 +61,10 @@ public class RpcV2CborSerializeBenchmark {
         @SuppressWarnings({"unchecked", "rawtypes"})
         ApiOperation<SerializableStruct, SerializableStruct> op =
                 (ApiOperation) state.operation;
-        bh.consume(protocol.createRequest(op, state.input, state.context, state.endpoint));
+        var request = protocol.createRequest(op, state.input, state.context, state.endpoint);
+        bh.consume(request);
+        if (SerializeState.RELEASE_REQUESTS) {
+            SerializeState.releasePooledBody(protocol, request);
+        }
     }
 }

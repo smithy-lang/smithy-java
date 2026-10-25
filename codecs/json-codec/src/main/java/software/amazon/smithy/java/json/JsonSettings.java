@@ -7,7 +7,11 @@ package software.amazon.smithy.java.json;
 
 import java.util.Objects;
 import java.util.ServiceLoader;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
+import software.amazon.smithy.java.core.serde.RuntimeCodegenMode;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
+import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 
 /**
  * Settings used by a {@link JsonCodec}.
@@ -46,6 +50,8 @@ public final class JsonSettings {
     private final boolean serializeTypeInDocuments;
     private final boolean prettyPrint;
     private final boolean useStringForArbitraryPrecision;
+    private final RuntimeCodegenMode runtimeCodegenMode;
+    private final OutputBuffers outputBuffers;
 
     private JsonSettings(Builder builder) {
         this.timestampResolver = builder.useTimestampFormat
@@ -56,7 +62,30 @@ public final class JsonSettings {
                 : JsonFieldMapper.UseMemberName.INSTANCE;
         this.forbidUnknownUnionMembers = builder.forbidUnknownUnionMembers;
         this.defaultNamespace = builder.defaultNamespace;
-        this.provider = builder.provider;
+        this.outputBuffers = builder.outputBuffers;
+        JsonSerdeProvider provider = builder.provider instanceof CodegenJsonSerdeProvider codegen
+                ? codegen.delegate()
+                : builder.provider;
+        RuntimeCodegenMode requested = builder.runtimeCodegenMode;
+        RuntimeCodegenMode resolved = RuntimeCodegenFeature.resolve(requested, "json");
+        if (resolved != RuntimeCodegenMode.DISABLED
+                && builder.runtimeCodegenMode == null
+                && builder.providerOverridden
+                && !(provider instanceof SmithyJsonSerdeProvider)) {
+            if (resolved == RuntimeCodegenMode.STRICT) {
+                throw new IllegalStateException(
+                        "Strict JSON runtime codegen cannot fall back to a custom serde provider");
+            }
+            resolved = RuntimeCodegenMode.DISABLED;
+        }
+        this.runtimeCodegenMode = resolved;
+        boolean runtimeCodegen = resolved != RuntimeCodegenMode.DISABLED;
+        if (runtimeCodegen && !(provider instanceof SmithyJsonSerdeProvider)) {
+            throw new IllegalStateException(
+                    "JSON runtime code generation decorates only the native Smithy provider; "
+                            + "select it with -Dsmithy-java.json-provider=smithy or remove the custom provider");
+        }
+        this.provider = runtimeCodegen ? new CodegenJsonSerdeProvider(provider) : provider;
         this.serializeTypeInDocuments = builder.serializeTypeInDocuments;
         this.prettyPrint = builder.prettyPrint;
         this.useStringForArbitraryPrecision = builder.useStringForArbitraryPrecision;
@@ -138,6 +167,16 @@ public final class JsonSettings {
         return useStringForArbitraryPrecision;
     }
 
+    /** Returns whether runtime code generation is active. */
+    public boolean runtimeCodegen() {
+        return runtimeCodegenMode != RuntimeCodegenMode.DISABLED;
+    }
+
+    /** Returns whether runtime code generation rejects fallbacks. */
+    public boolean strictRuntimeCodegen() {
+        return runtimeCodegenMode == RuntimeCodegenMode.STRICT;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -150,7 +189,8 @@ public final class JsonSettings {
                 && serializeTypeInDocuments == that.serializeTypeInDocuments
                 && prettyPrint == that.prettyPrint
                 && useStringForArbitraryPrecision == that.useStringForArbitraryPrecision
-                && timestampResolver.getClass() == that.timestampResolver.getClass()
+                && runtimeCodegenMode == that.runtimeCodegenMode
+                && timestampResolver.equals(that.timestampResolver)
                 && fieldMapper.getClass() == that.fieldMapper.getClass()
                 && Objects.equals(defaultNamespace, that.defaultNamespace);
     }
@@ -161,7 +201,8 @@ public final class JsonSettings {
         h = 31 * h + Boolean.hashCode(serializeTypeInDocuments);
         h = 31 * h + Boolean.hashCode(prettyPrint);
         h = 31 * h + Boolean.hashCode(useStringForArbitraryPrecision);
-        h = 31 * h + timestampResolver.getClass().hashCode();
+        h = 31 * h + runtimeCodegenMode.hashCode();
+        h = 31 * h + timestampResolver.hashCode();
         h = 31 * h + fieldMapper.getClass().hashCode();
         h = 31 * h + Objects.hashCode(defaultNamespace);
         return h;
@@ -171,10 +212,20 @@ public final class JsonSettings {
         return provider;
     }
 
+    /**
+     * Returns the output buffer pool. Settings equality excludes this pool.
+     *
+     * @return the output buffer pool
+     */
+    public OutputBuffers outputBuffers() {
+        return outputBuffers;
+    }
+
     void updateBuilder(Builder builder) {
         builder.forbidUnknownUnionMembers(forbidUnknownUnionMembers);
         builder.defaultNamespace(defaultNamespace);
         builder.overrideSerdeProvider(provider);
+        builder.defaultTimestampFormat(timestampResolver.defaultFormat());
         if (timestampResolver instanceof TimestampResolver.UseTimestampFormatTrait) {
             builder.useTimestampFormat(true);
         }
@@ -184,6 +235,8 @@ public final class JsonSettings {
         builder.serializeTypeInDocuments(serializeTypeInDocuments);
         builder.prettyPrint(prettyPrint);
         builder.useStringForArbitraryPrecision(useStringForArbitraryPrecision);
+        builder.runtimeCodegenMode(runtimeCodegenMode);
+        builder.outputBuffers(outputBuffers);
     }
 
     /**
@@ -210,6 +263,9 @@ public final class JsonSettings {
         private boolean serializeTypeInDocuments = true;
         private boolean prettyPrint = false;
         private boolean useStringForArbitraryPrecision = false;
+        private RuntimeCodegenMode runtimeCodegenMode;
+        private boolean providerOverridden;
+        private OutputBuffers outputBuffers = OutputBuffers.shared();
 
         private Builder() {}
 
@@ -220,6 +276,19 @@ public final class JsonSettings {
          */
         public JsonSettings build() {
             return new JsonSettings(this);
+        }
+
+        /**
+         * Sets the output buffer pool. The default is {@link OutputBuffers#shared()}.
+         *
+         * <p>Use {@link OutputBuffers#create()} for a pool owned by this codec.
+         *
+         * @param outputBuffers pool for serialization output
+         * @return the builder
+         */
+        public Builder outputBuffers(OutputBuffers outputBuffers) {
+            this.outputBuffers = Objects.requireNonNull(outputBuffers, "outputBuffers");
+            return this;
         }
 
         /**
@@ -324,6 +393,19 @@ public final class JsonSettings {
             return this;
         }
 
+        /** Enables runtime-generated codecs when supported by the current JVM. */
+        public Builder runtimeCodegen(boolean runtimeCodegen) {
+            this.runtimeCodegenMode = runtimeCodegen
+                    ? RuntimeCodegenMode.ENABLED
+                    : RuntimeCodegenMode.DISABLED;
+            return this;
+        }
+
+        private Builder runtimeCodegenMode(RuntimeCodegenMode runtimeCodegenMode) {
+            this.runtimeCodegenMode = runtimeCodegenMode;
+            return this;
+        }
+
         /**
          * Uses a custom JSON serde provider.
          *
@@ -332,6 +414,7 @@ public final class JsonSettings {
          */
         Builder overrideSerdeProvider(JsonSerdeProvider provider) {
             this.provider = Objects.requireNonNull(provider);
+            this.providerOverridden = true;
             return this;
         }
     }

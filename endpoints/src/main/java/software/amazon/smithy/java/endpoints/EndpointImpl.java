@@ -18,14 +18,35 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 final class EndpointImpl implements Endpoint {
 
     private final SmithyUri uri;
-    private final List<EndpointAuthScheme> authSchemes;
+    private final EndpointAuthScheme authScheme;
+    /**
+     * The scheme list, or null while {@link #authScheme} is holding a lone scheme that nothing has asked
+     * for yet.
+     *
+     * <p>Not final because of that laziness. Two threads racing to fill it both store an equal
+     * {@code List.of} whose fields are final, so the JMM's final-field freeze means a racing reader sees
+     * a fully built list and it does not matter which write lands — the same argument {@code SmithyUri}
+     * uses for its lazily derived string.
+     */
+    private List<EndpointAuthScheme> authSchemes;
     private final Map<Context.Key<?>, Object> properties;
 
     private EndpointImpl(Builder builder) {
         this.uri = Objects.requireNonNull(builder.uri);
-        this.authSchemes = builder.authSchemes == null ? List.of() : Collections.unmodifiableList(builder.authSchemes);
+        if (builder.authSchemes != null) {
+            this.authScheme = null;
+            this.authSchemes = Collections.unmodifiableList(builder.authSchemes);
+        } else if (builder.authScheme != null) {
+            // Deferred: wrapping one scheme in a list costs an object that a caller reading only the URI
+            // or the properties never needs.
+            this.authScheme = builder.authScheme;
+        } else {
+            this.authScheme = null;
+            this.authSchemes = List.of();
+        }
         this.properties = builder.properties == null ? Map.of() : Collections.unmodifiableMap(builder.properties);
         // Clear out the builder, making this class immutable and the builder still reusable.
+        builder.authScheme = null;
         builder.authSchemes = null;
         builder.properties = null;
     }
@@ -48,7 +69,11 @@ final class EndpointImpl implements Endpoint {
 
     @Override
     public List<EndpointAuthScheme> authSchemes() {
-        return authSchemes;
+        List<EndpointAuthScheme> result = authSchemes;
+        if (result == null) {
+            result = authSchemes = List.of(authScheme);
+        }
+        return result;
     }
 
     @Override
@@ -60,23 +85,32 @@ final class EndpointImpl implements Endpoint {
             return false;
         }
         EndpointImpl endpoint = (EndpointImpl) o;
-        return Objects.equals(uri, endpoint.uri) && Objects.equals(authSchemes, endpoint.authSchemes)
+        return Objects.equals(uri, endpoint.uri) && authSchemes().equals(endpoint.authSchemes())
                 && Objects.equals(properties, endpoint.properties);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(uri, authSchemes, properties);
+        return Objects.hash(uri, authSchemes(), properties);
     }
 
     @Override
     public String toString() {
-        return "Endpoint{uri=" + uri + ", authSchemes=" + authSchemes + ", properties=" + properties + '}';
+        return "Endpoint{uri=" + uri + ", authSchemes=" + authSchemes() + ", properties=" + properties + '}';
     }
 
     static final class Builder implements Endpoint.Builder {
 
         private SmithyUri uri;
+        /**
+         * The single auth scheme an endpoint almost always has, held without a list.
+         *
+         * <p>Going straight to {@code new ArrayList<>()} cost three objects for one element: the list,
+         * the capacity-10 {@code Object[]} its first {@code add} grows into, and the unmodifiable wrapper.
+         * That was ~31% of the allocation an S3 endpoint resolution did. {@code authSchemes} is only
+         * allocated once a second scheme actually arrives.
+         */
+        private EndpointAuthScheme authScheme;
         private List<EndpointAuthScheme> authSchemes;
         private Map<Context.Key<?>, Object> properties;
 
@@ -88,10 +122,16 @@ final class EndpointImpl implements Endpoint {
 
         @Override
         public Builder addAuthScheme(EndpointAuthScheme authScheme) {
-            if (this.authSchemes == null) {
-                this.authSchemes = new ArrayList<>();
+            if (this.authSchemes != null) {
+                this.authSchemes.add(authScheme);
+            } else if (this.authScheme == null) {
+                this.authScheme = authScheme;
+            } else {
+                this.authSchemes = new ArrayList<>(4);
+                this.authSchemes.add(this.authScheme);
+                this.authSchemes.add(authScheme);
+                this.authScheme = null;
             }
-            this.authSchemes.add(authScheme);
             return this;
         }
 

@@ -105,6 +105,33 @@ public final class SchemasGenerator
     }
 
     /**
+     * Measures the total generated code size when all shapes share a single schema class.
+     * Used to verify that models below the fast-path shape-count threshold are also below
+     * the generated content-size threshold.
+     *
+     * @param shapes ordered list of schema fields
+     * @param model the Smithy model
+     * @param context code generation context
+     * @param order the schema field order (may still be under construction)
+     * @return total generated content size in characters
+     */
+    static int measureCombinedSize(
+            List<SchemaField> shapes,
+            Model model,
+            CodeGenerationContext context,
+            SchemaFieldOrder order
+    ) {
+        String namespace = CodegenUtils.getModelNamespace(context.settings());
+        var writer = new JavaWriter(context.settings(), namespace, "measurement");
+        for (var field : shapes) {
+            if (!field.isExternal()) {
+                generateSingleShape(writer, field, model, context, order);
+            }
+        }
+        return writer.toContentString().length();
+    }
+
+    /**
      * Measures the generated code size for each shape in the list.
      * Used during partitioning to estimate per-shape contribution to class file size.
      *

@@ -18,14 +18,14 @@ import software.amazon.smithy.java.json.smithy.SmithyJsonSerdeProvider;
 /**
  * Verifies that double/float serialization via the Smithy JSON serializer produces
  * output that roundtrips correctly through {@link Double#parseDouble}/{@link Float#parseFloat}.
- * The Smithy serializer delegates to the Schubfach algorithm for non-integer finite values.
+ * The Smithy serializer delegates to zmij for finite values outside the integer fast path.
  */
 class SchubfachTest {
 
     private static final SmithyJsonSerdeProvider SMITHY = new SmithyJsonSerdeProvider();
 
     private String serializeDouble(double v) throws Exception {
-        try (var codec = JsonCodec.builder().overrideSerdeProvider(SMITHY).build();
+        try (var codec = JsonCodec.builder().overrideSerdeProvider(SMITHY).runtimeCodegen(false).build();
                 var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeDouble(PreludeSchemas.DOUBLE, v);
@@ -35,7 +35,7 @@ class SchubfachTest {
     }
 
     private String serializeFloat(float v) throws Exception {
-        try (var codec = JsonCodec.builder().overrideSerdeProvider(SMITHY).build();
+        try (var codec = JsonCodec.builder().overrideSerdeProvider(SMITHY).runtimeCodegen(false).build();
                 var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeFloat(PreludeSchemas.FLOAT, v);

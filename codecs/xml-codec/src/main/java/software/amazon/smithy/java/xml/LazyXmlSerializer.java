@@ -11,6 +11,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.MapSerializer;
@@ -27,18 +28,28 @@ final class LazyXmlSerializer implements ShapeSerializer {
     private final XmlNamespaceTrait defaultNamespace;
     private final XmlInfo xmlInfo;
     private final OutputStream sink;
+    private final OutputBuffers pool;
     private SmithyXmlSerializer delegate;
+    private boolean closed;
 
-    LazyXmlSerializer(XmlNamespaceTrait defaultNamespace, XmlInfo xmlInfo, OutputStream sink) {
+    LazyXmlSerializer(XmlNamespaceTrait defaultNamespace, XmlInfo xmlInfo, OutputStream sink, OutputBuffers pool) {
         this.defaultNamespace = defaultNamespace;
         this.xmlInfo = xmlInfo;
         this.sink = sink;
+        this.pool = pool;
     }
 
     private SmithyXmlSerializer delegate() {
-        if (delegate == null) {
-            delegate = SmithyXmlSerializer.acquire(defaultNamespace, xmlInfo, sink);
+        if (closed) {
+            throw new IllegalStateException("Serializer is closed");
         }
+        if (delegate == null) {
+            delegate = SmithyXmlSerializer.acquire(defaultNamespace, xmlInfo, sink, pool);
+        }
+        return delegate;
+    }
+
+    SmithyXmlSerializer delegateForTest() {
         return delegate;
     }
 
@@ -136,8 +147,12 @@ final class LazyXmlSerializer implements ShapeSerializer {
 
     @Override
     public void close() {
-        if (delegate != null) {
-            delegate.close();
+        // Return the delegate to its pool only once. A double release can give the same instance to concurrent callers.
+        closed = true;
+        var d = delegate;
+        if (d != null) {
+            delegate = null;
+            d.close();
         }
     }
 }

@@ -90,7 +90,7 @@ Codec Layer (JSON, CBOR, XML)
 ## Development Guidelines
 
 ### Code Conventions
-- Java 17+ required (toolchain uses Java 21, compiles to Java 17)
+- Java 21+ required (toolchain uses Java 25, compiles to Java 21)
 - Uses Spotless for formatting with Eclipse formatter
 - SpotBugs for static analysis with custom filter rules
 - License headers required on all files (auto-applied by Spotless)

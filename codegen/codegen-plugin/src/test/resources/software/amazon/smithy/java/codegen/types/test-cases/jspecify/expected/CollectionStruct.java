@@ -200,22 +200,22 @@ public final class CollectionStruct implements SerializableStruct {
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
+        serializer.writeList($SCHEMA_SPARSE_LIST, sparseList, sparseList.size(), SharedSerde.SparseStringListSerializer.INSTANCE);
+        serializer.writeMap($SCHEMA_SPARSE_MAP, sparseMap, sparseMap.size(), SharedSerde.SparseStringMapSerializer.INSTANCE);
+        serializer.writeList($SCHEMA_SPARSE_LIST_OF_SPARSE_MAP, sparseListOfSparseMap, sparseListOfSparseMap.size(), SharedSerde.SparseListOfSparseMapSerializer.INSTANCE);
+        serializer.writeList($SCHEMA_NON_SPARSE_LIST_OF_NON_SPARSE_MAP, nonSparseListOfNonSparseMap, nonSparseListOfNonSparseMap.size(), SharedSerde.NonSparseListOfNonSparseMapSerializer.INSTANCE);
         if (nonSparseList != null) {
             serializer.writeList($SCHEMA_NON_SPARSE_LIST, nonSparseList, nonSparseList.size(), SharedSerde.NonSparseStringListSerializer.INSTANCE);
         }
-        serializer.writeList($SCHEMA_SPARSE_LIST, sparseList, sparseList.size(), SharedSerde.SparseStringListSerializer.INSTANCE);
         if (nonSparseMap != null) {
             serializer.writeMap($SCHEMA_NON_SPARSE_MAP, nonSparseMap, nonSparseMap.size(), SharedSerde.NonSparseStringMapSerializer.INSTANCE);
         }
-        serializer.writeMap($SCHEMA_SPARSE_MAP, sparseMap, sparseMap.size(), SharedSerde.SparseStringMapSerializer.INSTANCE);
         if (nonSparseListOfSparseMap != null) {
             serializer.writeList($SCHEMA_NON_SPARSE_LIST_OF_SPARSE_MAP, nonSparseListOfSparseMap, nonSparseListOfSparseMap.size(), SharedSerde.NonSparseListOfSparseMapSerializer.INSTANCE);
         }
-        serializer.writeList($SCHEMA_SPARSE_LIST_OF_SPARSE_MAP, sparseListOfSparseMap, sparseListOfSparseMap.size(), SharedSerde.SparseListOfSparseMapSerializer.INSTANCE);
         if (sparseMapOfNonSparseList != null) {
             serializer.writeMap($SCHEMA_SPARSE_MAP_OF_NON_SPARSE_LIST, sparseMapOfNonSparseList, sparseMapOfNonSparseList.size(), SharedSerde.SparseMapOfNonSparseListSerializer.INSTANCE);
         }
-        serializer.writeList($SCHEMA_NON_SPARSE_LIST_OF_NON_SPARSE_MAP, nonSparseListOfNonSparseMap, nonSparseListOfNonSparseMap.size(), SharedSerde.NonSparseListOfNonSparseMapSerializer.INSTANCE);
     }
 
     @Override

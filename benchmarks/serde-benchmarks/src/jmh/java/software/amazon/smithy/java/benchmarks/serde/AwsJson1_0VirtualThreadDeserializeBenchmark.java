@@ -54,7 +54,7 @@ public class AwsJson1_0VirtualThreadDeserializeBenchmark {
     public void setup() {
         protocol = new AwsJson1Protocol(SERVICE_ID);
         state = DeserializeState
-                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE, false);
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE);
     }
 
     @Benchmark

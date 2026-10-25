@@ -12,8 +12,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.Flow;
+import java.util.function.Consumer;
 
-final class WrappedDataStream implements DataStream {
+class WrappedDataStream implements DataStream {
 
     private final DataStream delegate;
     private final String contentType;
@@ -45,6 +46,11 @@ final class WrappedDataStream implements DataStream {
     @Override
     public void writeTo(OutputStream out) throws IOException {
         delegate.writeTo(out);
+    }
+
+    @Override
+    public void forEachBuffer(Consumer<ByteBuffer> action) {
+        delegate.forEachBuffer(action);
     }
 
     @Override

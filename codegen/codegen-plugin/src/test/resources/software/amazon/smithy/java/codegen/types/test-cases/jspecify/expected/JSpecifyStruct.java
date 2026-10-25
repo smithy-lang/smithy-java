@@ -103,10 +103,10 @@ public final class JSpecifyStruct implements SerializableStruct {
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         serializer.writeString($SCHEMA_REQUIRED_STRING, requiredString);
+        serializer.writeBoolean($SCHEMA_REQUIRED_PRIMITIVE, requiredPrimitive);
         if (optionalString != null) {
             serializer.writeString($SCHEMA_OPTIONAL_STRING, optionalString);
         }
-        serializer.writeBoolean($SCHEMA_REQUIRED_PRIMITIVE, requiredPrimitive);
         if (sparseList != null) {
             serializer.writeList($SCHEMA_SPARSE_LIST, sparseList, sparseList.size(), SharedSerde.SparseStringListSerializer.INSTANCE);
         }

@@ -44,7 +44,7 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
     @Override
     public int getPriority() {
-        return 10;
+        return 5;
     }
 
     @Override

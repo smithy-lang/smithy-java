@@ -30,6 +30,9 @@ public class RestXmlSerializeBenchmark {
             ShapeId.from("com.amazonaws.sdk.benchmark#AwsRestXmlDataPlane");
 
     @Param({
+            "restXml_WideTypesRequest_S",
+            "restXml_WideTypesRequest_M",
+            "restXml_WideTypesRequest_L",
             "restXml_CopyObjectRequest_Baseline",
             "restXml_CopyObjectRequest_M",
             "restXml_PutObject_S",
@@ -52,6 +55,10 @@ public class RestXmlSerializeBenchmark {
         @SuppressWarnings({"unchecked", "rawtypes"})
         ApiOperation<SerializableStruct, SerializableStruct> op =
                 (ApiOperation) state.operation;
-        bh.consume(protocol.createRequest(op, state.input, state.context, state.endpoint));
+        var request = protocol.createRequest(op, state.input, state.context, state.endpoint);
+        bh.consume(request);
+        if (SerializeState.RELEASE_REQUESTS) {
+            SerializeState.releasePooledBody(protocol, request);
+        }
     }
 }

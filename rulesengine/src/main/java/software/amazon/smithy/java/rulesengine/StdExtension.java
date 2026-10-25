@@ -11,11 +11,18 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.endpoints.EndpointContext;
 
 final class StdExtension implements RulesExtension {
+    private static final EndpointPropertyBinding EMPTY_PROPERTIES = new EndpointPropertyBinding() {};
+
     @Override
     public void putBuiltinProviders(Map<String, Function<Context, Object>> providers) {
         providers.put("SDK::Endpoint", ctx -> {
             var result = ctx.get(EndpointContext.CUSTOM_ENDPOINT);
             return result == null ? null : result.uri().toString();
         });
+    }
+
+    @Override
+    public EndpointPropertyBinding bindEndpointProperties(EndpointPropertyBinding.Properties properties) {
+        return EMPTY_PROPERTIES;
     }
 }

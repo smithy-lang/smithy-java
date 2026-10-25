@@ -31,6 +31,9 @@ public class AwsQuerySerializeBenchmark {
     private static final String VERSION = "1999-12-31";
 
     @Param({
+            "awsQuery_WideTypesRequest_S",
+            "awsQuery_WideTypesRequest_M",
+            "awsQuery_WideTypesRequest_L",
             "awsQuery_GetMetricDataRequest_S",
             "awsQuery_GetMetricDataRequest_M",
             "awsQuery_GetMetricDataRequest_L",
@@ -55,6 +58,10 @@ public class AwsQuerySerializeBenchmark {
         @SuppressWarnings({"unchecked", "rawtypes"})
         ApiOperation<SerializableStruct, SerializableStruct> op =
                 (ApiOperation) state.operation;
-        bh.consume(protocol.createRequest(op, state.input, state.context, state.endpoint));
+        var request = protocol.createRequest(op, state.input, state.context, state.endpoint);
+        bh.consume(request);
+        if (SerializeState.RELEASE_REQUESTS) {
+            SerializeState.releasePooledBody(protocol, request);
+        }
     }
 }

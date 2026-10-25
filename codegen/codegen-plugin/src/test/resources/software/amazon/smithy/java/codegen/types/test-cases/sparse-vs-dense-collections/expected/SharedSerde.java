@@ -24,14 +24,12 @@ final class SharedSerde {
         @Override
         public void accept(Map<String, String> values, MapSerializer serializer) {
             var $k = Schemas.SPARSE_MAP.mapKeyMember();
-            for (var valueEntry : values.entrySet()) {
-                serializer.writeEntry(
-                    $k,
-                    valueEntry.getKey(),
-                    valueEntry.getValue(),
-                    SparseMap$ValueSerializer.INSTANCE
-                );
-            }
+            values.forEach((k, v) -> serializer.writeEntry(
+                $k,
+                k,
+                v,
+                SparseMap$ValueSerializer.INSTANCE
+            ));
         }
     }
 
@@ -121,14 +119,12 @@ final class SharedSerde {
         @Override
         public void accept(Map<String, String> values, MapSerializer serializer) {
             var $k = Schemas.DENSE_MAP.mapKeyMember();
-            for (var valueEntry : values.entrySet()) {
-                serializer.writeEntry(
-                    $k,
-                    valueEntry.getKey(),
-                    valueEntry.getValue(),
-                    DenseMap$ValueSerializer.INSTANCE
-                );
-            }
+            values.forEach((k, v) -> serializer.writeEntry(
+                $k,
+                k,
+                v,
+                DenseMap$ValueSerializer.INSTANCE
+            ));
         }
     }
 

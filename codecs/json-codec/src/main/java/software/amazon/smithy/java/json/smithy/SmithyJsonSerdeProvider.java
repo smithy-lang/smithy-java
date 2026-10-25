@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.json.JsonSerdeProvider;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.json.jackson.JacksonJsonSerdeProvider;
@@ -17,8 +18,8 @@ import software.amazon.smithy.java.json.jackson.JacksonJsonSerdeProvider;
 /**
  * Native JSON serde provider for smithy-java.
  *
- * <p>Can be explicitly selected via system property:
- * {@code -Dsmithy-java.json-provider=smithy}
+ * <p>This is the default provider. Jackson can be selected using
+ * {@code -Dsmithy-java.json-provider=jackson}.
  */
 public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
 
@@ -26,7 +27,7 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
 
     @Override
     public int getPriority() {
-        return 5;
+        return 10;
     }
 
     @Override
@@ -44,6 +45,24 @@ public final class SmithyJsonSerdeProvider implements JsonSerdeProvider {
         try {
             shape.serialize(serializer);
             return serializer.extractResult();
+        } catch (Exception t) {
+            exception = true;
+            throw t;
+        } finally {
+            SmithyJsonSerializer.release(serializer, exception);
+        }
+    }
+
+    @Override
+    public DataStream serializeToDataStream(SerializableShape shape, JsonSettings settings, String contentType) {
+        if (settings.prettyPrint()) {
+            return DataStream.ofByteBuffer(getJacksonFallback().serialize(shape, settings), contentType);
+        }
+        var serializer = SmithyJsonSerializer.acquire(settings);
+        boolean exception = false;
+        try {
+            shape.serialize(serializer);
+            return serializer.detach(contentType);
         } catch (Exception t) {
             exception = true;
             throw t;

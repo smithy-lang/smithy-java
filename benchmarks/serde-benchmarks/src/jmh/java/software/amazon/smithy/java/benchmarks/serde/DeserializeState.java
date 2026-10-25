@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.benchmarks.serde;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
+import software.amazon.smithy.java.benchmarks.WireBodyNormalizer;
 import software.amazon.smithy.java.benchmarks.serde.BenchmarkTestCases.ResponseEntry;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -29,18 +29,16 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * <p>Each benchmark drives {@code ClientProtocol#deserializeResponse(operation,
  * context, typeRegistry, request, response)}. This state object holds those
  * arguments, pre-built once during {@code @Setup}, including a fully formed
- * {@link HttpResponse} carrying the test case's status code, headers, and
- * body.
+ * {@link HttpResponse} carrying the test case's status code, headers, and body.
  *
- * <p>For protocols whose response bodies are stored base64-encoded in the
- * smithy model (i.e. CBOR), the body is decoded once at setup; the benchmark
- * loop measures only deserialization.
+ * <p>Base64 decoding and JSON whitespace normalization happen once at setup;
+ * the benchmark loop measures only deserialization.
  *
  * <p>When a test case has no body, the empty-body fallback is used. For XML
- * protocols, the fallback is auto-derived from the output shape's simple
- * name ({@code <ShapeName/>}) so the deserializer's element-name check
- * passes. For JSON protocols, pass {@code "{}".getBytes(UTF_8)}; for CBOR
- * pass {@code {0xa0}} (empty-map encoding).
+ * protocols, a null fallback is auto-derived from the output shape's wire
+ * name ({@code <ShapeName/>}) so the deserializer's element-name check passes.
+ * For JSON protocols, pass {@code "{}".getBytes(UTF_8)}; for CBOR pass
+ * {@code {0xa0}} (empty-map encoding).
  */
 final class DeserializeState {
 
@@ -60,8 +58,7 @@ final class DeserializeState {
         this.response = response;
         this.context = Context.create();
         this.typeRegistry = TypeRegistry.empty();
-        // Some HTTP-binding deserializers consult the request URI; provide
-        // a simple stub.
+        // Some HTTP-binding deserializers consult the request URI; provide a simple stub.
         this.request = HttpRequest.create()
                 .setMethod("POST")
                 .setUri(ENDPOINT);
@@ -70,58 +67,46 @@ final class DeserializeState {
     /**
      * Build the deserialize state from a response test case.
      *
-     * @param testCaseId       benchmark test case id
-     * @param generatedPackage Java package emitted by the protocol's codegen
-     *                         projection
-     * @param emptyBody        bytes to use when the test case body is absent.
-     *                         Pass {@code null} for an XML-style default
-     *                         derived from the output shape name.
-     * @param contentType      content-type header value (e.g.
-     *                         {@code "application/json"})
-     * @param base64DecodeBody whether the body string in the test trait is
-     *                         base64-encoded (CBOR convention) and should be
-     *                         decoded before being placed in the response
+     * <p>Trait response headers override defaults so HTTP header bindings see the
+     * values specified by the test case.
+     *
+     * @param testCaseId benchmark test case id
+     * @param generatedPackage Java package emitted by the protocol's codegen projection
+     * @param serviceId service whose operation is being benchmarked
+     * @param emptyBody bytes to use when the test case body is absent.
+     *        Pass {@code null} for an XML-style default derived from the output
+     *        shape's {@code @xmlName}, or its simple name if that trait is absent.
+     * @param contentType default content-type header value (e.g. {@code "application/json"})
      */
     static DeserializeState forTestCase(
             String testCaseId,
             String generatedPackage,
             ShapeId serviceId,
             byte[] emptyBody,
-            String contentType,
-            boolean base64DecodeBody
+            String contentType
     ) {
         ResponseEntry entry = BenchmarkTestCases.response(testCaseId);
         OperationShape opShape = entry.operation();
 
         ApiOperation<? extends SerializableStruct, ? extends SerializableStruct> operation =
                 BenchmarkOperations.resolve(opShape, generatedPackage, serviceId);
+        var outputSchema = operation.outputSchema();
 
         byte[] resolvedEmpty = emptyBody;
         if (resolvedEmpty == null) {
-            // Default empty XML body uses the output shape's wire name as
-            // the root element. This matches what an XML protocol response
-            // with header-only bindings looks like on the wire. The wire
-            // name comes from @xmlName if present, otherwise the shape's
-            // simple name.
-            var schema = operation.outputSchema();
-            var xmlName = schema.getTrait(TraitKey.XML_NAME_TRAIT);
-            String rootName = xmlName != null ? xmlName.getValue() : schema.id().getName();
+            // Header-only XML responses still need the output shape's wire name as the root element.
+            var xmlName = outputSchema.getTrait(TraitKey.XML_NAME_TRAIT);
+            String rootName = xmlName != null ? xmlName.getValue() : outputSchema.id().getName();
             resolvedEmpty = ("<" + rootName + "/>").getBytes(StandardCharsets.UTF_8);
         }
-        byte[] body = entry.testCase()
-                .getBody()
-                .map(s -> base64DecodeBody
-                        ? Base64.getMimeDecoder().decode(s)
-                        : s.getBytes(StandardCharsets.UTF_8))
-                .orElse(resolvedEmpty);
+        byte[] body = WireBodyNormalizer.wireBody(entry.testCase(), outputSchema, contentType, resolvedEmpty);
         int statusCode = entry.testCase().getCode();
 
         ModifiableHttpResponse response = HttpResponse.create()
                 .setStatusCode(statusCode)
                 .setHeader(HeaderName.CONTENT_TYPE.toString(), contentType);
 
-        // Merge the trait's response.headers (if any) so the binding
-        // deserializer's @httpHeader extraction sees realistic headers.
+        // Merge trait headers so @httpHeader bindings see realistic response values.
         Map<String, String> traitHeaders = entry.testCase().getHeaders();
         if (traitHeaders != null) {
             for (Map.Entry<String, String> e : traitHeaders.entrySet()) {

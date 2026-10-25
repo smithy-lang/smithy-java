@@ -87,6 +87,17 @@
     </Match>
 
     <!--
+    ~ Booleans in the rules engine are always the canonical Boolean.TRUE/FALSE, either from the
+    ~ constant pool or from a register fill, so the compiled condition and result nodes compare them
+    ~ by reference exactly as the bytecode interpreter does. Using equals() here would both cost more
+    ~ and let a non-canonical Boolean compare equal on the compiled path but not the interpreted one.
+    -->
+    <Match>
+        <Class name="~software\.amazon\.smithy\.java\.rulesengine\.CompiledNode(\$.*)?" />
+        <Bug pattern="RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN" />
+    </Match>
+
+    <!--
     ~ signal() intentionally calls notifyAll() with no state change of its own: the queue state was
     ~ already mutated under the same monitor by a preceding burst of offer(..., signal=false) calls,
     ~ and signal() just flushes the deferred consumer wake. The naked-notify heuristic can't see the
@@ -150,14 +161,6 @@
         <Bug pattern="US_USELESS_SUPPRESSION_ON_FIELD"/>
     </Match>
 
-    <!-- Vendored Schubfach algorithm (from Jackson/OpenJDK) — not our code to fix. -->
-    <Match>
-        <Class name="software.amazon.smithy.java.codecs.commons.Schubfach$DoubleToDecimal" />
-    </Match>
-    <Match>
-        <Class name="software.amazon.smithy.java.codecs.commons.Schubfach$FloatToDecimal" />
-    </Match>
-
     <!--
     ~ Intentional String reference (==) fast path before the equals() comparison. Header names are
     ~ canonicalized to interned constants, so a reference hit is a cheap shortcut; every == check is
@@ -170,8 +173,34 @@
     </Match>
     <Match>
         <Class name="software.amazon.smithy.java.http.api.ArrayHttpHeaders"/>
-        <Method name="setHeaderCanonical"/>
         <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+    <!-- Equal names with distinct instances cause a cache miss and a fresh sort. -->
+    <Match>
+        <Class name="software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigningResources"/>
+        <Method name="sameNames"/>
+        <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ"/>
+    </Match>
+    <!--
+    ~ stripBrackets deliberately preserves the input reference when it performs no normalization.
+    ~ normalizeHost uses that identity result to distinguish unchanged malformed brackets without
+    ~ rescanning the host. A distinct reference is always the strictly shorter bracket-stripped value.
+    -->
+    <Match>
+        <Class name="software.amazon.smithy.java.io.uri.SmithyUriTemplate"/>
+        <Method name="normalizeHost"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+
+    <!--
+    ~ RulesExtension.Binding.authScheme explicitly permits null for a malformed dynamic
+    ~ candidate, which preserves the materialized path's skip behavior. SpotBugs infers non-null from
+    ~ the common implementations and incorrectly marks the required check as redundant.
+    -->
+    <Match>
+        <Class name="software.amazon.smithy.java.rulesengine.EndpointFactory"/>
+        <Method name="constantAuthSchemes"/>
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
     </Match>
 
     <Match>

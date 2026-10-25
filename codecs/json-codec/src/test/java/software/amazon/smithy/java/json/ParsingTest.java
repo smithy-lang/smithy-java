@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentEqualsFlags;
@@ -34,7 +35,10 @@ public class ParsingTest {
     public void parserTestCases(JsonSerdeProvider provider, Path file) throws IOException {
         var filename = file.getFileName().toString();
         var contents = Files.readAllBytes(file);
-        var codec = JsonCodec.builder().overrideSerdeProvider(provider).build();
+        var codec = JsonCodec.builder()
+                .overrideSerdeProvider(provider)
+                .runtimeCodegen(false)
+                .build();
 
         if (filename.startsWith("y_")) {
             try (var deser = codec.createDeserializer(contents)) {
@@ -69,7 +73,9 @@ public class ParsingTest {
 
         List<Arguments> arguments = new ArrayList<>();
         for (var path : loadJsonFiles()) {
-            arguments.add(Arguments.arguments(jacksonProvider, path));
+            if (!RuntimeCodegenFeature.strict("json")) {
+                arguments.add(Arguments.arguments(jacksonProvider, path));
+            }
             arguments.add(Arguments.arguments(smithyProvider, path));
         }
 

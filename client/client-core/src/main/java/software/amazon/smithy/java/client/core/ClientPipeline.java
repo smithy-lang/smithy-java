@@ -32,6 +32,7 @@ import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.AcquireInitialTokenRequest;
@@ -122,16 +123,33 @@ final class ClientPipeline<RequestT, ResponseT> {
         // 5. Serialize the input message into a protocol request message.
         //    Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
         RequestT request = protocol.createRequest(call.operation, input, call.context, UNRESOLVED);
-        var requestHook = new RequestHook<>(call.operation, call.context, input, request);
+        // Interceptors can replace the request body. Keep the original lease until all attempts complete.
+        // Keep the lease local because concurrent calls can share a context.
+        PooledDataStream pooledBody = protocol.pooledRequestBody(request);
+        try {
+            var requestHook = new RequestHook<>(call.operation, call.context, input, request);
 
-        // 6. Interceptors: Invoke ReadAfterSerialization.
-        call.interceptor.readAfterSerialization(requestHook);
+            // 6. Interceptors: Invoke ReadAfterSerialization.
+            call.interceptor.readAfterSerialization(requestHook);
 
-        // 7. Interceptors: Invoke ModifyBeforeRetryLoop.
-        request = call.interceptor.modifyBeforeRetryLoop(requestHook);
-        requestHook = requestHook.withRequest(request);
+            // 7. Interceptors: Invoke ModifyBeforeRetryLoop.
+            requestHook = requestHook.withRequest(call.interceptor.modifyBeforeRetryLoop(requestHook));
 
-        return acquireRetryToken(call, requestHook);
+            return acquireRetryToken(call, requestHook);
+        } finally {
+            releasePooledRequestBody(pooledBody);
+        }
+    }
+
+    private static void releasePooledRequestBody(PooledDataStream pooled) {
+        if (pooled != null) {
+            try {
+                pooled.release();
+            } catch (RuntimeException e) {
+                // A failure to recycle memory must not change the call's result.
+                LOGGER.debug("Failed to release pooled request body", e);
+            }
+        }
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> O acquireRetryToken(
@@ -186,7 +204,11 @@ final class ClientPipeline<RequestT, ResponseT> {
         call.context.put(CallContext.ENDPOINT, endpoint);
 
         // Augment or swap the resolved auth scheme based on the endpoint's authSchemes property.
-        resolvedAuthScheme = applyEndpointAuthSchemeOverrides(call, endpoint, resolvedAuthScheme);
+        resolvedAuthScheme = applyEndpointAuthSchemeOverrides(
+                call,
+                endpoint,
+                requestHook.request(),
+                resolvedAuthScheme);
         call.context.put(CallContext.IDENTITY, resolvedAuthScheme.identity().unwrap());
         call.context.put(CallContext.IDENTITY_RESOLVER, resolvedAuthScheme.identityResolver());
 
@@ -271,17 +293,25 @@ final class ClientPipeline<RequestT, ResponseT> {
             AuthScheme<RequestT, IdentityT> authScheme,
             AuthSchemeOption option
     ) {
-        var identityProperties = authScheme.getIdentityProperties(context).merge(option.identityPropertyOverrides());
-        var signerProperties = authScheme.getSignerProperties(context).merge(option.signerPropertyOverrides());
         var identityResolver = authScheme.identityResolver(identityResolvers);
         if (identityResolver == null) {
             return null;
         }
+        var identityProperties = withOverrides(
+                authScheme.getIdentityProperties(context),
+                option.identityPropertyOverrides());
+        var signerProperties = withOverrides(
+                authScheme.getSignerProperties(context),
+                option.signerPropertyOverrides());
         return new ResolvedScheme<>(
                 signerProperties,
                 authScheme,
                 identityResolver,
                 identityResolver.resolveIdentity(identityProperties));
+    }
+
+    private static Context withOverrides(Context base, Context overrides) {
+        return overrides == Context.empty() ? base : base.merge(overrides);
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(
@@ -319,7 +349,8 @@ final class ClientPipeline<RequestT, ResponseT> {
      *
      * <ul>
      *     <li>If no {@code authSchemes} entries are emitted, keep the resolver-chosen scheme.</li>
-     *     <li>Iterate emitted entries; pick the first one whose ID is in {@code supportedAuthSchemes}.</li>
+     *     <li>Iterate emitted entries; pick the first one whose ID is in {@code supportedAuthSchemes}
+     *         and whose request type is compatible with the serialized request.</li>
      *     <li>If that entry matches the resolver-chosen scheme, merge its property overrides onto
      *         the existing signer Context (no re-resolution).</li>
      *     <li>If it differs, swap to the new scheme: re-resolve identity for it, then apply the
@@ -336,6 +367,7 @@ final class ClientPipeline<RequestT, ResponseT> {
             O extends SerializableStruct> ResolvedScheme<?, RequestT> applyEndpointAuthSchemeOverrides(
                     ClientCall<I, O> call,
                     Endpoint endpoint,
+                    RequestT request,
                     ResolvedScheme<?, RequestT> resolvedScheme
             ) {
         var endpointAuthSchemes = endpoint.authSchemes();
@@ -350,10 +382,10 @@ final class ClientPipeline<RequestT, ResponseT> {
                 return mergeOverrides(resolvedScheme, endpointAuthScheme);
             }
 
-            // Endpoint asked for a different scheme. If the client supports it, swap.
+            // Endpoint asked for a different scheme. If the client supports it for this request type, swap.
             ShapeId targetId = ShapeId.from(endpointSchemeId);
             AuthScheme<?, ?> swapped = call.supportedAuthSchemes.get(targetId);
-            if (swapped == null) {
+            if (swapped == null || !swapped.requestClass().isAssignableFrom(request.getClass())) {
                 continue;
             }
             AuthScheme<RequestT, ?> targetScheme = (AuthScheme<RequestT, ?>) swapped;

@@ -112,7 +112,7 @@ final class JsonWriteUtils {
         return p;
     }
 
-    private static int writeQuotedAscii(byte[] buf, int pos, byte[] latin1) {
+    static int writeQuotedAscii(byte[] buf, int pos, byte[] latin1) {
         int copied = copyJsonAscii(latin1, buf, pos + 1);
         if (copied < 0) {
             return -1;
@@ -326,13 +326,6 @@ final class JsonWriteUtils {
      */
     static int maxQuotedStringBytes(String value) {
         return value.length() * 6 + 2;
-    }
-
-    /**
-     * Returns the maximum number of bytes needed for a base64-encoded string.
-     */
-    static int maxBase64Bytes(int dataLen) {
-        return ((dataLen + 2) / 3) * 4 + 2;
     }
 
     /// Computes the UTF-8 byte representation of a JSON field name prefix. The result includes the opening quote, the

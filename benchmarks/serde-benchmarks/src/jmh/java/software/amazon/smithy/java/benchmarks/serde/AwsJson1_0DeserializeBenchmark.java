@@ -32,6 +32,9 @@ public class AwsJson1_0DeserializeBenchmark {
     private static final byte[] EMPTY_JSON_BODY = "{}".getBytes(StandardCharsets.UTF_8);
     private static final String CONTENT_TYPE = "application/x-amz-json-1.0";
 
+    @Param("generic")
+    public String implementation;
+
     @Param({
             "awsJson1_0_GetItemOutput_Baseline",
             "awsJson1_0_GetItemOutput_S",
@@ -42,6 +45,9 @@ public class AwsJson1_0DeserializeBenchmark {
             "awsJson1_0_GetItemOutputBinary_M",
             "awsJson1_0_GetItemOutputBinary_L",
             "awsJson1_0_HealthcheckResponse_Example",
+            "awsJson1_0_WideTypesResponse_S",
+            "awsJson1_0_WideTypesResponse_M",
+            "awsJson1_0_WideTypesResponse_L",
     })
     public String testCaseId;
 
@@ -50,17 +56,30 @@ public class AwsJson1_0DeserializeBenchmark {
 
     @Setup
     public void setup() {
+        boolean generated = "generated".equals(implementation);
+        if (generated && Runtime.version().feature() < 25) {
+            throw new IllegalStateException("Runtime codegen unavailable on " + Runtime.version());
+        }
+        System.setProperty("smithy-java.runtime-codegen", generated ? "enabled" : "disabled");
+        System.setProperty("smithy-java.json-provider", "smithy");
         protocol = new AwsJson1Protocol(SERVICE_ID);
         state = DeserializeState
-                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE, false);
+                .forTestCase(testCaseId, GENERATED_PACKAGE, SERVICE_ID, EMPTY_JSON_BODY, CONTENT_TYPE);
     }
 
     @Benchmark
     public void deserialize(Blackhole bh) {
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        ApiOperation<SerializableStruct, SerializableStruct> op =
-                (ApiOperation) state.operation;
         bh.consume(
-                protocol.deserializeResponse(op, state.context, state.typeRegistry, state.request, state.response));
+                protocol.deserializeResponse(
+                        operation(),
+                        state.context,
+                        state.typeRegistry,
+                        state.request,
+                        state.response));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ApiOperation<SerializableStruct, SerializableStruct> operation() {
+        return (ApiOperation) state.operation;
     }
 }
