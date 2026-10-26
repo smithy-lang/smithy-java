@@ -1,0 +1,59 @@
+name: Codegen Size Comment
+
+# Fork pull request runs receive read-only tokens, so workflow_run posts the comments.
+# Do not execute pull request code in this workflow. It has write permissions.
+
+on:
+  workflow_run:
+    workflows: [Codegen Size]
+    types: [completed]
+
+permissions:
+  actions: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: Post report
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download report
+        uses: actions/download-artifact@v8
+        with:
+          name: codegen-size-report
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: report
+
+      - name: Post or update comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          pr=$(tr -cd '0-9' < report/pr-number)
+          if [ -z "$pr" ]; then
+            echo "The report does not name a pull request"
+            exit 1
+          fi
+
+          current=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq .head.sha)
+          if [ "$current" != "$HEAD_SHA" ]; then
+            echo "PR #$pr moved from $HEAD_SHA to $current; a newer run will post its report"
+            exit 0
+          fi
+
+          marker='<!-- codegen-size-report -->'
+          { echo "$marker"; head -c 60000 report/report.md; } > body.md
+
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | awk 'NR == 1')
+          if [ -n "$existing" ]; then
+            gh api --silent -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F body=@body.md
+            echo "Updated comment $existing on PR #$pr"
+          else
+            gh api --silent -X POST "repos/$GITHUB_REPOSITORY/issues/$pr/comments" -F body=@body.md
+            echo "Commented on PR #$pr"
+          fi
