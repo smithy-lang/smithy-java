@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.client.waiters.Waiter;
@@ -65,7 +66,8 @@ public final class WaiterContainerGenerator implements Consumer<CodeGenerationCo
             writer.putContext("objects", Objects.class);
             var clientSymbol = context.symbolProvider().toSymbol(serviceShape);
             writer.putContext("clientType", clientSymbol);
-            var waitableOperations = context.model().getShapesWithTrait(WaitableTrait.class);
+            var waitableOperations = new TreeSet<>(java.util.Comparator.comparing(Shape::getId));
+            waitableOperations.addAll(context.model().getShapesWithTrait(WaitableTrait.class));
             writer.putContext("waiters",
                     new WaiterGenerator(writer,
                             context.symbolProvider(),
