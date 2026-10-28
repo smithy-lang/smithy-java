@@ -8,7 +8,6 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.SmithyEnum;
-import software.amazon.smithy.java.core.schema.UnknownEnumValue;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -101,9 +100,29 @@ public sealed interface EnumType extends SmithyEnum, SerializableShape permits E
         }
     }
 
-    final class $Unknown extends UnknownEnumValue implements EnumType {
-        public $Unknown(String value) {
-            super(value);
+    record $Unknown(String value) implements EnumType {
+        public $Unknown {
+            Objects.requireNonNull(value, "Value cannot be null");
+        }
+
+        @Override
+        public String getValue() {
+            return value;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof $Unknown that && value.equals(that.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return value.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return value;
         }
     }
 

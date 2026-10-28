@@ -24,8 +24,6 @@ import software.amazon.smithy.java.core.schema.IntEnumValue;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SmithyEnum;
 import software.amazon.smithy.java.core.schema.SmithyIntEnum;
-import software.amazon.smithy.java.core.schema.UnknownEnumValue;
-import software.amazon.smithy.java.core.schema.UnknownIntEnumValue;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
@@ -33,6 +31,7 @@ import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -226,7 +225,9 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
 
             boolean string = shape.isEnumShape();
             writer.putContext("knownBase", string ? EnumValue.class : IntEnumValue.class);
-            writer.putContext("unknownBase", string ? UnknownEnumValue.class : UnknownIntEnumValue.class);
+            writer.putContext("sensitive", shape.hasTrait(SensitiveTrait.class));
+            writer.putContext("objects", Objects.class);
+            writer.putContext("integer", Integer.class);
             var enumValues = getEnumValues(shape);
             for (var member : shape.members()) {
                 writer.pushState();
@@ -248,14 +249,38 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.popState();
         }
 
+        /**
+         * Explicit methods avoid the {@code ObjectMethods} bootstrap and reduce generated class size.
+         */
         private void generateUnknownVariant() {
-            writer.write("""
-                    final class $$Unknown extends ${unknownBase:T} implements ${shape:T} {
-                        public $$Unknown(${value:T} value) {
-                            super(value);
-                        }
-                    }
-                    """);
+            writer.write(
+                    """
+                            record $$Unknown(${value:T} value) implements ${shape:T} {${?string}
+                                public $$Unknown {
+                                    ${objects:T}.requireNonNull(value, "Value cannot be null");
+                                }${/string}
+
+                                @Override
+                                public ${value:T} getValue() {
+                                    return value;
+                                }
+
+                                @Override
+                                public boolean equals(Object other) {
+                                    return other instanceof $$Unknown that && ${?string}value.equals(that.value)${/string}${^string}value == that.value${/string};
+                                }
+
+                                @Override
+                                public int hashCode() {
+                                    return ${?string}value.hashCode()${/string}${^string}value${/string};
+                                }
+
+                                @Override
+                                public String toString() {
+                                    return ${?sensitive}"*REDACTED*"${/sensitive}${^sensitive}${?string}value${/string}${^string}${integer:T}.toString(value)${/string}${/sensitive};
+                                }
+                            }
+                            """);
         }
     }
 

@@ -13,6 +13,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -35,9 +36,29 @@ public class EnumValueTest {
             }
         }
 
-        final class $Unknown extends UnknownEnumValue implements Color {
-            $Unknown(String value) {
-                super(value);
+        record $Unknown(String value) implements Color {
+            public $Unknown {
+                Objects.requireNonNull(value, "Value cannot be null");
+            }
+
+            @Override
+            public String getValue() {
+                return value;
+            }
+
+            @Override
+            public boolean equals(Object other) {
+                return other instanceof $Unknown that && value.equals(that.value);
+            }
+
+            @Override
+            public int hashCode() {
+                return value.hashCode();
+            }
+
+            @Override
+            public String toString() {
+                return value;
             }
         }
     }
@@ -50,9 +71,20 @@ public class EnumValueTest {
             serializer.writeString(SCHEMA, getValue());
         }
 
-        final class $Unknown extends UnknownEnumValue implements Size {
-            $Unknown(String value) {
-                super(value);
+        record $Unknown(String value) implements Size {
+            @Override
+            public String getValue() {
+                return value;
+            }
+
+            @Override
+            public boolean equals(Object other) {
+                return other instanceof $Unknown that && value.equals(that.value);
+            }
+
+            @Override
+            public int hashCode() {
+                return value.hashCode();
             }
         }
     }
@@ -72,9 +104,25 @@ public class EnumValueTest {
             }
         }
 
-        final class $Unknown extends UnknownIntEnumValue implements Level {
-            $Unknown(int value) {
-                super(value);
+        record $Unknown(int value) implements Level {
+            @Override
+            public int getValue() {
+                return value;
+            }
+
+            @Override
+            public boolean equals(Object other) {
+                return other instanceof $Unknown that && value == that.value;
+            }
+
+            @Override
+            public int hashCode() {
+                return value;
+            }
+
+            @Override
+            public String toString() {
+                return Integer.toString(value);
             }
         }
     }
@@ -85,6 +133,7 @@ public class EnumValueTest {
         assertThat(Level.LOW.getValue(), equalTo(1));
         assertThat(Color.RED, sameInstance(Color.RED));
         assertThat(Color.RED.equals(new Color.$Unknown("red")), is(false));
+        assertThat(new Color.$Unknown("red").equals(Color.RED), is(false));
         assertThat(Color.RED.toString(), containsString("red"));
         assertThat(Level.LOW.toString(), containsString("1"));
     }
@@ -100,13 +149,24 @@ public class EnumValueTest {
         assertThat(a, not(equalTo(new Color.$Unknown("green"))));
         assertThat(a.equals(new Size.$Unknown("purple")), is(false));
         assertThat(a.equals(null), is(false));
-        assertThat(a.toString(), containsString("purple"));
+        assertThat(a.toString(), equalTo("purple"));
 
         var x = new Level.$Unknown(7);
         assertThat(x, equalTo(new Level.$Unknown(7)));
         assertThat(x.hashCode(), equalTo(7));
         assertThat(x.value(), equalTo(7));
         assertThat(x, not(equalTo(new Level.$Unknown(8))));
+        assertThat(x.toString(), equalTo("7"));
+    }
+
+    @Test
+    public void unknownValuesSupportRecordPatterns() {
+        Color color = new Color.$Unknown("purple");
+        String matched = switch (color) {
+            case Color.$Known known -> "known:" + known.getValue();
+            case Color.$Unknown(String value) -> "unknown:" + value;
+        };
+        assertThat(matched, equalTo("unknown:purple"));
     }
 
     @Test

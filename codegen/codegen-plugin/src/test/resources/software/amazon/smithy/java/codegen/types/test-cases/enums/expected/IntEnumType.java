@@ -7,7 +7,6 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.SmithyIntEnum;
-import software.amazon.smithy.java.core.schema.UnknownIntEnumValue;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -108,9 +107,26 @@ public sealed interface IntEnumType extends SmithyIntEnum, SerializableShape per
         }
     }
 
-    final class $Unknown extends UnknownIntEnumValue implements IntEnumType {
-        public $Unknown(int value) {
-            super(value);
+    record $Unknown(int value) implements IntEnumType {
+
+        @Override
+        public int getValue() {
+            return value;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof $Unknown that && value == that.value;
+        }
+
+        @Override
+        public int hashCode() {
+            return value;
+        }
+
+        @Override
+        public String toString() {
+            return Integer.toString(value);
         }
     }
 
