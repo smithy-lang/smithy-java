@@ -1,11 +1,11 @@
-name: Codegen Size Comment
+name: Codegen Compatibility Comment
 
 # Fork pull request runs receive read-only tokens, so workflow_run posts the comments.
 # Do not execute pull request code in this workflow. It has write permissions.
 
 on:
   workflow_run:
-    workflows: [Codegen Size]
+    workflows: [Codegen Compatibility]
     types: [completed]
 
 permissions:
@@ -15,11 +15,15 @@ permissions:
 jobs:
   comment:
     name: Post report
-    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    if: >
+      github.event.workflow_run.event == 'pull_request'
+      && (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Download report
+        id: download
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           name: codegen-size-report
@@ -28,6 +32,7 @@ jobs:
           path: report
 
       - name: Post or update comment
+        if: steps.download.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -46,10 +51,14 @@ jobs:
           fi
 
           marker='<!-- codegen-size-report -->'
-          { echo "$marker"; head -c 60000 report/report.md; } > body.md
-
           existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate \
             --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | awk 'NR == 1')
+          if [ -z "$existing" ] && [ ! -f report/notable ]; then
+            echo "Nothing changed and no comment exists on PR #$pr; not commenting"
+            exit 0
+          fi
+
+          { echo "$marker"; head -c 60000 report/report.md; } > body.md
           if [ -n "$existing" ]; then
             gh api --silent -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F body=@body.md
             echo "Updated comment $existing on PR #$pr"
