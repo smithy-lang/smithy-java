@@ -41,7 +41,7 @@ dependencies {
     testImplementation("io.netty:netty-all:4.2.19.Final")
     testImplementation("org.bouncycastle:bcpkix-jdk18on:1.86")
     // Jackson for HPACK test suite JSON parsing
-    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.22.3")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
 
     // Jazzer for fuzz testing
     testImplementation(libs.jazzer.junit)
