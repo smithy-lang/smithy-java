@@ -12,7 +12,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
 public sealed interface UnionWithTypeMember extends SerializableStruct {
-    Schema $SCHEMA = Schemas.UNION_WITH_TYPE_MEMBER;
+    Schema $SCHEMA = Schemas.$7;
 
     ShapeId $ID = $SCHEMA.id();
 

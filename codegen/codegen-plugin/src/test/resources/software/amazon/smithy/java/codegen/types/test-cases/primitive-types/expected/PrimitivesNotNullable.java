@@ -16,7 +16,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @SmithyGenerated
 public final class PrimitivesNotNullable implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.PRIMITIVES_NOT_NULLABLE;
+    public static final Schema $SCHEMA = Schemas.$0;
     private static final Schema $0 = $SCHEMA.member(0); // byte
     private static final Schema $1 = $SCHEMA.member(1); // short
     private static final Schema $2 = $SCHEMA.member(2); // int

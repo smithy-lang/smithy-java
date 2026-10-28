@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -31,7 +30,6 @@ import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
-import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -64,20 +62,17 @@ public final class SchemaFieldOrder {
                 .filter(not(Prelude::isPreludeShape))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        // Phase 1: Assign field names and default className "Schemas"
+        // Phase 1: Assign field names and default className "Schemas".
+        // Short field names reduce constant-pool size in generated classes.
         var allFields = new ArrayList<SchemaField>();
-        var usedFieldNames = new HashSet<String>();
+        int position = 0;
         for (var shape : allShapes) {
-            var shapeFieldName = toSchemaName(shape);
-            if (usedFieldNames.contains(shapeFieldName) || shape.getId().getName().equals(shapeFieldName)) {
-                shapeFieldName = toFullQualifiedSchemaName(shape);
-            }
+            var shapeFieldName = "$" + position++;
             boolean isShapeRecursive = CodegenUtils.recursiveShape(directive.model(), shape);
             boolean isExternal =
                     symbolProvider.toSymbol(shape).getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false);
             allFields.add(
                     new SchemaField(shape, shapeFieldName, SchemaClassRef.placeholder(), isShapeRecursive, isExternal));
-            usedFieldNames.add(shapeFieldName);
         }
 
         // Build reverseMapping so getSchemaFieldName() works during measurement
@@ -175,15 +170,6 @@ public final class SchemaFieldOrder {
         }
         throw new IllegalStateException(
                 "Shape " + shape.getId() + " is not in schema field order and has no known schema fallback");
-    }
-
-    private static String toSchemaName(Shape shape) {
-        return CaseUtils.toSnakeCase(shape.toShapeId().getName()).toUpperCase(Locale.ENGLISH);
-    }
-
-    private static String toFullQualifiedSchemaName(Shape shape) {
-        return CaseUtils.toSnakeCase(shape.toShapeId().toString().replace(".", "_").replace("#", "_"))
-                .toUpperCase(Locale.ENGLISH);
     }
 
     /**

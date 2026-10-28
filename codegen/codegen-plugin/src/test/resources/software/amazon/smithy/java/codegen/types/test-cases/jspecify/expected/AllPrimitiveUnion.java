@@ -17,7 +17,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @SmithyGenerated
 @NullMarked
 public sealed interface AllPrimitiveUnion extends SerializableStruct {
-    Schema $SCHEMA = Schemas.ALL_PRIMITIVE_UNION;
+    Schema $SCHEMA = Schemas.$0;
 
     ShapeId $ID = $SCHEMA.id();
 

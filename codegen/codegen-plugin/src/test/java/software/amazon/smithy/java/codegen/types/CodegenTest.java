@@ -317,7 +317,8 @@ public class CodegenTest {
         assertThat(getGeneratedSource("SharedSerde.java"))
                 .contains("static void deserializeItemListMember(")
                 .contains("static void deserializeItemMapValue(")
-                .contains("Item.builder().deserializeMember(deserializer, Schemas.ITEM_LIST.listMember()).build()")
+                .containsPattern(
+                        "Item\\.builder\\(\\)\\.deserializeMember\\(deserializer, Schemas\\.\\$\\d+\\.listMember\\(\\)\\)\\.build\\(\\)")
                 .doesNotContain("class ItemMapSerializer")
                 .doesNotContain("class ItemListSerializer");
     }
@@ -382,8 +383,9 @@ public class CodegenTest {
                 .contains("class ColorMapSerializer implements")
                 .contains("class SparseListMapSerializer implements")
                 .contains("serializer.writeSparseStringList($m, value, $m.listMember());")
-                .contains("serializer.writeSparseStringList(Schemas.SPARSE_LIST_MAP.mapValueMember(), values, "
-                        + "Schemas.SPARSE_LIST_MAP.mapValueMember().listMember());")
+                .containsPattern(
+                        "serializer\\.writeSparseStringList\\(Schemas\\.\\$\\d+\\.mapValueMember\\(\\), values, "
+                                + "Schemas\\.\\$\\d+\\.mapValueMember\\(\\)\\.listMember\\(\\)\\);")
                 .doesNotContain("class SparseStringListSerializer");
     }
 

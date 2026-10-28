@@ -17,7 +17,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @SmithyGenerated
 @NullMarked
 public sealed interface MixedUnion extends SerializableStruct {
-    Schema $SCHEMA = Schemas.MIXED_UNION;
+    Schema $SCHEMA = Schemas.$11;
 
     ShapeId $ID = $SCHEMA.id();
 

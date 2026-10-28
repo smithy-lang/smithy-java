@@ -13,7 +13,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @SmithyGenerated
 public final class ObjectShape implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.OBJECT;
+    public static final Schema $SCHEMA = Schemas.$5;
     private static final Schema $0 = $SCHEMA.member(0); // class
     private static final Schema $1 = $SCHEMA.member(1); // getClass
     private static final Schema $2 = $SCHEMA.member(2); // hashCode

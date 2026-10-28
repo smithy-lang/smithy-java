@@ -16,7 +16,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @SmithyGenerated
 public final class CollectionsStruct implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.COLLECTIONS_STRUCT;
+    public static final Schema $SCHEMA = Schemas.$4;
     private static final Schema $0 = $SCHEMA.member(0); // denseList
     private static final Schema $1 = $SCHEMA.member(1); // sparseList
     private static final Schema $2 = $SCHEMA.member(2); // denseMap

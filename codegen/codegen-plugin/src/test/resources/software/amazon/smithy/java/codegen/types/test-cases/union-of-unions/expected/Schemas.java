@@ -9,37 +9,33 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * Defines schemas for shapes in the model package.
  */
 final class Schemas {
-    static final SchemaBuilder DEEPEST_UNION_BUILDER = Schema.unionBuilder(ShapeId.from("smithy.test#DeepestUnion"));
-    static final SchemaBuilder INNER_UNION_BUILDER = Schema.unionBuilder(ShapeId.from("smithy.test#InnerUnion"));
-    static final SchemaBuilder OUTER_UNION_BUILDER = Schema.unionBuilder(ShapeId.from("smithy.test#OuterUnion"));
+    static final SchemaBuilder $0_BUILDER = Schema.unionBuilder(ShapeId.from("smithy.test#DeepestUnion"));
+    static final SchemaBuilder $1_BUILDER = Schema.unionBuilder(ShapeId.from("smithy.test#InnerUnion"));
+    static final SchemaBuilder $2_BUILDER = Schema.unionBuilder(ShapeId.from("smithy.test#OuterUnion"));
 
     static {
-            DEEPEST_UNION_BUILDER
-                .putMember("outer", Schemas.OUTER_UNION_BUILDER)
+            $0_BUILDER
+                .putMember("outer", Schemas.$2_BUILDER)
                 .putMember("text", PreludeSchemas.STRING)
-                .builderSupplier(DeepestUnion::builder)
-                .shapeClass(DeepestUnion.class)
-                .build();
+                .builderSupplier(DeepestUnion::builder).shapeClass(DeepestUnion.class).build();
 
-            INNER_UNION_BUILDER
-                .putMember("deepest", Schemas.DEEPEST_UNION_BUILDER)
+            $1_BUILDER
+                .putMember("deepest", Schemas.$0_BUILDER)
                 .putMember("number", PreludeSchemas.INTEGER)
-                .builderSupplier(InnerUnion::builder)
-                .shapeClass(InnerUnion.class)
-                .build();
+                .builderSupplier(InnerUnion::builder).shapeClass(InnerUnion.class).build();
 
-            OUTER_UNION_BUILDER
-                .putMember("inner", Schemas.INNER_UNION_BUILDER)
+            $2_BUILDER
+                .putMember("inner", Schemas.$1_BUILDER)
                 .putMember("other", PreludeSchemas.STRING)
-                .builderSupplier(OuterUnion::builder)
-                .shapeClass(OuterUnion.class)
-                .build();
+                .builderSupplier(OuterUnion::builder).shapeClass(OuterUnion.class).build();
 
     }
 
-    static final Schema DEEPEST_UNION = DEEPEST_UNION_BUILDER.build().resolve();
-    static final Schema INNER_UNION = INNER_UNION_BUILDER.build().resolve();
-    static final Schema OUTER_UNION = OUTER_UNION_BUILDER.build().resolve();
+    static final Schema $0 = $0_BUILDER.build().resolve();
+    static final Schema $1 = $1_BUILDER.build().resolve();
+    static final Schema $2 = $2_BUILDER.build().resolve();
+
+    static final Schema[] $ALL = {$0, $1, $2};
 
     private Schemas() {}
 }

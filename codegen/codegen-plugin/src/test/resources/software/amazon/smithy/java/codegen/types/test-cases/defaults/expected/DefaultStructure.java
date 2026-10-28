@@ -23,7 +23,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @SmithyGenerated
 public final class DefaultStructure implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.DEFAULT_STRUCTURE;
+    public static final Schema $SCHEMA = Schemas.$3;
     private static final Schema $0 = $SCHEMA.member(0); // boolean
     private static final Schema $1 = $SCHEMA.member(1); // bigDecimal
     private static final Schema $2 = $SCHEMA.member(2); // bigDecimalWithDoubleDefault

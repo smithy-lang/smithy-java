@@ -22,7 +22,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @NullMarked
 public final class JSpecifyStruct implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.J_SPECIFY_STRUCT;
+    public static final Schema $SCHEMA = Schemas.$10;
     private static final Schema $0 = $SCHEMA.member(0); // requiredString
     private static final Schema $1 = $SCHEMA.member(1); // requiredPrimitive
     private static final Schema $2 = $SCHEMA.member(2); // optionalString

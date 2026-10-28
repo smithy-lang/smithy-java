@@ -20,7 +20,7 @@ final class SharedSerde {
             state.put(key, deserializer.readNull());
             return;
         }
-        state.put(key, deserializer.readString(Schemas.SPARSE_MAP.mapValueMember()));
+        state.put(key, deserializer.readString(Schemas.$3.mapValueMember()));
     }
 
     static Map<String, String> deserializeSparseMap(
@@ -48,7 +48,7 @@ final class SharedSerde {
             state.add(deserializer.readNull());
             return;
         }
-        state.add(deserializer.readString(Schemas.SPARSE_LIST.listMember()));
+        state.add(deserializer.readString(Schemas.$2.listMember()));
     }
 
     static List<String> deserializeSparseList(
@@ -76,7 +76,7 @@ final class SharedSerde {
         if (deserializer.isNull()) {
             throw new SerializationException("Null value found in dense map");
         }
-        state.put(key, deserializer.readString(Schemas.DENSE_MAP.mapValueMember()));
+        state.put(key, deserializer.readString(Schemas.$1.mapValueMember()));
     }
 
     static Map<String, String> deserializeDenseMap(
@@ -103,7 +103,7 @@ final class SharedSerde {
         if (deserializer.isNull()) {
             throw new SerializationException("Null value found in dense list");
         }
-        state.add(deserializer.readString(Schemas.DENSE_LIST.listMember()));
+        state.add(deserializer.readString(Schemas.$0.listMember()));
     }
 
     static List<String> deserializeDenseList(

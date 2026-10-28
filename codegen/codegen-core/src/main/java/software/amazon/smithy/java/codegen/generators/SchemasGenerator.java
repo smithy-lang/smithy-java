@@ -428,21 +428,18 @@ public final class SchemasGenerator
         private void generateStructMemberSchemas(Shape shape, String builderMethod) {
             String template;
             if (schemaField.isRecursive()) {
-                template = """
-                            ${name:L}_BUILDER${?hasMembers}
-                                ${C|}
-                                ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
-                                .shapeClass(${schemaTypeClass:T}.class)
-                                .build();
-                        """;
+                template =
+                        """
+                                    ${name:L}_BUILDER${?hasMembers}
+                                        ${C|}
+                                        ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder).shapeClass(${schemaTypeClass:T}.class).build();
+                                """;
             } else {
                 template =
                         """
                                 static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.${builderMethod:L}(${shapeId:T}.from(${id:S})${traits:C})${?hasMembers}
                                          ${C|}
-                                         ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
-                                         .shapeClass(${schemaTypeClass:T}.class)
-                                         .build();
+                                         ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder).shapeClass(${schemaTypeClass:T}.class).build();
                                 """;
             }
             writer.pushState();

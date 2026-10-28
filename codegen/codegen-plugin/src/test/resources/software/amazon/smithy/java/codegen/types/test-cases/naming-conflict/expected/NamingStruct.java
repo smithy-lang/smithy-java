@@ -14,7 +14,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @SmithyGenerated
 public final class NamingStruct implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.NAMING_STRUCT;
+    public static final Schema $SCHEMA = Schemas.$8;
     private static final Schema $0 = $SCHEMA.member(0); // other
     private static final Schema $1 = $SCHEMA.member(1); // builder
     private static final Schema $2 = $SCHEMA.member(2); // type

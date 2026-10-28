@@ -7,13 +7,12 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
 public sealed interface InnerUnion extends SerializableStruct {
-    Schema $SCHEMA = Schemas.INNER_UNION;
+    Schema $SCHEMA = Schemas.$1;
 
     ShapeId $ID = $SCHEMA.id();
 
@@ -31,13 +30,13 @@ public sealed interface InnerUnion extends SerializableStruct {
 
     @SmithyGenerated
     record DeepestMember(DeepestUnion deepest) implements InnerUnion {
-        private static final Schema $SCHEMA_DEEPEST = $SCHEMA.member("deepest");
+        private static final Schema $0 = $SCHEMA.member(0); // deepest
         public DeepestMember {
             Objects.requireNonNull(deepest, "Union value cannot be null");
         }
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeStruct($SCHEMA_DEEPEST, deepest);
+            serializer.writeStruct($0, deepest);
         }
 
         @Override
@@ -47,17 +46,17 @@ public sealed interface InnerUnion extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
 
     @SmithyGenerated
     record NumberMember(int number) implements InnerUnion {
-        private static final Schema $SCHEMA_NUMBER = $SCHEMA.member("number");
+        private static final Schema $1 = $SCHEMA.member(1); // number
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeInteger($SCHEMA_NUMBER, number);
+            serializer.writeInteger($1, number);
         }
 
         @Override
@@ -68,7 +67,7 @@ public sealed interface InnerUnion extends SerializableStruct {
 
         @Override
         public String toString() {
-            return ToStringSerializer.serialize(this);
+            return SchemaUtils.toString(this);
         }
 
     }
@@ -76,7 +75,7 @@ public sealed interface InnerUnion extends SerializableStruct {
     record $Unknown(String memberName) implements InnerUnion {
         @Override
         public void serialize(ShapeSerializer serializer) {
-            throw new UnsupportedOperationException("Cannot serialize union with unknown member " + this.memberName);
+            throw new UnsupportedOperationException("Cannot serialize union with unknown member ".concat(this.memberName));
         }
 
         @Override
@@ -151,10 +150,11 @@ public sealed interface InnerUnion extends SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> deepest((DeepestUnion) SchemaUtils.validateSameMember(DeepestMember.$SCHEMA_DEEPEST, member, value));
-                case 1 -> number((int) SchemaUtils.validateSameMember(NumberMember.$SCHEMA_NUMBER, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> deepest((DeepestUnion) value);
+                case 1 -> number((int) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
@@ -170,17 +170,24 @@ public sealed interface InnerUnion extends SerializableStruct {
             return this;
         }
 
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {
+            switch (member.memberIndex()) {
+                case 0 -> builder.deepest(DeepestUnion.builder().deserializeMember(de, member).build());
+                case 1 -> builder.number(de.readInteger(member));
+                default -> throw SchemaUtils.unknownMember(member);
+            }
+        }
+
         private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
             private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
 
             @Override
-            @SuppressWarnings("unchecked")
             public void accept(Builder builder, Schema member, ShapeDeserializer de) {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.deepest(DeepestUnion.builder().deserializeMember(de, member).build());
-                    case 1 -> builder.number(de.readInteger(member));
-                    default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
-                }
+                Builder.$deserializeMember(builder, member, de);
             }
 
             @Override

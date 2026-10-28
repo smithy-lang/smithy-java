@@ -12,7 +12,7 @@ import software.amazon.smithy.utils.SmithyGenerated;
 @SmithyGenerated
 public final class List implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.LIST;
+    public static final Schema $SCHEMA = Schemas.$1;
 
     public static final ShapeId $ID = $SCHEMA.id();
 

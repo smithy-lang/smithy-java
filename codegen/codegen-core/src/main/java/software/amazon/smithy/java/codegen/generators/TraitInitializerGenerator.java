@@ -37,19 +37,12 @@ record TraitInitializerGenerator(
             return;
         }
 
-        writer.write(",");
-        writer.indent().indent();
-        var iter = traitsToAdd.iterator();
-        while (iter.hasNext()) {
-            var trait = iter.next();
+        // Keep traits on the shape or member line to reduce LineNumberTable entries in generated Schemas classes.
+        for (var trait : traitsToAdd) {
             writer.pushState();
+            writer.writeInline(", ");
             context.getInitializer(trait).accept(writer, trait);
-            if (iter.hasNext()) {
-                writer.writeInline(",\n");
-            }
             writer.popState();
         }
-
-        writer.dedent().dedent();
     }
 }
