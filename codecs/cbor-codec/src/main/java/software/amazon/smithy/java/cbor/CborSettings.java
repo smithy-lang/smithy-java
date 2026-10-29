@@ -7,6 +7,7 @@ package software.amazon.smithy.java.cbor;
 
 import java.util.Objects;
 import java.util.ServiceLoader;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 
 public final class CborSettings {
     private static final CborSerdeProvider PROVIDER;
@@ -41,10 +42,16 @@ public final class CborSettings {
 
     private final String defaultNamespace;
     private final CborSerdeProvider provider;
+    private final OutputBuffers outputBuffers;
 
     private CborSettings(Builder builder) {
         this.defaultNamespace = builder.defaultNamespace;
         this.provider = builder.provider;
+        this.outputBuffers = builder.outputBuffers;
+    }
+
+    public OutputBuffers outputBuffers() {
+        return outputBuffers;
     }
 
     public CborSerdeProvider provider() {
@@ -62,6 +69,20 @@ public final class CborSettings {
     public static final class Builder {
         private String defaultNamespace;
         private CborSerdeProvider provider = PROVIDER;
+        private OutputBuffers outputBuffers = OutputBuffers.shared();
+
+        /**
+         * Sets the output buffer pool. The default is {@link OutputBuffers#shared()}.
+         *
+         * <p>Use {@link OutputBuffers#create()} for a pool owned by this codec.
+         *
+         * @param outputBuffers pool for serialization output
+         * @return the builder
+         */
+        public Builder outputBuffers(OutputBuffers outputBuffers) {
+            this.outputBuffers = Objects.requireNonNull(outputBuffers, "outputBuffers");
+            return this;
+        }
 
         /**
          * Sets the default namespace when attempting to deserialize documents that use a relative shape ID.
@@ -90,6 +111,7 @@ public final class CborSettings {
         public Builder updateBuilder(CborSettings settings) {
             overrideSerdeProvider(settings.provider());
             defaultNamespace(settings.defaultNamespace());
+            outputBuffers(settings.outputBuffers());
             return this;
         }
 

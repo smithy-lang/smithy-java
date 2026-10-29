@@ -58,6 +58,10 @@ public class AwsQuerySerializeBenchmark {
         @SuppressWarnings({"unchecked", "rawtypes"})
         ApiOperation<SerializableStruct, SerializableStruct> op =
                 (ApiOperation) state.operation;
-        bh.consume(protocol.createRequest(op, state.input, state.context, state.endpoint));
+        var request = protocol.createRequest(op, state.input, state.context, state.endpoint);
+        bh.consume(request);
+        if (SerializeState.RELEASE_REQUESTS) {
+            SerializeState.releasePooledBody(protocol, request);
+        }
     }
 }

@@ -41,7 +41,7 @@ final class FixtureServerProcess implements Target {
             "-XX:+AlwaysPreTouch",
             "-Dio.netty.leakDetection.level=disabled");
     private static final String DESCRIPTION = "smithy-java HttpClient (SmithyHttpClientTransport), HTTP/1.1 over "
-            + "BoringSSL TLS 1.3 to a loopback fixture server in a child JVM; certificate verification disabled "
+            + "TLS 1.3 to a loopback fixture server in a child JVM; certificate verification disabled "
             + "(self-signed)";
 
     private final Process process;

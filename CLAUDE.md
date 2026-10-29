@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./gradlew :module-name:test` - Run tests for a specific module (e.g., `:core:test`)
 - `./gradlew :module-name:build` - Build a specific module
 - `./gradlew :examples:end-to-end:smithyBuild` - Generate code for examples
+- `./gradlew :codegen:codegen-plugin:codegenSize -PawsModelsTests` - Generate, compile, and measure code for every AWS API model (add `-PcodegenSizeOnly=ec2` for one service); `codegenSizeCompare` diffs two reports
 
 ### Code Generation
 - Code generation happens during the `smithyBuild` task

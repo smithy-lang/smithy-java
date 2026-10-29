@@ -11,6 +11,7 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 public interface JsonSerdeProvider {
 
@@ -23,6 +24,15 @@ public interface JsonSerdeProvider {
     ShapeDeserializer newDeserializer(ByteBuffer source, JsonSettings settings);
 
     ShapeSerializer newSerializer(OutputStream sink, JsonSettings settings);
+
+    /**
+     * Serializes a shape into a body stream.
+     * Providers can return pooled output.
+     * See {@link software.amazon.smithy.java.core.serde.Codec#serializeToDataStream} for ownership requirements.
+     */
+    default DataStream serializeToDataStream(SerializableShape shape, JsonSettings settings, String contentType) {
+        return DataStream.ofByteBuffer(serialize(shape, settings), contentType);
+    }
 
     /**
      * Serializes a shape directly to a ByteBuffer.

@@ -7,6 +7,7 @@ package software.amazon.smithy.java.json;
 
 import java.util.Objects;
 import java.util.ServiceLoader;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.codecs.commons.internal.codegen.RuntimeCodegenFeature;
 import software.amazon.smithy.java.core.serde.RuntimeCodegenMode;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
@@ -50,6 +51,7 @@ public final class JsonSettings {
     private final boolean prettyPrint;
     private final boolean useStringForArbitraryPrecision;
     private final RuntimeCodegenMode runtimeCodegenMode;
+    private final OutputBuffers outputBuffers;
 
     private JsonSettings(Builder builder) {
         this.timestampResolver = builder.useTimestampFormat
@@ -60,6 +62,7 @@ public final class JsonSettings {
                 : JsonFieldMapper.UseMemberName.INSTANCE;
         this.forbidUnknownUnionMembers = builder.forbidUnknownUnionMembers;
         this.defaultNamespace = builder.defaultNamespace;
+        this.outputBuffers = builder.outputBuffers;
         JsonSerdeProvider provider = builder.provider instanceof CodegenJsonSerdeProvider codegen
                 ? codegen.delegate()
                 : builder.provider;
@@ -209,6 +212,15 @@ public final class JsonSettings {
         return provider;
     }
 
+    /**
+     * Returns the output buffer pool. Settings equality excludes this pool.
+     *
+     * @return the output buffer pool
+     */
+    public OutputBuffers outputBuffers() {
+        return outputBuffers;
+    }
+
     void updateBuilder(Builder builder) {
         builder.forbidUnknownUnionMembers(forbidUnknownUnionMembers);
         builder.defaultNamespace(defaultNamespace);
@@ -224,6 +236,7 @@ public final class JsonSettings {
         builder.prettyPrint(prettyPrint);
         builder.useStringForArbitraryPrecision(useStringForArbitraryPrecision);
         builder.runtimeCodegenMode(runtimeCodegenMode);
+        builder.outputBuffers(outputBuffers);
     }
 
     /**
@@ -252,6 +265,7 @@ public final class JsonSettings {
         private boolean useStringForArbitraryPrecision = false;
         private RuntimeCodegenMode runtimeCodegenMode;
         private boolean providerOverridden;
+        private OutputBuffers outputBuffers = OutputBuffers.shared();
 
         private Builder() {}
 
@@ -262,6 +276,19 @@ public final class JsonSettings {
          */
         public JsonSettings build() {
             return new JsonSettings(this);
+        }
+
+        /**
+         * Sets the output buffer pool. The default is {@link OutputBuffers#shared()}.
+         *
+         * <p>Use {@link OutputBuffers#create()} for a pool owned by this codec.
+         *
+         * @param outputBuffers pool for serialization output
+         * @return the builder
+         */
+        public Builder outputBuffers(OutputBuffers outputBuffers) {
+            this.outputBuffers = Objects.requireNonNull(outputBuffers, "outputBuffers");
+            return this;
         }
 
         /**

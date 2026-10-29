@@ -12,6 +12,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.endpoints.Endpoint;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -72,6 +73,19 @@ public interface ClientProtocol<RequestT, ResponseT> {
      * @return Returns the request to send.
      */
     RequestT setServiceEndpoint(RequestT request, Endpoint endpoint);
+
+    /**
+     * Returns the request's pooled body, or null if the body is not pooled.
+     *
+     * <p>The pipeline captures this body before interceptors can replace it.
+     * The pipeline releases it after the call completes, including retries. The default returns null.
+     *
+     * @param request request returned by {@link #createRequest}
+     * @return the pooled body, or null
+     */
+    default PooledDataStream pooledRequestBody(RequestT request) {
+        return null;
+    }
 
     /**
      * Deserializes the output from the transport response or throws a modeled or unmodeled exception.

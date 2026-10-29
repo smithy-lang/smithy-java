@@ -15,6 +15,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 
 /**
@@ -75,6 +76,13 @@ final class MultiByteBufferDataStream implements DataStream {
     @Override
     public String contentType() {
         return contentType;
+    }
+
+    @Override
+    public void forEachBuffer(Consumer<ByteBuffer> action) {
+        for (var buffer : buffers) {
+            action.accept(buffer.duplicate());
+        }
     }
 
     @Override

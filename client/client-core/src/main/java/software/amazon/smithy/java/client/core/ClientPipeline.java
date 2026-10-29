@@ -32,6 +32,7 @@ import software.amazon.smithy.java.core.serde.event.FrameProcessor;
 import software.amazon.smithy.java.endpoints.Endpoint;
 import software.amazon.smithy.java.endpoints.EndpointAuthScheme;
 import software.amazon.smithy.java.endpoints.EndpointResolverParams;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.AcquireInitialTokenRequest;
@@ -122,16 +123,33 @@ final class ClientPipeline<RequestT, ResponseT> {
         // 5. Serialize the input message into a protocol request message.
         //    Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
         RequestT request = protocol.createRequest(call.operation, input, call.context, UNRESOLVED);
-        var requestHook = new RequestHook<>(call.operation, call.context, input, request);
+        // Interceptors can replace the request body. Keep the original lease until all attempts complete.
+        // Keep the lease local because concurrent calls can share a context.
+        PooledDataStream pooledBody = protocol.pooledRequestBody(request);
+        try {
+            var requestHook = new RequestHook<>(call.operation, call.context, input, request);
 
-        // 6. Interceptors: Invoke ReadAfterSerialization.
-        call.interceptor.readAfterSerialization(requestHook);
+            // 6. Interceptors: Invoke ReadAfterSerialization.
+            call.interceptor.readAfterSerialization(requestHook);
 
-        // 7. Interceptors: Invoke ModifyBeforeRetryLoop.
-        request = call.interceptor.modifyBeforeRetryLoop(requestHook);
-        requestHook = requestHook.withRequest(request);
+            // 7. Interceptors: Invoke ModifyBeforeRetryLoop.
+            requestHook = requestHook.withRequest(call.interceptor.modifyBeforeRetryLoop(requestHook));
 
-        return acquireRetryToken(call, requestHook);
+            return acquireRetryToken(call, requestHook);
+        } finally {
+            releasePooledRequestBody(pooledBody);
+        }
+    }
+
+    private static void releasePooledRequestBody(PooledDataStream pooled) {
+        if (pooled != null) {
+            try {
+                pooled.release();
+            } catch (RuntimeException e) {
+                // A failure to recycle memory must not change the call's result.
+                LOGGER.debug("Failed to release pooled request body", e);
+            }
+        }
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> O acquireRetryToken(

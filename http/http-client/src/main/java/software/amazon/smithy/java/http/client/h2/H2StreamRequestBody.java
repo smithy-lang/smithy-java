@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.nio.channels.ReadableByteChannel;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 
 /**
  * Per-stream outbound body state.
@@ -54,7 +55,10 @@ final class H2StreamRequestBody {
             return;
         }
 
-        if (body.isReplayable() && body.hasKnownLength() && body.contentLength() <= Integer.MAX_VALUE) {
+        // Use frame buffers for pooled bodies to avoid creating a private copy.
+        if (body.isReplayable() && body.hasKnownLength()
+                && body.contentLength() <= Integer.MAX_VALUE
+                && !(body instanceof PooledDataStream)) {
             try {
                 if (body.contentLength() <= DIRECT_REPLAYABLE_UPLOAD_LIMIT) {
                     exchange.writeReplayableBody(body.asByteBuffer(), true);

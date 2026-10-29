@@ -11,6 +11,7 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -54,7 +55,8 @@ public class QueryFormSerializerBenchmark {
         QueryFormSerializer serializer = QueryFormSerializer.acquire(
                 QueryFormSerializer.QueryVariant.AWS_QUERY,
                 "Benchmark",
-                "2020-01-01");
+                "2020-01-01",
+                OutputBuffers.shared());
         serializer.writeString(member, value);
         return serializer.finish();
     }

@@ -29,6 +29,7 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -160,7 +161,7 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
 
     @Override
     public HttpResponse send(Context context, HttpRequest request) {
-        return sendRequest(createJavaRequest(context, request));
+        return sendRequest(request, createJavaRequest(context, request));
     }
 
     /**
@@ -181,12 +182,16 @@ public final class JavaHttpClientTransport implements ClientTransport<HttpReques
         return httpRequestBuilder.build();
     }
 
-    private HttpResponse sendRequest(java.net.http.HttpRequest request) {
+    private HttpResponse sendRequest(HttpRequest request, java.net.http.HttpRequest javaRequest) {
         java.net.http.HttpResponse<DataStream> res = null;
         try {
-            res = client.send(request, responseBodyHandler);
+            res = client.send(javaRequest, responseBodyHandler);
             return createSmithyResponse(res);
         } catch (IOException | InterruptedException | RuntimeException e) {
+            // The JDK can still subscribe to the body on its own threads after send() fails. Prevent recycling.
+            if (request.body() instanceof PooledDataStream pooled) {
+                pooled.abandon();
+            }
             if (res != null) {
                 try {
                     res.body().close();

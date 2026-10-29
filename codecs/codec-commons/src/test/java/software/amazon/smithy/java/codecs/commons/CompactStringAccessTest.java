@@ -43,6 +43,18 @@ public class CompactStringAccessTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"", "a", "plain ASCII", "0123456789abcdef0123456789abcdef"})
+    public void recognizesAsciiStrings(String value) {
+        assertThat(CompactStringAccess.isAscii(value)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"é", "café", "€", "a😀z"})
+    public void rejectsNonAsciiStrings(String value) {
+        assertThat(CompactStringAccess.isAscii(value)).isFalse();
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = {0, 1, 7, 8, 15, 16, 31, 32, 127, 128, 255, 256, 299})
     public void countPositivesReturnsLengthForAllAscii(int len) {
         byte[] bytes = new byte[len + 7];

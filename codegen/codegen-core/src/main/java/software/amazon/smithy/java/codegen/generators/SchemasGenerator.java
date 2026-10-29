@@ -69,6 +69,8 @@ public final class SchemasGenerator
                                             ${value:C|}
                                             ${/resolvers}
 
+                                            static final ${schema:T}[] $$ALL = {${#all}${value:L}${^key.last}, ${/key.last}${/all}};
+
                                             private ${className:L}() {}
                                         }
                                         """;
@@ -97,6 +99,13 @@ public final class SchemasGenerator
                         writer.putContext("schemas", schemas);
                         writer.putContext("builders", builders);
                         writer.putContext("resolvers", resolvers);
+                        writer.putContext("schema", Schema.class);
+                        writer.putContext(
+                                "all",
+                                shapeOrder.stream()
+                                        .filter(not(SchemaField::isExternal))
+                                        .map(SchemaField::fieldName)
+                                        .toList());
                         writer.write(template);
                         writer.popState();
                     });
@@ -419,21 +428,18 @@ public final class SchemasGenerator
         private void generateStructMemberSchemas(Shape shape, String builderMethod) {
             String template;
             if (schemaField.isRecursive()) {
-                template = """
-                            ${name:L}_BUILDER${?hasMembers}
-                                ${C|}
-                                ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
-                                .shapeClass(${schemaTypeClass:T}.class)
-                                .build();
-                        """;
+                template =
+                        """
+                                    ${name:L}_BUILDER${?hasMembers}
+                                        ${C|}
+                                        ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder).shapeClass(${schemaTypeClass:T}.class).build();
+                                """;
             } else {
                 template =
                         """
                                 static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.${builderMethod:L}(${shapeId:T}.from(${id:S})${traits:C})${?hasMembers}
                                          ${C|}
-                                         ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder)
-                                         .shapeClass(${schemaTypeClass:T}.class)
-                                         .build();
+                                         ${/hasMembers}.builderSupplier(${schemaTypeClass:T}::builder).shapeClass(${schemaTypeClass:T}.class).build();
                                 """;
             }
             writer.pushState();
@@ -538,7 +544,7 @@ public final class SchemasGenerator
         @Override
         public Void unionShape(UnionShape shape) {
             writer.write(
-                    "static final ${schemaBuilder:T} ${name:L} = ${schemaClass:T}.structureBuilder(${shapeId:T}.from(${id:S})${traits:C});");
+                    "static final ${schemaBuilder:T} ${name:L} = ${schemaClass:T}.unionBuilder(${shapeId:T}.from(${id:S})${traits:C});");
             return null;
         }
     }

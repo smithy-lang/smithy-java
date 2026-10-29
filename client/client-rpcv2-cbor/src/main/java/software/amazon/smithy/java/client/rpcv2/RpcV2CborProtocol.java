@@ -10,6 +10,7 @@ import software.amazon.smithy.java.cbor.Rpcv2CborCodec;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
@@ -19,7 +20,7 @@ import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
  */
 public final class RpcV2CborProtocol extends AbstractRpcV2ClientProtocol {
     private static final String PAYLOAD_MEDIA_TYPE = "application/cbor";
-    private static final Codec CBOR_CODEC = Rpcv2CborCodec.builder().build();
+    private final Codec codec = Rpcv2CborCodec.builder().outputBuffers(OutputBuffers.create()).build();
 
     public RpcV2CborProtocol(ShapeId service) {
         super(Rpcv2CborTrait.ID, service, PAYLOAD_MEDIA_TYPE);
@@ -27,7 +28,7 @@ public final class RpcV2CborProtocol extends AbstractRpcV2ClientProtocol {
 
     @Override
     protected Codec codec() {
-        return CBOR_CODEC;
+        return codec;
     }
 
     public static final class Factory implements ClientProtocolFactory<Rpcv2CborTrait> {

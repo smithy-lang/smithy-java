@@ -15,6 +15,7 @@ import static org.hamcrest.Matchers.nullValue;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Assertions;
@@ -22,13 +23,17 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.OutputHook;
+import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ErrorFault;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
 import software.amazon.smithy.java.framework.model.InternalFailureException;
+import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.io.datastream.PooledDataStream;
 import software.amazon.smithy.java.retries.api.RetrySafety;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -227,5 +232,85 @@ public class MockPluginTest {
         assertThat(bresult.getMember("id").asString(), equalTo("b"));
 
         assertThat(mock.getRequests(), hasSize(2));
+    }
+
+    @Test
+    public void releasesPooledRequestBodiesAfterTheCallButRecordsReadableCopies() throws URISyntaxException {
+        var mockQueue = new MockQueue()
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .addHeader("content-type", "application/json")
+                        .setBody(DataStream.ofBytes("{\"id\":\"a\"}".getBytes(StandardCharsets.UTF_8)))
+                        .toUnmodifiable());
+        var mock = MockPlugin.builder().addQueue(mockQueue).build();
+        var liveBody = new AtomicReference<DataStream>();
+
+        var client = DynamicClient.builder()
+                .serviceId(SERVICE)
+                .model(MODEL)
+                .addPlugin(mock)
+                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public void readAfterSigning(RequestHook<?, ?, ?> hook) {
+                        liveBody.set(((HttpRequest) hook.request()).body());
+                    }
+                })
+                .build();
+
+        var result = client.call("GetSprocket", Document.of(Map.of("id", Document.of("abc"))));
+        assertThat(result.getMember("id").asString(), equalTo("a"));
+
+        assertThat(liveBody.get(), instanceOf(PooledDataStream.class));
+        var pooled = (PooledDataStream) liveBody.get();
+        assertThat(pooled.escaped(), is(false));
+        Assertions.assertThrows(IllegalStateException.class, pooled::asByteBuffer);
+
+        assertThat(mock.getRequests(), hasSize(1));
+        var recorded = mock.getRequests().get(0).request().body();
+        assertThat(recorded, not(instanceOf(PooledDataStream.class)));
+        assertThat(StandardCharsets.UTF_8.decode(recorded.asByteBuffer()).toString(), equalTo("{\"id\":\"abc\"}"));
+    }
+
+    @Test
+    public void recordsReadableCopiesOfMetadataWrappedPooledBodies() throws URISyntaxException {
+        var mockQueue = new MockQueue()
+                .enqueue(HttpResponse.create()
+                        .setStatusCode(200)
+                        .addHeader("content-type", "application/json")
+                        .setBody(DataStream.ofBytes("{\"id\":\"a\"}".getBytes(StandardCharsets.UTF_8)))
+                        .toUnmodifiable());
+        var mock = MockPlugin.builder().addQueue(mockQueue).build();
+        var liveBody = new AtomicReference<DataStream>();
+
+        var client = DynamicClient.builder()
+                .serviceId(SERVICE)
+                .model(MODEL)
+                .addPlugin(mock)
+                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, ?, RequestT> hook) {
+                        var req = (HttpRequest) hook.request();
+                        var wrapped = DataStream.withMetadata(req.body(), "application/x-custom", -1);
+                        liveBody.set(wrapped);
+                        return hook.asRequestType(req.toModifiable().setBody(wrapped));
+                    }
+                })
+                .build();
+
+        var result = client.call("GetSprocket", Document.of(Map.of("id", Document.of("abc"))));
+        assertThat(result.getMember("id").asString(), equalTo("a"));
+
+        assertThat(liveBody.get(), instanceOf(PooledDataStream.class));
+        Assertions.assertThrows(IllegalStateException.class, () -> liveBody.get().asByteBuffer());
+
+        assertThat(mock.getRequests(), hasSize(1));
+        var recorded = mock.getRequests().get(0).request().body();
+        assertThat(recorded, not(instanceOf(PooledDataStream.class)));
+        assertThat(recorded.contentType(), equalTo("application/x-custom"));
+        assertThat(StandardCharsets.UTF_8.decode(recorded.asByteBuffer()).toString(), equalTo("{\"id\":\"abc\"}"));
     }
 }

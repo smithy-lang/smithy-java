@@ -33,15 +33,29 @@ public abstract class StripedPool<T, C> {
     private final int slotMask;
     private final AtomicReferenceArray<T> pool;
 
+    /** Sizes the pool from four slots per available processor, rounded up to a power of two. */
     protected StripedPool() {
-        this(4);
+        this(logicalSlots(4, N_PROCS));
     }
 
-    protected StripedPool(int multiplier) {
-        int raw = N_PROCS * multiplier;
-        int logicalSlots = Integer.highestOneBit(raw - 1) << 1;
-        this.slotMask = logicalSlots - 1;
-        this.pool = new AtomicReferenceArray<>(logicalSlots << STRIDE_SHIFT);
+    /**
+     * Rounds the slot count up to a power of two, with at least one slot.
+     *
+     * @param logicalSlots requested slot count
+     */
+    protected StripedPool(int logicalSlots) {
+        int slots = Math.max(1, Integer.highestOneBit(Math.max(1, logicalSlots) - 1) << 1);
+        this.slotMask = slots - 1;
+        this.pool = new AtomicReferenceArray<>(slots << STRIDE_SHIFT);
+    }
+
+    final int logicalSlotCount() {
+        return slotMask + 1;
+    }
+
+    static int logicalSlots(int multiplier, int processors) {
+        int raw = Math.max(1, processors * multiplier);
+        return Math.max(1, Integer.highestOneBit(raw - 1) << 1);
     }
 
     /**
@@ -90,6 +104,16 @@ public abstract class StripedPool<T, C> {
             }
         }
         return create(context);
+    }
+
+    /**
+     * Removes all idle items from the pool.
+     * Acquired items remain valid and can return to the pool later.
+     */
+    public final void clear() {
+        for (int i = 0; i < pool.length(); i++) {
+            pool.set(i, null);
+        }
     }
 
     public final void release(T item) {

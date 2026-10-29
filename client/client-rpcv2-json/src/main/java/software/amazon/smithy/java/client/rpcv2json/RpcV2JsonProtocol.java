@@ -10,6 +10,7 @@ import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.rpcv2.AbstractRpcV2ClientProtocol;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -33,6 +34,7 @@ public final class RpcV2JsonProtocol extends AbstractRpcV2ClientProtocol {
         this.codec = JsonCodec.builder()
                 .defaultNamespace(service.getNamespace())
                 .useStringForArbitraryPrecision(true)
+                .outputBuffers(OutputBuffers.create())
                 .build();
     }
 

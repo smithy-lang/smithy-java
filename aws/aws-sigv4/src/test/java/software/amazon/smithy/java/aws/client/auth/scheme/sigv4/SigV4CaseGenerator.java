@@ -444,29 +444,44 @@ final class SigV4CaseGenerator {
             request.setBody(DataStream.ofBytes(new byte[0]));
             return "empty";
         }
-        if (k < 60) {
+        if (k < 55) {
             request.setBody(DataStream.ofBytes(bytes));
             return "heap[" + bytes.length + "]";
         }
-        if (k < 70) {
+        if (k < 63) {
             var direct = ByteBuffer.allocateDirect(bytes.length);
             direct.put(bytes).flip();
             request.setBody(DataStream.ofByteBuffer(direct));
             return "direct[" + bytes.length + "]";
         }
-        if (k < 80) {
+        if (k < 71) {
             int pad = s.nextInt(10);
             byte[] padded = new byte[bytes.length + pad + 5];
             System.arraycopy(bytes, 0, padded, pad, bytes.length);
             request.setBody(DataStream.ofByteBuffer(ByteBuffer.wrap(padded, pad, bytes.length).asReadOnlyBuffer()));
             return "readOnly[" + bytes.length + "@" + pad + "]";
         }
-        if (k < 90) {
+        if (k < 79) {
             int pad = s.nextInt(10);
             byte[] padded = new byte[bytes.length + pad + 5];
             System.arraycopy(bytes, 0, padded, pad, bytes.length);
             request.setBody(DataStream.ofByteBuffer(ByteBuffer.wrap(padded, pad, bytes.length).slice()));
             return "slice[" + bytes.length + "@" + pad + "]";
+        }
+        if (k < 87) {
+            int pad = s.nextInt(10);
+            byte[] padded = new byte[bytes.length + pad + 5];
+            System.arraycopy(bytes, 0, padded, pad, bytes.length);
+            request.setBody(DataStream.ofLeasedBytes(padded, pad, bytes.length, null, array -> {}));
+            return "leased[" + bytes.length + "@" + pad + "]";
+        }
+        if (k < 94) {
+            int split = bytes.length == 0 ? 0 : s.nextInt(bytes.length + 1);
+            var parts = List.of(
+                    ByteBuffer.wrap(bytes, 0, split),
+                    ByteBuffer.wrap(bytes, split, bytes.length - split));
+            request.setBody(DataStream.ofByteBuffers(parts, bytes.length, null));
+            return "multi[" + split + "+" + (bytes.length - split) + "]";
         }
         request.setBody(DataStream.ofInputStream(new ByteArrayInputStream(bytes)));
         return "unknownLength[" + bytes.length + "]";

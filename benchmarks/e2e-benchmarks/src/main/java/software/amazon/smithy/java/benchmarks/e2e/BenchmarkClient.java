@@ -91,7 +91,7 @@ final class BenchmarkClient implements AutoCloseable {
             if (outputPayloadMember != null) {
                 Object payload = output.getMemberValue(outputPayloadMember);
                 if (payload instanceof DataStream stream) {
-                    Bodies.drain(stream);
+                    Bodies.drainPayload(stream);
                 } else if (payload instanceof ByteBuffer buffer) {
                     Bodies.consume(buffer);
                 }

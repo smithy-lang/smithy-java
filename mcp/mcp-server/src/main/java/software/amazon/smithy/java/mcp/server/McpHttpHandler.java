@@ -110,11 +110,11 @@ public final class McpHttpHandler {
             var params = request.getParams();
             var identifier = McpHttpBinding.stringMember(params, "protocolVersion");
             return identifier == null
-                    ? ProtocolVersion.defaultVersion()
+                    ? engine.defaultProtocolVersion()
                     : ProtocolVersion.parse(identifier);
         }
         return headerVersion == null
-                ? ProtocolVersion.defaultVersion()
+                ? engine.defaultProtocolVersion()
                 : ProtocolVersion.parse(headerVersion);
     }
 

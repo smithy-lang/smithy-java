@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /** Optional {@link Codec} capability for coding selected structure members. */
@@ -29,6 +30,16 @@ public interface MemberSubsetCodec {
 
     /** Returns selected members serialized, or null when unsupported. */
     ByteBuffer serialize(SerializableStruct struct, MemberSubset subset);
+
+    /**
+     * Serializes selected members into a body stream. Returns null if unsupported.
+     *
+     * @see Codec#serializeToDataStream
+     */
+    default DataStream serializeToDataStream(SerializableStruct struct, MemberSubset subset, String contentType) {
+        ByteBuffer bytes = serialize(struct, subset);
+        return bytes == null ? null : DataStream.ofByteBuffer(bytes, contentType);
+    }
 
     /**
      * Deserializes only the members {@code subset} includes directly into {@code builder}.

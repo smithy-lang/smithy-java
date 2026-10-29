@@ -22,7 +22,9 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import software.amazon.smithy.java.aws.client.core.settings.EndpointSettings;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
+import software.amazon.smithy.java.aws.client.core.settings.S3EndpointSettings;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.rulesengine.EndpointRulesPlugin;
 import software.amazon.smithy.java.context.Context;
@@ -178,7 +180,23 @@ public class S3EndpointBenchmark {
 
     @State(Scope.Benchmark)
     public static class ParamState {
-        @Param({/*"binding",*/ "canned"})
+        /**
+         * How endpoint parameters reach the resolver.
+         *
+         * <ul>
+         *   <li>{@code canned} — every parameter is handed over by name in
+         *       {@link RulesEngineSettings#ADDITIONAL_ENDPOINT_PARAMS}. This is the escape hatch, and it
+         *       makes the resolver re-resolve each name to a register index on every call.</li>
+         *   <li>{@code bound} — parameters arrive the way a generated client supplies them: the bucket
+         *       through its {@code smithy.rules#contextParam} input member, and the region and feature
+         *       flags through the typed context keys the builtins read, whose register indices are
+         *       resolved once when the program is loaded. Nothing is passed by name.</li>
+         * </ul>
+         *
+         * <p>Comparing the two isolates the cost of by-name parameter passing, which a CPU profile
+         * attributed ~18% of a resolve to.
+         */
+        @Param({"canned", "bound"})
         private String paramMode;
 
         @Param({"none", "az", "express", "az+express"})
@@ -197,7 +215,6 @@ public class S3EndpointBenchmark {
 
         @Setup
         public void setup() {
-            boolean canned = "canned".equals(paramMode);
             resolver = SharedResolver.getResolver(treeMode);
             var client = SharedResolver.CLIENT;
             var getObject = SharedResolver.GET_OBJECT;
@@ -205,7 +222,7 @@ public class S3EndpointBenchmark {
             // vanilla virtual addressing@us-west-2
             vanillaVirtualAddressingParams = buildParams(client,
                     getObject,
-                    canned,
+                    paramMode,
                     Map.of("Bucket", Document.of("bucket-name"), "Key", Document.of("key")),
                     "us-west-2",
                     Map.of("Accelerate",
@@ -224,7 +241,7 @@ public class S3EndpointBenchmark {
             // vanilla path style@us-west-2
             vanillaPathStyleParams = buildParams(client,
                     getObject,
-                    canned,
+                    paramMode,
                     Map.of("Bucket", Document.of("bucket-name"), "Key", Document.of("key")),
                     "us-west-2",
                     Map.of("Accelerate",
@@ -243,7 +260,7 @@ public class S3EndpointBenchmark {
             // Data Plane with short zone name
             dataPlaneShortZoneParams = buildParams(client,
                     getObject,
-                    canned,
+                    paramMode,
                     Map.of("Bucket", Document.of("mybucket--abcd-ab1--x-s3"), "Key", Document.of("key")),
                     "us-east-1",
                     Map.of("Region",
@@ -262,7 +279,7 @@ public class S3EndpointBenchmark {
             // vanilla access point arn@us-west-2
             vanillaAccessPointArnParams = buildParams(client,
                     getObject,
-                    canned,
+                    paramMode,
                     Map.of("Bucket",
                             Document.of("arn:aws:s3:us-west-2:123456789012:accesspoint:myendpoint"),
                             "Key",
@@ -284,7 +301,7 @@ public class S3EndpointBenchmark {
             // S3 outposts vanilla test
             s3OutpostsVanillaParams = buildParams(client,
                     getObject,
-                    canned,
+                    paramMode,
                     Map.of("Bucket",
                             Document.of(
                                     "arn:aws:s3-outposts:us-west-2:123456789012:outpost/op-01234567890123456/accesspoint/reports"),
@@ -305,7 +322,7 @@ public class S3EndpointBenchmark {
             // Same as vanilla virtual addressing, but with a no-op trace sink on the context.
             tracedVirtualAddressingParams = buildParams(client,
                     getObject,
-                    canned,
+                    paramMode,
                     Map.of("Bucket", Document.of("bucket-name"), "Key", Document.of("key")),
                     "us-west-2",
                     Map.of("Accelerate",
@@ -340,29 +357,34 @@ public class S3EndpointBenchmark {
         private static EndpointResolverParams buildParams(
                 DynamicClient client,
                 ApiOperation<?, ?> operation,
-                boolean canned,
+                String paramMode,
                 Map<String, Document> inputMembers,
                 String region,
                 Map<String, Object> additionalParams
         ) {
-            return buildParams(client, operation, canned, inputMembers, region, additionalParams, null);
+            return buildParams(client, operation, paramMode, inputMembers, region, additionalParams, null);
         }
 
         private static EndpointResolverParams buildParams(
                 DynamicClient client,
                 ApiOperation<?, ?> operation,
-                boolean canned,
+                String paramMode,
                 Map<String, Document> inputMembers,
                 String region,
                 Map<String, Object> additionalParams,
                 BddTraceSink traceSink
         ) {
+            boolean bound = "bound".equals(paramMode);
             var inputValue = client.createStruct(
                     ShapeId.from("com.amazonaws.s3#GetObjectRequest"),
-                    Document.of(canned ? Map.of() : inputMembers));
+                    Document.of(bound ? inputMembers : Map.of()));
             var ctx = Context.create();
             ctx.put(RegionSetting.REGION, region);
-            ctx.put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, additionalParams);
+            if (bound) {
+                bindAsBuiltins(ctx, additionalParams);
+            } else {
+                ctx.put(RulesEngineSettings.ADDITIONAL_ENDPOINT_PARAMS, additionalParams);
+            }
             if (traceSink != null) {
                 ctx.put(RulesEngineSettings.BDD_TRACE_SINK, traceSink);
             }
@@ -371,6 +393,38 @@ public class S3EndpointBenchmark {
                     .inputValue(inputValue)
                     .operation(operation)
                     .build();
+        }
+
+        /**
+         * Puts the parameters a generated client would supply through typed context keys onto the
+         * context, instead of handing them over by name.
+         *
+         * <p>{@code Bucket} is left out because it travels through the input member's
+         * {@code contextParam}. Parameters with neither a builtin nor a default, like
+         * {@code UseS3ExpressControlEndpoint}, are also left out: they are optional, so an unset
+         * register behaves the same as an explicit false.
+         */
+        private static void bindAsBuiltins(Context ctx, Map<String, Object> params) {
+            putBoolean(ctx, params, "UseFIPS", EndpointSettings.USE_FIPS);
+            putBoolean(ctx, params, "UseDualStack", EndpointSettings.USE_DUAL_STACK);
+            putBoolean(ctx, params, "Accelerate", S3EndpointSettings.S3_ACCELERATE);
+            putBoolean(ctx, params, "ForcePathStyle", S3EndpointSettings.S3_FORCE_PATH_STYLE);
+            putBoolean(ctx, params, "UseArnRegion", S3EndpointSettings.S3_USE_ARN_REGION);
+            var region = params.get("Region");
+            if (region instanceof String s) {
+                ctx.put(RegionSetting.REGION, s);
+            }
+        }
+
+        private static void putBoolean(
+                Context ctx,
+                Map<String, Object> params,
+                String name,
+                Context.Key<Boolean> key
+        ) {
+            if (params.get(name) instanceof Boolean value) {
+                ctx.put(key, value);
+            }
         }
     }
 
@@ -434,7 +488,7 @@ public class S3EndpointBenchmark {
 
         @Setup
         public void setup(ParamState params) {
-            boolean canned = "canned".equals(params.paramMode);
+
             var client = SharedResolver.CLIENT;
             var getObject = SharedResolver.GET_OBJECT;
             paramVariants = new EndpointResolverParams[BUCKET_COUNT];
@@ -442,7 +496,7 @@ public class S3EndpointBenchmark {
                 String bucket = "bucket-" + i;
                 paramVariants[i] = ParamState.buildParams(client,
                         getObject,
-                        canned,
+                        params.paramMode,
                         Map.of("Bucket", Document.of(bucket), "Key", Document.of("key")),
                         "us-west-2",
                         Map.of("Accelerate",

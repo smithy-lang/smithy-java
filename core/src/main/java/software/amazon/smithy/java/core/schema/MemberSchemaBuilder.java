@@ -65,6 +65,7 @@ final class MemberSchemaBuilder {
         }
     }
 
+    // Match CodegenUtils#isRequiredWithNoDefault so generated member indices refer to the correct schemas.
     private boolean computeIsRequired() {
         if (!traits.contains(TraitKey.REQUIRED_TRAIT)) {
             return false;

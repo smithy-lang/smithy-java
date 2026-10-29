@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.binding;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -23,10 +24,12 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -248,6 +251,62 @@ public class HttpBindingDeserializerTest {
 
     private static DataStream inputStreamBody(String value) {
         return DataStream.ofInputStream(new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    static List<Arguments> rejectingCodecs() {
+        return List.of(
+                Arguments.of("builder rejects member", new EchoCodec(), new RejectingBuilder()),
+                Arguments.of("direct subset codec rejects body",
+                        new RejectingSubsetCodec(new IllegalArgumentException("rejected")),
+                        new BodyOutput.Builder()));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("rejectingCodecs")
+    void requestDeserializerWrapsFailuresInSerializationException(
+            String name,
+            Codec codec,
+            ShapeBuilder<?> builder
+    ) {
+        var request = HttpRequest.create()
+                .setMethod("POST")
+                .setUri(URI.create("https://example.com/"))
+                .setBody(DataStream.ofString("body"));
+        var deser = new RequestDeserializer()
+                .payloadCodec(codec)
+                .request(request)
+                .inputShapeBuilder(builder);
+
+        var e = Assertions.assertThrows(SerializationException.class, deser::deserialize);
+        Assertions.assertInstanceOf(IllegalArgumentException.class, e.getCause());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("rejectingCodecs")
+    void responseDeserializerWrapsFailuresInSerializationException(
+            String name,
+            Codec codec,
+            ShapeBuilder<?> builder
+    ) {
+        var deser = new ResponseDeserializer()
+                .payloadCodec(codec)
+                .response(response(DataStream.ofString("body")))
+                .outputShapeBuilder(builder);
+
+        var e = Assertions.assertThrows(SerializationException.class, deser::deserialize);
+        Assertions.assertInstanceOf(IllegalArgumentException.class, e.getCause());
+    }
+
+    @Test
+    void responseDeserializerDoesNotRewrapSerializationException() {
+        var original = new SerializationException("bad payload");
+        var deser = new ResponseDeserializer()
+                .payloadCodec(new RejectingSubsetCodec(original))
+                .response(response(DataStream.ofString("body")))
+                .outputShapeBuilder(new BodyOutput.Builder());
+
+        var e = Assertions.assertThrows(SerializationException.class, deser::deserialize);
+        Assertions.assertSame(original, e);
     }
 
     private static HttpResponse response(DataStream body) {
@@ -657,6 +716,63 @@ public class HttpBindingDeserializerTest {
                     });
                 }
             };
+        }
+    }
+
+    /**
+     * A builder for {@link BodyOutput} that rejects its input, like a union builder does when more than one member
+     * is set.
+     */
+    private static final class RejectingBuilder implements ShapeBuilder<BodyOutput> {
+        @Override
+        public BodyOutput build() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ShapeBuilder<BodyOutput> deserialize(ShapeDeserializer decoder) {
+            decoder.readStruct(BodyOutput.SCHEMA, this, (builder, member, deserializer) -> {
+                throw new IllegalArgumentException("Only one value may be set for unions");
+            });
+            return this;
+        }
+
+        @Override
+        public Schema schema() {
+            return BodyOutput.SCHEMA;
+        }
+    }
+
+    private static final class RejectingSubsetCodec implements Codec, MemberSubsetCodec {
+        private final RuntimeException failure;
+
+        private RejectingSubsetCodec(RuntimeException failure) {
+            this.failure = failure;
+        }
+
+        @Override
+        public ByteBuffer serialize(SerializableStruct struct, MemberSubset subset) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean deserialize(
+                Schema schema,
+                ShapeBuilder<?> builder,
+                ByteBuffer source,
+                MemberSubset subset
+        ) {
+            throw failure;
+        }
+
+        @Override
+        public ShapeSerializer createSerializer(OutputStream sink) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ShapeDeserializer createDeserializer(ByteBuffer source) {
+            throw new UnsupportedOperationException();
         }
     }
 }

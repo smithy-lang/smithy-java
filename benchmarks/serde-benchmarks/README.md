@@ -18,6 +18,11 @@ uses internally, minus the actual HTTP transport.
 | `restXml` | `RestXmlClientProtocol#createRequest` | `RestXmlClientProtocol#deserializeResponse` |
 | `rpcv2Cbor` | `RpcV2CborProtocol#createRequest` | `RpcV2CborProtocol#deserializeResponse` |
 
+The `*CodecSerializeBenchmark` classes (AWS JSON 1.0 and RPC v2 CBOR) drive
+`Codec#serialize` on the same fixtures instead: the copy-out path that server
+responses and other direct codec callers take, as opposed to the leased
+request-body path behind `createRequest`.
+
 Each benchmark loop therefore measures the *same* per-iteration work the
 production code does for that protocol: header / URI label / query string
 binding (where applicable) plus body serialization on the way out, and the

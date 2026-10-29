@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 
 public class CborSerializerTest {
@@ -180,7 +181,7 @@ public class CborSerializerTest {
         }
         System.arraycopy(utf8, 0, expected, expected.length - utf8.length, utf8.length);
 
-        var serializer = new CborSerializer();
+        var serializer = new CborSerializer(null, OutputBuffers.shared());
         serializer.writeString(null, value);
         assertArrayEquals(expected, ByteBufferUtils.getBytes(serializer.extractResult()), value);
     }
