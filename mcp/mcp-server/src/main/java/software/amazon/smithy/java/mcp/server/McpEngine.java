@@ -105,6 +105,10 @@ public final class McpEngine implements AutoCloseable {
      *
      * <p>This is primarily useful for transport adapters. Application code should
      * prefer the typed-call overload.
+     *
+     * <p>An accepted {@code subscriptions/listen} returns {@code null}, like a notification: the
+     * request stays open, and delivering its acknowledgment and notifications is up to the transport
+     * (see {@link McpOutcome.Subscribed}).
      */
     public JsonRpcResponse execute(JsonRpcRequest request, ProtocolVersion protocolVersion) {
         var session = newSession();
@@ -134,7 +138,11 @@ public final class McpEngine implements AutoCloseable {
         } catch (RuntimeException e) {
             return errorOutcome(call, e);
         }
-        return execute(call, new McpRequestContext(version, transportContext, Context.create()));
+        var outcome = execute(call, new McpRequestContext(version, transportContext, Context.create()));
+        if (call instanceof McpCall.Initialize && outcome instanceof McpOutcome.Success) {
+            session.markHandshake();
+        }
+        return outcome;
     }
 
     JsonRpcRequest encode(McpCall call) {
@@ -177,6 +185,10 @@ public final class McpEngine implements AutoCloseable {
             Consumer<JsonRpcResponse> responseWriter
     ) {
         sources.bindTransport(notificationWriter, responseWriter);
+    }
+
+    void bindTransport(McpSources.CatalogListener listener, Consumer<JsonRpcResponse> responseWriter) {
+        sources.bindTransport(listener, responseWriter);
     }
 
     void addService(String id, Service service) {
@@ -279,11 +291,10 @@ public final class McpEngine implements AutoCloseable {
          * {@code supportedVersions}, names only the retained versions), and {@code initialize} falls back to
          * the newest retained handshake version.
          *
-         * <p>For example, a server that relays {@code notifications/tools/list_changed} from proxied servers
-         * can be restricted to handshake versions (2025-11-25 and earlier). 2026-07-28 only delivers
-         * list-change notifications through {@code subscriptions/listen}, which is not implemented yet, so
-         * restricting the versions lets clients that support both fall back to {@code initialize} and keep
-         * receiving those notifications.
+         * <p>For example, a server can be restricted to handshake versions (2025-11-25 and earlier) so that
+         * clients that support both eras fall back to {@code initialize}. On 2026-07-28, list-change
+         * notifications are delivered only through {@code subscriptions/listen}, which the stdio transport
+         * supports and the HTTP handler does not yet.
          *
          * <p>{@link #build()} fails with {@link IllegalArgumentException} if a version is not registered, and
          * with {@link IllegalStateException} if none of the versions supports {@code initialize}.

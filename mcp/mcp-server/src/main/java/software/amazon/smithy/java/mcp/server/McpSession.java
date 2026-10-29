@@ -11,10 +11,20 @@ final class McpSession {
     private final ReentrantLock negotiationLock = new ReentrantLock();
     private final McpProtocolRegistry protocols;
     private ProtocolVersion version;
+    // Era of the connection for unsolicited delivery; independent of the per-request version above.
+    private volatile boolean handshake;
 
     McpSession(McpProtocolRegistry protocols) {
         this.protocols = protocols;
         version = protocols.defaultProtocol().protocolVersion();
+    }
+
+    void markHandshake() {
+        handshake = true;
+    }
+
+    boolean handshake() {
+        return handshake;
     }
 
     ProtocolVersion negotiate(McpCall call, ProtocolVersion transportClaim) {
