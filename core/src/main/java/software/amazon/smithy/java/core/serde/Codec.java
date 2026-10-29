@@ -123,17 +123,27 @@ public interface Codec extends AutoCloseable {
     /**
      * Helper method to deserialize and build a shape.
      *
+     * <p>Any failure, including one raised by the builder for invalid input (e.g. a union with more than one
+     * member set), is thrown as a {@link SerializationException}.
+     *
      * @param source  What to parse.
      * @param builder Builder to populate.
      * @return Returns the built and error-corrected shape.
      * @param <T> Shape to build.
      */
     default <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
-        return builder.deserialize(createDeserializer(source)).errorCorrection().build();
+        try {
+            return builder.deserialize(createDeserializer(source)).errorCorrection().build();
+        } catch (RuntimeException e) {
+            throw SerializationException.wrap(e);
+        }
     }
 
     /**
      * Helper method to deserialize and build a shape.
+     *
+     * <p>Any failure, including one raised by the builder for invalid input (e.g. a union with more than one
+     * member set), is thrown as a {@link SerializationException}.
      *
      * @param source  What to parse.
      * @param builder Builder to populate.
@@ -141,7 +151,11 @@ public interface Codec extends AutoCloseable {
      * @param <T> Shape to build.
      */
     default <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
-        return builder.deserialize(createDeserializer(source)).errorCorrection().build();
+        try {
+            return builder.deserialize(createDeserializer(source)).errorCorrection().build();
+        } catch (RuntimeException e) {
+            throw SerializationException.wrap(e);
+        }
     }
 
     /**

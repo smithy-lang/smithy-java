@@ -1,23 +1,44 @@
 name: Codegen Compatibility
 
 on:
-  # Run daily at 4 AM UTC
-  schedule:
-    - cron: '0 4 * * *'
-
-  # Allow manual trigger
-  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'codegen/**'
+      - '!**.md'
+      - '!**/src/test/**'
+      - '!**/src/testFixtures/**'
+      - '!**/src/it/**'
+      - 'codegen/codegen-plugin/src/it/java/software/amazon/smithy/java/codegen/size/**'
+      - '!**/src/jmh/**'
+      - '.github/workflows/codegen-compatibility.yml'
+      - '.github/workflows/codegen-compatibility-comment.yml'
 
 permissions:
   contents: read
 
-jobs:
-  codegen-compatibility:
-    runs-on: ubuntu-latest
-    name: AWS Model Codegen Compatibility
+concurrency:
+  group: codegen-compatibility-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
+jobs:
+  measure:
+    name: Measure ${{ matrix.side }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: base
+            ref: ${{ github.event.pull_request.base.sha }}
+          - side: head
+            ref: ''
     steps:
-      - uses: actions/checkout@v7
+      - name: Check out ${{ matrix.side }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.ref }}
 
       - name: Set up JDK 25
         uses: actions/setup-java@v6
@@ -39,12 +60,107 @@ jobs:
           gradle-home-cache-includes: |
             caches
 
-      - name: Run codegen compatibility tests
-        run: |
-          ./gradlew :codegen:codegen-plugin:integ -PawsModelsTests --tests "*.AwsModelCodegenCompilationTest" --stacktrace
+      # The base may predate the codegenSize task. The comparison then reports the head alone.
+      # Skip unit tests so their failures cannot prevent the compatibility report.
+      - name: Generate, compile, and measure code for the AWS models
+        id: measure
+        continue-on-error: ${{ matrix.side == 'base' }}
+        run: ./gradlew :codegen:codegen-plugin:codegenSize -PawsModelsTests -x test --stacktrace
 
-      - uses: actions/upload-artifact@v7
-        if: failure()
+      - name: Upload report
+        if: steps.measure.outcome == 'success'
+        uses: actions/upload-artifact@v7
         with:
-          name: codegen-compatibility-report
-          path: '**/build/reports/tests'
+          name: codegen-size-${{ matrix.side }}
+          path: codegen/codegen-plugin/build/codegen-size/report.json
+          retention-days: 30
+
+  compare:
+    name: Compare
+    needs: measure
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: 25
+          distribution: 'corretto'
+
+      - name: Cache compiled buildscripts
+        uses: actions/cache@v6
+        with:
+          key: ${{ runner.os }}-gradle-${{ hashFiles('buildSrc/**/*.kts') }}
+          path: |
+            ./buildSrc/build
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          gradle-home-cache-includes: |
+            caches
+
+      - name: Download head report
+        uses: actions/download-artifact@v8
+        with:
+          name: codegen-size-head
+          path: ${{ runner.temp }}/codegen-size/head
+
+      - name: Download base report
+        id: base
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: codegen-size-base
+          path: ${{ runner.temp }}/codegen-size/base
+
+      - name: Compare reports
+        id: compare
+        run: |
+          set -euo pipefail
+          base="$RUNNER_TEMP/codegen-size/base/report.json"
+          args=("-PcodegenSizeHead=$RUNNER_TEMP/codegen-size/head/report.json")
+          if [ -f "$base" ]; then
+            args+=("-PcodegenSizeBase=$base")
+          else
+            echo "No base report; reporting the head alone"
+          fi
+          ./gradlew :codegen:codegen-plugin:codegenSizeCompare "${args[@]}" -x test --stacktrace
+
+      - name: Finish report
+        if: always() && steps.compare.outcome != 'skipped'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          report=codegen/codegen-plugin/build/codegen-size
+          mkdir -p "$RUNNER_TEMP/codegen-size/report"
+          {
+            cat "$report/report.md"
+            echo
+            echo "Base: \`$BASE_REF\` at ${BASE_SHA:0:9}. PR: ${HEAD_SHA:0:9} merged into the base. [Workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
+          } > "$RUNNER_TEMP/codegen-size/report/report.md"
+          echo "$PR_NUMBER" > "$RUNNER_TEMP/codegen-size/report/pr-number"
+          cp "$report/status" "$RUNNER_TEMP/codegen-size/report/status"
+          status=$(tr -d '[:space:]' < "$report/status")
+          echo "Status: $status"
+          if [ "$status" != "unchanged" ]; then
+            touch "$RUNNER_TEMP/codegen-size/report/notable"
+          fi
+          cat "$RUNNER_TEMP/codegen-size/report/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always() && steps.compare.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: codegen-size-report
+          path: ${{ runner.temp }}/codegen-size/report
+          retention-days: 30

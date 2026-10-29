@@ -64,6 +64,38 @@ public final class SchemaBuilder {
         return putMember(name, new MemberSchemaBuilder(id.withMember(name), target, traits));
     }
 
+    // Fixed-arity overloads keep trait-array allocation out of generated Schemas call sites.
+
+    /**
+     * Add a member with no traits.
+     *
+     * @return this builder.
+     * @throws IllegalStateException if this builder is already built.
+     */
+    public SchemaBuilder putMember(String name, Schema target) {
+        return putMember(name, target, new Trait[0]);
+    }
+
+    /**
+     * Add a member with one trait.
+     *
+     * @return this builder.
+     * @throws IllegalStateException if this builder is already built.
+     */
+    public SchemaBuilder putMember(String name, Schema target, Trait trait) {
+        return putMember(name, target, new Trait[] {trait});
+    }
+
+    /**
+     * Add a member with two traits.
+     *
+     * @return this builder.
+     * @throws IllegalStateException if this builder is already built.
+     */
+    public SchemaBuilder putMember(String name, Schema target, Trait trait1, Trait trait2) {
+        return putMember(name, target, new Trait[] {trait1, trait2});
+    }
+
     /**
      * Used for building recursive shapes, add a member that targets a shape that hasn't been built.
      *
@@ -75,6 +107,36 @@ public final class SchemaBuilder {
      */
     public SchemaBuilder putMember(String name, SchemaBuilder target, Trait... traits) {
         return putMember(name, new MemberSchemaBuilder(id.withMember(name), target, traits));
+    }
+
+    /**
+     * Add a member with no traits that targets an unbuilt shape.
+     *
+     * @return this builder.
+     * @throws IllegalStateException if this builder is already built.
+     */
+    public SchemaBuilder putMember(String name, SchemaBuilder target) {
+        return putMember(name, target, new Trait[0]);
+    }
+
+    /**
+     * Add a member with one trait that targets an unbuilt shape.
+     *
+     * @return this builder.
+     * @throws IllegalStateException if this builder is already built.
+     */
+    public SchemaBuilder putMember(String name, SchemaBuilder target, Trait trait) {
+        return putMember(name, target, new Trait[] {trait});
+    }
+
+    /**
+     * Add a member with two traits that targets an unbuilt shape.
+     *
+     * @return this builder.
+     * @throws IllegalStateException if this builder is already built.
+     */
+    public SchemaBuilder putMember(String name, SchemaBuilder target, Trait trait1, Trait trait2) {
+        return putMember(name, target, new Trait[] {trait1, trait2});
     }
 
     /**

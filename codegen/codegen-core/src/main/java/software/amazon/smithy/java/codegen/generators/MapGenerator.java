@@ -20,19 +20,17 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-/**
- * Generates serializers and deserializers for Map shapes.
- */
 @SmithyInternalApi
 public final class MapGenerator
         implements Consumer<GenerateMapDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override
     public void accept(GenerateMapDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        var serdeClass = SharedSerdeGenerator.getClassName(directive.context(), directive.shape());
         directive.context()
                 .writerDelegator()
                 .useFileWriter(
-                        CodegenUtils.getSerdeFileName(directive.settings()),
+                        CodegenUtils.getJavaFilePath(directive.settings(), "model", serdeClass),
                         CodegenUtils.getModelNamespace(directive.settings()),
                         writer -> writer.onSection("sharedSerde", t -> {
 
@@ -53,7 +51,7 @@ public final class MapGenerator
                             writer.pushState();
                             var template =
                                     """
-                                            static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${mapSerializer:T}> {
+                                            ${?generatedSerializer}static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${mapSerializer:T}> {
                                                 static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
 
                                                 @Override
@@ -81,30 +79,43 @@ public final class MapGenerator
                                                 }
                                             }
 
-                                            static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
-                                                var size = Math.min(deserializer.containerSize(), deserializer.containerPreAllocationLimit());
-                                                ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : ${collectionImpl:T}.${newMap:L}(size);
-                                                deserializer.readStringMap(schema, result, ${name:U}$$ValueDeserializer.INSTANCE);
-                                                return result;
+                                            ${/generatedSerializer}static void deserialize${name:U}Value(
+                                                    ${shape:B} state,
+                                                    ${string:T} key,
+                                                    ${shapeDeserializer:T} deserializer
+                                            ) {
+                                                if (deserializer.isNull()) {
+                                                    ${?sparse}state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, deserializer.readNull());
+                                                    return;${/sparse}${^sparse}throw new ${serdeException:T}("Null value found in dense map");${/sparse}
+                                                }
+                                                state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, $memberDeserializer:C);
                                             }
 
-                                            private static final class ${name:U}$$ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${string:T}, ${shape:B}> {
-                                                static final ${name:U}$$ValueDeserializer INSTANCE = new ${name:U}$$ValueDeserializer();
-
-                                                @Override
-                                                public void accept(${shape:B} state, ${string:T} key, ${shapeDeserializer:T} deserializer) {
-                                                    if (deserializer.isNull()) {
-                                                        ${?sparse}state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, deserializer.readNull());
-                                                        return;${/sparse}${^sparse}throw new ${serdeException:T}("Null value found in dense map");${/sparse}
-                                                    }
-                                                    state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, $memberDeserializer:C);
-                                                }
+                                            static ${shape:T} deserialize${name:U}(
+                                                    ${schema:T} schema,
+                                                    ${shapeDeserializer:T} deserializer
+                                            ) {
+                                                var size = Math.min(
+                                                        deserializer.containerSize(),
+                                                        deserializer.containerPreAllocationLimit());
+                                                ${shape:T} result = size == -1
+                                                        ? new ${collectionImpl:T}<>()
+                                                        : ${collectionImpl:T}.${newMap:L}(size);
+                                                deserializer.readStringMap(
+                                                        schema,
+                                                        result,
+                                                        ${serdeClass:L}::deserialize${name:U}Value);
+                                                return result;
                                             }
                                             """;
                             writer.putContext("shape", directive.symbol());
                             writer.putContext("name", name);
+                            writer.putContext(
+                                    "generatedSerializer",
+                                    !CodegenUtils.usesTypedMapWriter(directive.model(), directive.shape()));
                             writer.putContext("key", keySymbol);
                             writer.putContext("value", valueSymbol);
+                            writer.putContext("serdeClass", serdeClass);
                             writer.putContext("keySchema", keySchema);
                             writer.putContext("valueSchema", valueSchema);
                             var collectionImpl = (Class<?>) directive.symbol()
@@ -134,6 +145,7 @@ public final class MapGenerator
                                             directive.symbolProvider(),
                                             directive.model(),
                                             directive.getRenames(),
+                                            directive.context().schemaFieldOrder(),
                                             "deserializer",
                                             valueSchema));
                             writer.putContext(

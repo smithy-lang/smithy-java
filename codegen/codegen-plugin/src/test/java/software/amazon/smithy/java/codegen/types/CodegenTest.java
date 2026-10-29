@@ -51,13 +51,15 @@ public class CodegenTest {
         var settings = settingsBuilder.build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
+        assertThat(manifest.getFiles().stream().map(p -> p.getFileName().toString()))
+                .filteredOn(name -> name.startsWith("$HiddenEnum_") || name.startsWith("$HiddenIntEnum_"))
+                .hasSize(2);
         assertThat(manifest.getFiles())
-                .hasSize(8)
-                .containsExactlyInAnyOrder(
+                .hasSize(9)
+                .contains(
                         Path.of("/java/test/smithy/codegen/types/test/model/EnumShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/IntEnumShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/Schemas.java"),
-                        Path.of("/java/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/UnionShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
@@ -72,10 +74,9 @@ public class CodegenTest {
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
         assertThat(manifest.getFiles())
-                .hasSize(5)
+                .hasSize(4)
                 .containsExactlyInAnyOrder(
                         Path.of("/java/test/smithy/codegen/types/test/model/Schemas.java"),
-                        Path.of("/java/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
                         Path.of("/resources/META-INF/services/software.amazon.smithy.java.core.schema.SchemaIndex"));
@@ -89,12 +90,11 @@ public class CodegenTest {
                 .build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
-        assertEquals(6, manifest.getFiles().size());
+        assertEquals(5, manifest.getFiles().size());
         assertThat(manifest.getFiles())
-                .hasSize(6)
+                .hasSize(5)
                 .containsExactlyInAnyOrder(
                         Path.of("/java/test/smithy/codegen/types/test/model/Schemas.java"),
-                        Path.of("/java/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/UnionShape.java"),
                         Path.of("/java/test/smithy/codegen/types/test/model/GeneratedSchemaIndex.java"),
@@ -191,7 +191,7 @@ public class CodegenTest {
                 .contains("private final PresenceTracker tracker = PresenceTracker.of($SCHEMA);")
                 .contains("tracker.validate();")
                 .contains("if (tracker.allSet())")
-                .contains("if (!tracker.checkMember($SCHEMA_MEMBER0))")
+                .contains("if (!tracker.checkMember($0))")
                 .doesNotContain("private long $setMembers;");
     }
 
@@ -216,6 +216,218 @@ public class CodegenTest {
                 .contains("if ($setMembers != 0x1L)");
     }
 
+    @Test
+    void usesTypedCollectionWritersAndGeneratedDeserialization() {
+        var generatedModel = Model.assembler()
+                .addUnparsedModel(
+                        "serde.smithy",
+                        """
+                                $version: "2"
+                                namespace smithy.java.codegen.serde
+
+                                list StringList {
+                                    member: String
+                                }
+
+                                map StringMap {
+                                    key: String
+                                    value: String
+                                }
+
+                                structure Container {
+                                    list: StringList
+                                    map: StringMap
+                                }
+
+                                union Choice {
+                                    list: StringList
+                                }
+                                """)
+                .assemble()
+                .unwrap();
+        var settings = settingsBuilder.build();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .model(generatedModel)
+                .settings(settings)
+                .build();
+        plugin.execute(context);
+
+        assertThat(getGeneratedSource("Container.java"))
+                .contains("serializer.writeStringList($0, list, $0.listMember());")
+                .contains("serializer.writeStringMap($1, map, $1.mapKeyMember(), $1.mapValueMember());")
+                .contains("case 0 -> builder.list(SharedSerde.deserializeStringList(member, de));")
+                .contains("case 1 -> builder.map(SharedSerde.deserializeStringMap(member, de));")
+                .contains("decoder.readStruct($SCHEMA, this, Builder::$deserializeMember);")
+                .doesNotContain("StringListSerializer")
+                .doesNotContain("class $InnerDeserializer");
+        assertThat(getGeneratedSource("SharedSerde.java"))
+                .contains("static void deserializeStringListMember(")
+                .contains("static void deserializeStringMapValue(")
+                .doesNotContain("class StringMapSerializer")
+                .doesNotContain("class StringListSerializer");
+        assertThat(getGeneratedSource("Choice.java"))
+                .contains("decoder.readStruct($SCHEMA, this, $InnerDeserializer.INSTANCE);")
+                .contains("Builder.$deserializeMember(builder, member, de);")
+                .contains("builder.$unknownMember(memberName);");
+    }
+
+    @Test
+    void generatesDeserializersForStructureCollections() {
+        var generatedModel = Model.assembler()
+                .addUnparsedModel(
+                        "serde.smithy",
+                        """
+                                $version: "2"
+                                namespace smithy.java.codegen.serde
+
+                                structure Item {
+                                    value: String
+                                }
+
+                                list ItemList {
+                                    member: Item
+                                }
+
+                                map ItemMap {
+                                    key: String
+                                    value: Item
+                                }
+
+                                structure Container {
+                                    list: ItemList
+                                    map: ItemMap
+                                }
+                                """)
+                .assemble()
+                .unwrap();
+        var settings = settingsBuilder.build();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .model(generatedModel)
+                .settings(settings)
+                .build();
+        plugin.execute(context);
+
+        assertThat(getGeneratedSource("Container.java"))
+                .contains("serializer.writeStructList($0, list, $0.listMember());")
+                .contains("serializer.writeStructMap($1, map, $1.mapKeyMember(), $1.mapValueMember());")
+                .contains("case 0 -> builder.list(SharedSerde.deserializeItemList(member, de));")
+                .contains("case 1 -> builder.map(SharedSerde.deserializeItemMap(member, de));");
+        assertThat(getGeneratedSource("SharedSerde.java"))
+                .contains("static void deserializeItemListMember(")
+                .contains("static void deserializeItemMapValue(")
+                .containsPattern(
+                        "Item\\.builder\\(\\)\\.deserializeMember\\(deserializer, Schemas\\.\\$\\d+\\.listMember\\(\\)\\)\\.build\\(\\)")
+                .doesNotContain("class ItemMapSerializer")
+                .doesNotContain("class ItemListSerializer");
+    }
+
+    @Test
+    void generatesSerializerClassesForCollectionsWithoutTypedWriters() {
+        var generatedModel = Model.assembler()
+                .addUnparsedModel(
+                        "serde.smithy",
+                        """
+                                $version: "2"
+                                namespace smithy.java.codegen.serde
+
+                                enum Color {
+                                    RED
+                                }
+
+                                @sparse
+                                list SparseStringList {
+                                    member: String
+                                }
+
+                                list NestedList {
+                                    member: SparseStringList
+                                }
+
+                                map ColorMap {
+                                    key: Color
+                                    value: String
+                                }
+
+                                @sparse
+                                map SparseListMap {
+                                    key: String
+                                    value: SparseStringList
+                                }
+
+                                structure Container {
+                                    nested: NestedList
+                                    colors: ColorMap
+                                    lists: SparseListMap
+                                    sparse: SparseStringList
+                                }
+                                """)
+                .assemble()
+                .unwrap();
+        var settings = settingsBuilder.build();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .model(generatedModel)
+                .settings(settings)
+                .build();
+        plugin.execute(context);
+
+        assertThat(getGeneratedSource("Container.java"))
+                .contains("serializer.writeList($0, nested, nested.size(), SharedSerde.NestedListSerializer.INSTANCE);")
+                .contains("serializer.writeMap($1, colors, colors.size(), SharedSerde.ColorMapSerializer.INSTANCE);")
+                .contains("serializer.writeMap($2, lists, lists.size(), SharedSerde.SparseListMapSerializer.INSTANCE);")
+                .contains("serializer.writeSparseStringList($3, sparse, $3.listMember());");
+        assertThat(getGeneratedSource("SharedSerde.java"))
+                .contains("class NestedListSerializer implements")
+                .contains("class ColorMapSerializer implements")
+                .contains("class SparseListMapSerializer implements")
+                .contains("serializer.writeSparseStringList($m, value, $m.listMember());")
+                .containsPattern(
+                        "serializer\\.writeSparseStringList\\(Schemas\\.\\$\\d+\\.mapValueMember\\(\\), values, "
+                                + "Schemas\\.\\$\\d+\\.mapValueMember\\(\\)\\.listMember\\(\\)\\);")
+                .doesNotContain("class SparseStringListSerializer");
+    }
+
+    @Test
+    void shardsSerdeUsingSchemaPartitions() {
+        var modelSource = new StringBuilder()
+                .append("$version: \"2\"\n")
+                .append("namespace smithy.java.codegen.serde\n\n")
+                .append("structure Item {\n    value: String\n}\n\n");
+        for (int i = 0; i < 500; i++) {
+            modelSource.append("list Values")
+                    .append(i)
+                    .append(" {\n    member: Item\n}\n\n");
+        }
+        modelSource.append("structure Root {\n");
+        for (int i = 0; i < 500; i++) {
+            modelSource.append("    values")
+                    .append(i)
+                    .append(": Values")
+                    .append(i)
+                    .append('\n');
+        }
+        modelSource.append("}\n");
+        var generatedModel = Model.assembler()
+                .addUnparsedModel("sharded-serde.smithy", modelSource.toString())
+                .assemble()
+                .unwrap();
+        var settings = settingsBuilder.build();
+        var context = PluginContext.builder()
+                .fileManifest(manifest)
+                .model(generatedModel)
+                .settings(settings)
+                .build();
+        plugin.execute(context);
+
+        assertThat(manifest.getFiles().stream().map(path -> path.getFileName().toString()))
+                .contains("Schemas.java", "Schemas1.java", "SharedSerde.java", "SharedSerde1.java");
+        assertThat(getGeneratedSource("SharedSerde1.java"))
+                .contains("Schemas1.")
+                .doesNotContain("Schemas.");
+    }
+
     private String generateStructureSource(String modelSource, String fileName) {
         var generatedModel = Model.assembler()
                 .addUnparsedModel("presence.smithy", modelSource)
@@ -228,6 +440,10 @@ public class CodegenTest {
                 .settings(settings)
                 .build();
         plugin.execute(context);
+        return getGeneratedSource(fileName);
+    }
+
+    private String getGeneratedSource(String fileName) {
         var path = manifest.getFiles()
                 .stream()
                 .filter(file -> file.getFileName().toString().equals(fileName))

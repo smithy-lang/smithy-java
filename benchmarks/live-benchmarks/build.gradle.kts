@@ -23,7 +23,7 @@ dependencies {
     smithyBuild(project(":aws:aws-sigv4-s3express"))
 
     // The source projection loads these models from runtimeClasspath.
-    implementation("software.amazon.api.models:dynamodb:1.0.15")
+    implementation("software.amazon.api.models:dynamodb:1.0.17")
     implementation("software.amazon.api.models:s3:1.0.25")
 
     implementation(project(":core"))

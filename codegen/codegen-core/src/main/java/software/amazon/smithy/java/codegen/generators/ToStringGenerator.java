@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 
 /**
  * Writes the toString method for a serializable Class.
@@ -16,11 +16,11 @@ record ToStringGenerator(JavaWriter writer) implements Runnable {
     public void run() {
         writer.pushState();
         writer.putContext("string", String.class);
-        writer.putContext("toStringSerializer", ToStringSerializer.class);
+        writer.putContext("schemaUtils", SchemaUtils.class);
         writer.write("""
                 @Override
                 public ${string:T} toString() {
-                    return ${toStringSerializer:T}.serialize(this);
+                    return ${schemaUtils:T}.toString(this);
                 }
                 """);
         writer.popState();
