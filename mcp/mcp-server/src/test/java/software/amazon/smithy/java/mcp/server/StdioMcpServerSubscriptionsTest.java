@@ -129,22 +129,61 @@ class StdioMcpServerSubscriptionsTest {
                 "subscriptions/listen",
                 listen(Map.of("resourceSubscriptions", Document.of(List.of(Document.of(1))))));
         assertEquals(-32602, errorCode(read()));
+        writeLine("{\"jsonrpc\":\"2.0\",\"id\":\"null-uri\",\"method\":\"subscriptions/listen\",\"params\":{"
+                + "\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\"},"
+                + "\"notifications\":{\"resourceSubscriptions\":[null]}}}");
+        var nullUri = read();
+        assertEquals("null-uri", nullUri.getMember("id").asString());
+        assertEquals(-32602, errorCode(nullUri));
 
         send("ok", "subscriptions/listen", listen(Map.of("toolsListChanged", Document.of(true))));
         assertEquals("ok", subscriptionId(read()).asString());
     }
 
     @Test
-    void emptyAcceptedFilterIsStillAcknowledged() {
+    void emptyAcceptedFilterIsAcknowledgedThenCompleted() {
         start();
 
         send("resources-only", "subscriptions/listen", listen(Map.of("resourcesListChanged", Document.of(true))));
         var ack = read();
+        var complete = read();
 
         assertEquals("notifications/subscriptions/acknowledged", ack.getMember("method").asString());
         assertTrue(ack.getMember("params").getMember("notifications").asStringMap().isEmpty());
+        // Nothing can ever be delivered on it, so the stream ends right after the acknowledgment.
+        assertEquals("resources-only", complete.getMember("id").asString());
+        assertEquals("complete", complete.getMember("result").getMember("resultType").asString());
         server.refreshTools();
         output.assertNoOutput(100);
+        server.shutdown().join();
+        server = null;
+        output.assertNoOutput(100);
+    }
+
+    @Test
+    void numericCancellationMatchesTheIdByValue() {
+        start();
+        send(7, "subscriptions/listen", listen(Map.of("toolsListChanged", Document.of(true))));
+        read();
+
+        writeLine("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7.0}}");
+        barrier();
+        server.refreshTools();
+
+        output.assertNoOutput(100);
+    }
+
+    @Test
+    void anOverflowingCancellationIdDoesNotEndTheConnection() {
+        start();
+        send("s", "subscriptions/listen", listen(Map.of("toolsListChanged", Document.of(true))));
+        read();
+
+        writeLine("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":1e309}}");
+        barrier();
+        server.refreshTools();
+
+        assertEquals("s", subscriptionId(read()).asString());
     }
 
     @Test

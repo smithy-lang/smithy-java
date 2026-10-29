@@ -92,7 +92,12 @@ public final class StdioMcpServer implements Server {
                 if (method == McpMethod.Standard.NOTIFICATIONS_CANCELLED && request.getId() == null) {
                     // Handled in arrival order on the reader thread, after any listen it references.
                     var params = request.getParams();
-                    subscriptions.cancel(McpHttpBinding.isObject(params) ? params.getMember("requestId") : null);
+                    try {
+                        subscriptions.cancel(McpHttpBinding.isObject(params) ? params.getMember("requestId") : null);
+                    } catch (RuntimeException e) {
+                        // A malformed cancellation is ignored; it must not end the connection.
+                        LOG.debug("Ignoring malformed cancellation", e);
+                    }
                     continue;
                 }
                 var task = requests.submit(() -> handleRequest(request));
@@ -113,7 +118,7 @@ public final class StdioMcpServer implements Server {
             }
         } finally {
             // EOF or read failure: the transport is gone, so subscriptions end without a response.
-            subscriptions.clear();
+            subscriptions.close();
             requests.shutdown();
         }
     }

@@ -46,7 +46,7 @@ public record McpSubscriptionFilter(
                 throw new McpProtocolException(-32602, "resourceSubscriptions must be an array of strings");
             }
             resources = uris.asList().stream().map(value -> {
-                if (!value.isType(ShapeType.STRING)) {
+                if (value == null || !value.isType(ShapeType.STRING)) {
                     throw new McpProtocolException(-32602, "resourceSubscriptions must be an array of strings");
                 }
                 return value.asString();
@@ -68,6 +68,13 @@ public record McpSubscriptionFilter(
             throw new McpProtocolException(-32602, name + " must be a boolean");
         }
         return value.asBoolean();
+    }
+
+    /**
+     * Returns whether this filter includes no notification types.
+     */
+    public boolean isEmpty() {
+        return !toolsListChanged && !promptsListChanged && !resourcesListChanged && resourceSubscriptions.isEmpty();
     }
 
     /**
