@@ -21,13 +21,12 @@ val extension = project.extensions.create<PublishingConfigExtension>("configureP
  *
  * Every published library depends on the smithy-java BOM as a platform, so Gradle consumers get all
  * smithy-java modules aligned to the same (highest requested) version.
- * The BOM only declares constraints, so it doesn't create a dependency cycle.
+ * The BOM only declares constraints, so it doesn't create a dependency cycle. The BOM itself applies
+ * java-platform rather than java-library, so it doesn't reference itself.
  */
-if (project.path != ":bom") {
-    plugins.withId("java-library") {
-        dependencies {
-            add("api", platform(project(":bom")))
-        }
+plugins.withId("java-library") {
+    dependencies {
+        add("api", platform(project(":bom")))
     }
 }
 
