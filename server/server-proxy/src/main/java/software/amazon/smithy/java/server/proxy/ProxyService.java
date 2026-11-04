@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server;
+package software.amazon.smithy.java.server.proxy;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +32,9 @@ import software.amazon.smithy.java.dynamicclient.DynamicOperation;
 import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
 import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
+import software.amazon.smithy.java.server.Operation;
+import software.amazon.smithy.java.server.RequestContext;
+import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.OperationShape;

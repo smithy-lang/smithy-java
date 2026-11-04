@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server;
+package software.amazon.smithy.java.server.core;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +17,8 @@ import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
+import software.amazon.smithy.java.server.Operation;
+import software.amazon.smithy.java.server.Service;
 
 /**
  * A service implementation that filters operations based on a provided filter.

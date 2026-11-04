@@ -27,7 +27,7 @@ import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.endpoints.EndpointResolver;
-import software.amazon.smithy.java.server.ProxyService;
+import software.amazon.smithy.java.server.proxy.ProxyService;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.modelbundle.api.BundlePlugin;
