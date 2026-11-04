@@ -310,9 +310,9 @@ public final class ShapeTranscoder {
                 return false;
             }
             try {
-                var integer = value.toBigIntegerExact();
-                return integer.compareTo(BigInteger.valueOf(minimum)) >= 0
-                        && integer.compareTo(BigInteger.valueOf(maximum)) <= 0;
+                // longValueExact checks the range without allocating 10^|scale|.
+                var integer = value.longValueExact();
+                return integer >= minimum && integer <= maximum;
             } catch (ArithmeticException e) {
                 return false;
             }
@@ -324,7 +324,7 @@ public final class ShapeTranscoder {
                 return false;
             }
             try {
-                var integer = value.toBigIntegerExact();
+                var integer = BigNumbers.toBigIntegerExact(value);
                 return switch (kind) {
                     case FLOAT, DOUBLE -> integer.equals(BigInteger.valueOf((long) floatingPointValue));
                     default -> true;
@@ -731,7 +731,7 @@ public final class ShapeTranscoder {
                 case BYTE, SHORT, INTEGER, LONG -> BigInteger.valueOf(integralValue);
                 case FLOAT, DOUBLE -> BigInteger.valueOf((long) floatingPointValue);
                 case BIG_INTEGER -> (BigInteger) objectValue;
-                case BIG_DECIMAL -> ((BigDecimal) objectValue).toBigInteger();
+                case BIG_DECIMAL -> BigNumbers.toBigInteger((BigDecimal) objectValue);
                 default -> throw new SerializationException("Expected a number, but found " + kind);
             };
         }

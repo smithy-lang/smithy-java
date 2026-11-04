@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codecs.commons;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
@@ -183,5 +185,90 @@ public class NumberCodecBenchmark {
     @Benchmark
     public void smithyWriteDouble(Blackhole bh) {
         bh.consume(NumberCodec.writeDouble(writeBuf, 0, DOUBLE_VALUE));
+    }
+
+    @State(Scope.Thread)
+    public static class BigDecimalWriteState {
+        @Param({
+                "1234567890.123456789",
+                "12345678901234567890",
+                "-123456789012345678901234567890.5",
+                "0.000123456789012345678901234567890",
+                "1E-25",
+                "12345E+3",
+                "1E+500",
+                "7x1000",
+                "1E+1000",
+        })
+        public String decimalText;
+        BigDecimal value;
+        byte[] writeBuf;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            value = new BigDecimal(decimalText.equals("7x1000") ? "7".repeat(1000) : decimalText);
+            writeBuf = new byte[Math.max(NumberCodec.maxBigDecimalLength(value), value.toPlainString().length()) + 8];
+        }
+    }
+
+    @State(Scope.Thread)
+    public static class BigIntegerWriteState {
+        @Param({
+                "123456789012345678901",
+                "123456789012345678901234567890123456",
+                "7x100",
+                "7x1000",
+        })
+        public String integerText;
+        BigInteger value;
+        byte[] writeBuf;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            value = new BigInteger(integerText.startsWith("7x")
+                    ? "7".repeat(Integer.parseInt(integerText.substring(2)))
+                    : integerText);
+            writeBuf = new byte[value.toString().length() + 8];
+        }
+    }
+
+    @Benchmark
+    @SuppressWarnings("deprecation")
+    public void jdkWriteBigDecimalPlain(BigDecimalWriteState state, Blackhole bh) {
+        String s = state.value.toPlainString();
+        s.getBytes(0, s.length(), state.writeBuf, 0);
+        bh.consume(s.length());
+    }
+
+    @Benchmark
+    public void smithyWriteBigDecimal(BigDecimalWriteState state, Blackhole bh) {
+        bh.consume(NumberCodec.writeBigDecimal(state.writeBuf, 0, state.value));
+    }
+
+    @Benchmark
+    public void smithyMaxBigDecimalLength(BigDecimalWriteState state, Blackhole bh) {
+        bh.consume(NumberCodec.maxBigDecimalLength(state.value));
+    }
+
+    @Benchmark
+    public void smithyWriteBigDecimalWithCapacity(BigDecimalWriteState state, Blackhole bh) {
+        int max = NumberCodec.maxBigDecimalLength(state.value);
+        if (max > state.writeBuf.length) {
+            throw new IllegalStateException();
+        }
+        bh.consume(NumberCodec.writeBigDecimal(state.writeBuf, 0, state.value));
+    }
+
+    @Benchmark
+    @SuppressWarnings("deprecation")
+    public void jdkWriteBigInteger(BigIntegerWriteState state, Blackhole bh) {
+        String s = state.value.toString();
+        s.getBytes(0, s.length(), state.writeBuf, 0);
+        bh.consume(s.length());
+    }
+
+    @Benchmark
+    public void smithyWriteBigInteger(BigIntegerWriteState state, Blackhole bh) {
+        bh.consume(NumberCodec.writeBigInteger(state.writeBuf, 0, state.value));
     }
 }

@@ -10,7 +10,6 @@ import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.
 import static software.amazon.smithy.java.core.serde.TimestampFormatter.Prelude.HTTP_DATE;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -22,6 +21,7 @@ import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -56,13 +56,13 @@ final class SmithyDocumentAdapter {
         var toType = schema.type();
         return switch (toType) {
             case BIG_DECIMAL -> switch (fromType) {
-                case STRING -> Document.of(new BigDecimal(document.asString()));
+                case STRING -> Document.of(BigNumbers.parseBigDecimal(document.asString()));
                 case INTEGER, LONG, BIG_INTEGER, FLOAT, DOUBLE, BIG_DECIMAL ->
                     Document.of(new BigDecimal(document.asNumber().toString()));
                 default -> badType(fromType, toType);
             };
             case BIG_INTEGER -> switch (fromType) {
-                case STRING -> Document.of(new BigInteger(document.asString()));
+                case STRING -> Document.of(BigNumbers.parseBigInteger(document.asString()));
                 case INTEGER, LONG, BIG_INTEGER -> Document.of(document.asBigInteger());
                 default -> badType(fromType, toType);
             };

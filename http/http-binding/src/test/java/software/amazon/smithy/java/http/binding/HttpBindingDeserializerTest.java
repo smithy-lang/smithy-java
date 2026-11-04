@@ -8,13 +8,19 @@ package software.amazon.smithy.java.http.binding;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -22,6 +28,7 @@ import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
 import software.amazon.smithy.java.core.serde.SerializationException;
@@ -774,5 +781,60 @@ public class HttpBindingDeserializerTest {
         public ShapeDeserializer createDeserializer(ByteBuffer source) {
             throw new UnsupportedOperationException();
         }
+    }
+
+    private static final String MAX_DIGITS = "7".repeat(BigNumbers.MAX_DIGITS);
+    private static final String TOO_MANY_DIGITS = "7".repeat(BigNumbers.MAX_TEXT_DIGITS + 1);
+    private static final String FAR_TOO_MANY_DIGITS = "1".repeat(2_000_000);
+    private static final String TOO_MANY_FULLWIDTH_DIGITS = "\uFF17".repeat(BigNumbers.MAX_TEXT_DIGITS + 1);
+
+    static Stream<Arguments> stringValueLocations() {
+        return Stream.of(
+                Arguments.of(Named.<Function<String, ShapeDeserializer>>of("header", HttpHeaderDeserializer::new)),
+                Arguments.of(Named.<Function<String, ShapeDeserializer>>of("query",
+                        value -> new HttpQueryStringDeserializer(List.of(value)))),
+                Arguments.of(Named.<Function<String, ShapeDeserializer>>of("label", HttpPathLabelDeserializer::new)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("stringValueLocations")
+    @Timeout(10)
+    void readsBigNumbersWithMaxDigits(Function<String, ShapeDeserializer> location) {
+        Assertions.assertEquals(new BigInteger("-" + MAX_DIGITS),
+                location.apply("-" + MAX_DIGITS).readBigInteger(PreludeSchemas.BIG_INTEGER));
+        String decimal = "1".repeat(BigNumbers.MAX_DIGITS - 2) + ".1E+1";
+        Assertions.assertEquals(new BigDecimal(decimal),
+                location.apply(decimal).readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+        Assertions.assertEquals(new BigDecimal("1E+900000000"),
+                location.apply("1E+900000000").readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+    }
+
+    @ParameterizedTest
+    @MethodSource("stringValueLocations")
+    @Timeout(10)
+    void rejectsBigNumbersOverMaxDigits(Function<String, ShapeDeserializer> location) {
+        for (var digits : List.of(
+                TOO_MANY_DIGITS,
+                "-" + TOO_MANY_DIGITS,
+                FAR_TOO_MANY_DIGITS,
+                "7".repeat(BigNumbers.MAX_TEXT_DIGITS),
+                TOO_MANY_FULLWIDTH_DIGITS,
+                "\uFF17".repeat(300_000))) {
+            Assertions.assertThrows(SerializationException.class,
+                    () -> location.apply(digits).readBigInteger(PreludeSchemas.BIG_INTEGER));
+            Assertions.assertThrows(SerializationException.class,
+                    () -> location.apply(digits).readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+            Assertions.assertThrows(SerializationException.class,
+                    () -> location.apply(digits + ".5").readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("stringValueLocations")
+    void malformedBigNumbersStillFailAsSerializationException(Function<String, ShapeDeserializer> location) {
+        Assertions.assertThrows(SerializationException.class,
+                () -> location.apply("1.5").readBigInteger(PreludeSchemas.BIG_INTEGER));
+        Assertions.assertThrows(SerializationException.class,
+                () -> location.apply("abc").readBigDecimal(PreludeSchemas.BIG_DECIMAL));
     }
 }

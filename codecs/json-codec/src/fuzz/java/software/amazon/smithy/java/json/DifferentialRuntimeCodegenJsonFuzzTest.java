@@ -32,7 +32,6 @@ import software.smithy.fuzz.test.model.GeneratedSchemaIndex;
 class DifferentialRuntimeCodegenJsonFuzzTest {
 
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
-    private static final int MAX_CANONICAL_EXPONENT = 10_000;
 
     private static final JsonCodec INTERPRETED =
             JsonCodec.builder().overrideSerdeProvider(new SmithyJsonSerdeProvider()).build();
@@ -61,7 +60,6 @@ class DifferentialRuntimeCodegenJsonFuzzTest {
     }
 
     private void runTestsOn(byte[] input) {
-        boolean skipCanonicalSerialization = hasExcessiveJsonExponent(input);
         for (var shapeBuilderSupplier : getShapeBuilders()) {
             var refResult = tryDeserialize(INTERPRETED, shapeBuilderSupplier.get(), input);
             var genResult = tryDeserialize(CODEGEN, shapeBuilderSupplier.get(), input);
@@ -77,7 +75,7 @@ class DifferentialRuntimeCodegenJsonFuzzTest {
                                 + "Interpreted output: %s%n"
                                 + "Codegen error: %s",
                         Base64.getEncoder().encodeToString(input),
-                        safeSerializeToString(refResult.shape, skipCanonicalSerialization),
+                        asString(trySerialize(INTERPRETED, refResult.shape)),
                         genResult.error));
             }
 
@@ -88,13 +86,8 @@ class DifferentialRuntimeCodegenJsonFuzzTest {
                                 + "Codegen output: %s%n"
                                 + "Interpreted error: %s",
                         Base64.getEncoder().encodeToString(input),
-                        safeSerializeToString(genResult.shape, skipCanonicalSerialization),
+                        asString(trySerialize(INTERPRETED, genResult.shape)),
                         refResult.error));
-            }
-
-            // TODO: Remove when NumberCodec.writeBigDecimal bounds plain-notation expansion.
-            if (skipCanonicalSerialization) {
-                continue;
             }
 
             byte[] refBytes = trySerialize(INTERPRETED, refResult.shape);
@@ -151,58 +144,6 @@ class DifferentialRuntimeCodegenJsonFuzzTest {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private static String safeSerializeToString(SerializableShape shape, boolean skipCanonicalSerialization) {
-        return skipCanonicalSerialization
-                ? "<canonical serialization omitted: excessive exponent>"
-                : asString(trySerialize(INTERPRETED, shape));
-    }
-
-    private static boolean hasExcessiveJsonExponent(byte[] input) {
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = 0; i < input.length; i++) {
-            int current = input[i] & 0xff;
-            if (inString) {
-                if (escaped) {
-                    escaped = false;
-                } else if (current == '\\') {
-                    escaped = true;
-                } else if (current == '"') {
-                    inString = false;
-                }
-                continue;
-            }
-            if (current == '"') {
-                inString = true;
-                continue;
-            }
-            if ((current != 'e' && current != 'E')
-                    || i == 0
-                    || ((input[i - 1] < '0' || input[i - 1] > '9') && input[i - 1] != '.')) {
-                continue;
-            }
-
-            int offset = i + 1;
-            if (offset < input.length && (input[offset] == '+' || input[offset] == '-')) {
-                offset++;
-            }
-            int magnitude = 0;
-            int digits = 0;
-            while (offset < input.length && input[offset] >= '0' && input[offset] <= '9') {
-                digits++;
-                int digit = input[offset++] - '0';
-                if (magnitude > (MAX_CANONICAL_EXPONENT - digit) / 10) {
-                    return true;
-                }
-                magnitude = magnitude * 10 + digit;
-            }
-            if (digits > 0 && magnitude > MAX_CANONICAL_EXPONENT) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private record DeserializeResult(SerializableShape shape, Exception error) {}
