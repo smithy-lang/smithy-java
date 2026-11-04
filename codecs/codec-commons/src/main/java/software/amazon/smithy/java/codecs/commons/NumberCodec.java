@@ -13,6 +13,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -312,8 +314,6 @@ public final class NumberCodec {
         }
     }
 
-    private static final BigInteger TEN_TO_18 = BigInteger.valueOf(1_000_000_000_000_000_000L);
-
     public static int writeInt(byte[] buf, int pos, int value) {
         if (value == 0) {
             buf[pos] = '0';
@@ -350,36 +350,68 @@ public final class NumberCodec {
         return writePositiveLong(buf, pos, value);
     }
 
+    private static final int MAX_LIMB_BITS = 128;
+
+    private static final long TEN_TO_9 = 1_000_000_000L;
+
+    private static final long INT_MASK = 0xFFFFFFFFL;
+
     public static int writeBigInteger(byte[] buf, int pos, BigInteger value) {
+        if (value.bitLength() < 64) {
+            return writeLong(buf, pos, value.longValue());
+        }
+        BigInteger magnitude = value.abs();
+        int bits = magnitude.bitLength();
+        if (bits > MAX_LIMB_BITS) {
+            return writeAsciiString(buf, pos, value.toString());
+        }
         if (value.signum() < 0) {
             buf[pos++] = '-';
-            value = value.negate();
         }
+        long hi = bits <= 64 ? 0 : magnitude.shiftRight(64).longValue();
+        return writeMagnitude128(buf, pos, hi, magnitude.longValue());
+    }
 
-        if (value.compareTo(TEN_TO_18) < 0) {
-            return writePositiveLong(buf, pos, value.longValue());
+    // Three divisions by 10^9 reduce any 128-bit unsigned magnitude below 2^63.
+    private static int writeMagnitude128(byte[] buf, int pos, long hi, long lo) {
+        int g0 = 0;
+        int g1 = 0;
+        int g2 = 0;
+        int peeled = 0;
+        while (hi != 0 || lo < 0) {
+            long q0 = Long.divideUnsigned(hi, TEN_TO_9);
+            long r = Long.remainderUnsigned(hi, TEN_TO_9);
+            long cur = (r << 32) | (lo >>> 32);
+            long q1 = cur / TEN_TO_9;
+            r = cur - q1 * TEN_TO_9;
+            cur = (r << 32) | (lo & INT_MASK);
+            long q2 = cur / TEN_TO_9;
+            r = cur - q2 * TEN_TO_9;
+            hi = q0;
+            lo = (q1 << 32) | q2;
+            switch (peeled++) {
+                case 0 -> g0 = (int) r;
+                case 1 -> g1 = (int) r;
+                default -> g2 = (int) r;
+            }
         }
-
-        BigInteger[] qr = value.divideAndRemainder(TEN_TO_18);
-        BigInteger high = qr[0];
-        long low = qr[1].longValue();
-
-        if (high.compareTo(TEN_TO_18) < 0) {
-            pos = writePositiveLong(buf, pos, high.longValue());
-            return writePaddedLong18(buf, pos, low);
+        pos = writePositiveLong(buf, pos, lo);
+        if (peeled > 2) {
+            pos = writePaddedInt9(buf, pos, g2);
         }
-
-        BigInteger[] qr2 = high.divideAndRemainder(TEN_TO_18);
-        long mid = qr2[1].longValue();
-
-        if (qr2[0].compareTo(TEN_TO_18) < 0) {
-            pos = writePositiveLong(buf, pos, qr2[0].longValue());
-            pos = writePaddedLong18(buf, pos, mid);
-            return writePaddedLong18(buf, pos, low);
+        if (peeled > 1) {
+            pos = writePaddedInt9(buf, pos, g1);
         }
+        if (peeled > 0) {
+            pos = writePaddedInt9(buf, pos, g0);
+        }
+        return pos;
+    }
 
-        String s = value.toString();
-        return writeAsciiString(buf, pos, s);
+    private static int writePaddedInt9(byte[] buf, int pos, int value) {
+        int top = value / DIGITS_10_8;
+        buf[pos] = (byte) ('0' + top);
+        return writePaddedInt8(buf, pos + 1, value - top * DIGITS_10_8);
     }
 
     /**
@@ -504,22 +536,35 @@ public final class NumberCodec {
         return writeNonFiniteDoubleQuoted(buf, pos, value);
     }
 
+    // Allow a sign, decimal point, exponent marker, exponent sign, and ten exponent digits beyond the significant digits.
+    private static final int SCIENTIFIC_OVERHEAD = 14;
+
+    /**
+     * Writes a {@code BigDecimal} and returns the end position.
+     *
+     * <p>Uses {@link BigDecimal#toPlainString()} notation when it contains at most
+     * {@link BigNumbers#MAX_DIGITS} digits.
+     * Otherwise, uses {@link BigDecimal#toString()} notation, which preserves the scale.
+     *
+     * <p>Reserve {@link #maxBigDecimalLength} bytes from {@code pos}.
+     */
     public static int writeBigDecimal(byte[] buf, int pos, BigDecimal value) {
-        // TODO: Bound plain-notation expansion before calling BigDecimal.toPlainString.
         int scale = value.scale();
-        if (value.unscaledValue().bitLength() < 64) {
+        BigInteger unscaled = value.unscaledValue();
+        if (unscaled.bitLength() < 64) {
+            long compact = unscaled.longValue();
             if (scale == 0) {
-                return writeLong(buf, pos, value.longValueExact());
+                return writeLong(buf, pos, compact);
             }
-            if (scale > 0 && scale < POWERS_OF_10.length) {
-                long unscaled = value.unscaledValue().longValue();
-                if (unscaled < 0) {
+            // Negating Long.MIN_VALUE overflows even though its bit length is 63.
+            if (scale > 0 && scale < POWERS_OF_10.length && compact != Long.MIN_VALUE) {
+                if (compact < 0) {
                     buf[pos++] = '-';
-                    unscaled = -unscaled;
+                    compact = -compact;
                 }
                 long divisor = POWERS_OF_10[scale];
-                long intPart = unscaled / divisor;
-                long fracPart = unscaled - intPart * divisor;
+                long intPart = compact / divisor;
+                long fracPart = compact - intPart * divisor;
                 pos = writeLong(buf, pos, intPart);
                 buf[pos++] = '.';
                 for (int i = scale - 1; i >= 0; i--) {
@@ -531,20 +576,60 @@ public final class NumberCodec {
                 return pos;
             }
         }
-        return writeAsciiString(buf, pos, value.toPlainString());
+        return writeGeneralBigDecimal(buf, pos, value, unscaled, scale);
     }
 
+    private static int writeGeneralBigDecimal(byte[] buf, int pos, BigDecimal value, BigInteger unscaled, int scale) {
+        int signum = unscaled.signum();
+        if (signum == 0 && scale < 0) {
+            buf[pos] = '0';
+            return pos + 1;
+        }
+        int digits = value.precision();
+        if (plainDigits(digits, scale) > BigNumbers.MAX_DIGITS) {
+            return writeScientific(buf, pos, value);
+        }
+        int digitsStart = signum < 0 ? pos + 1 : pos;
+        int digitsEnd = writeBigInteger(buf, pos, unscaled);
+        if (scale <= 0) {
+            int end = digitsEnd - scale;
+            Arrays.fill(buf, digitsEnd, end, (byte) '0');
+            return end;
+        }
+        if (digits > scale) {
+            int dot = digitsEnd - scale;
+            System.arraycopy(buf, dot, buf, dot + 1, scale);
+            buf[dot] = '.';
+            return digitsEnd + 1;
+        }
+        int shift = 2 + scale - digits;
+        System.arraycopy(buf, digitsStart, buf, digitsStart + shift, digits);
+        buf[digitsStart] = '0';
+        buf[digitsStart + 1] = '.';
+        Arrays.fill(buf, digitsStart + 2, digitsStart + shift, (byte) '0');
+        return digitsEnd + shift;
+    }
+
+    private static int writeScientific(byte[] buf, int pos, BigDecimal value) {
+        return writeAsciiString(buf, pos, value.toString());
+    }
+
+    /**
+     * Returns an upper bound on the bytes {@link #writeBigDecimal} needs from its starting position.
+     */
     public static int maxBigDecimalLength(BigDecimal value) {
         int scale = value.scale();
-        int bitLength = value.unscaledValue().bitLength();
-        if (bitLength < 64 && scale >= 0 && scale < POWERS_OF_10.length) {
-            return 1 + 20 + 1 + scale;
+        if (scale < 0 && value.signum() == 0) {
+            return 1;
         }
-        int unscaledDigits = (int) (bitLength * 0.302) + 2;
-        if (scale <= 0) {
-            return 1 + unscaledDigits + (-scale);
-        }
-        return 1 + unscaledDigits + 1 + scale;
+        int digits = value.precision();
+        long plain = plainDigits(digits, scale);
+        int plainBytes = plain > BigNumbers.MAX_DIGITS ? 0 : (int) plain + 2;
+        return Math.max(plainBytes, digits + SCIENTIFIC_OVERHEAD);
+    }
+
+    private static long plainDigits(int digits, int scale) {
+        return scale <= 0 ? digits - (long) scale : Math.max(digits, scale + 1L);
     }
 
     @SuppressWarnings("deprecation")
@@ -630,18 +715,6 @@ public final class NumberCodec {
         int d01 = DIGIT_PAIRS[q * 2] << 24 | (DIGIT_PAIRS[q * 2 + 1] & 0xFF) << 16;
         int d23 = (DIGIT_PAIRS[r * 2] & 0xFF) << 8 | (DIGIT_PAIRS[r * 2 + 1] & 0xFF);
         INT_HANDLE.set(buf, pos, d01 | d23);
-    }
-
-    private static int writePaddedLong18(byte[] buf, int pos, long value) {
-        int end = pos + 18;
-        int p = end;
-        for (int i = 0; i < 9; i++) {
-            int r = (int) (value % 100) * 2;
-            value /= 100;
-            buf[--p] = DIGIT_PAIRS[r + 1];
-            buf[--p] = DIGIT_PAIRS[r];
-        }
-        return end;
     }
 
     public static int digitCount(int value) {

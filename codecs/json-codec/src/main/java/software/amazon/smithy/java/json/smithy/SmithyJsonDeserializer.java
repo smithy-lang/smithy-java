@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
@@ -381,7 +382,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             }
             String s = readStringValue();
             try {
-                return new BigInteger(s);
+                return BigNumbers.parseBigInteger(s);
             } catch (NumberFormatException e) {
                 throw new SerializationException("Invalid BigInteger value: " + s, e);
             }
@@ -392,11 +393,12 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         }
         int start = pos;
         pos = JsonReadUtils.findNumberEnd(buf, pos, end);
-        String numStr = new String(buf, start, pos - start, StandardCharsets.US_ASCII);
         try {
-            return new BigInteger(numStr);
+            return BigNumbers.parseBigInteger(buf, start, pos - start);
         } catch (NumberFormatException e) {
-            throw new SerializationException("Invalid BigInteger value: " + numStr, e);
+            throw new SerializationException(
+                    "Invalid BigInteger value: " + new String(buf, start, pos - start, StandardCharsets.US_ASCII),
+                    e);
         }
     }
 
@@ -410,7 +412,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
             }
             String s = readStringValue();
             try {
-                return new BigDecimal(s);
+                return BigNumbers.parseBigDecimal(s);
             } catch (NumberFormatException e) {
                 throw new SerializationException("Invalid BigDecimal value: " + s, e);
             }
@@ -421,11 +423,12 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         }
         int start = pos;
         pos = JsonReadUtils.findNumberEnd(buf, pos, end);
-        String numStr = new String(buf, start, pos - start, StandardCharsets.US_ASCII);
         try {
-            return new BigDecimal(numStr);
+            return BigNumbers.parseBigDecimal(buf, start, pos - start);
         } catch (NumberFormatException e) {
-            throw new SerializationException("Invalid BigDecimal value: " + numStr, e);
+            throw new SerializationException(
+                    "Invalid BigDecimal value: " + new String(buf, start, pos - start, StandardCharsets.US_ASCII),
+                    e);
         }
     }
 
@@ -1026,6 +1029,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                     number = lv;
                 }
             } else {
+                BigNumbers.checkDigits(digitLen);
                 String numStr = new String(buf, pos, len, StandardCharsets.US_ASCII);
                 try {
                     long lv = Long.parseLong(numStr);
@@ -1035,7 +1039,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                         number = lv;
                     }
                 } catch (NumberFormatException e) {
-                    number = new BigInteger(numStr);
+                    number = BigNumbers.checkBigIntegerDigits(new BigInteger(numStr));
                 }
             }
             pos = newPos;

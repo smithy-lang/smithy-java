@@ -14,6 +14,7 @@ import java.util.HexFormat;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -97,6 +98,9 @@ public class ShapeUtils {
     }
 
     private static final class RandomShapeGenerator implements ShapeDeserializer {
+
+        private boolean sparse;
+
         @Override
         public boolean readBoolean(Schema schema) {
             return random().nextBoolean();
@@ -151,12 +155,30 @@ public class ShapeUtils {
 
         @Override
         public BigDecimal readBigDecimal(Schema schema) {
+            if (randomInt(8) == 0) {
+                return maxDigitBigDecimal();
+            }
             var bigDecimal = new BigDecimal(readBigInteger(schema));
             int times = randomInt();
             while (times-- > 0) {
                 bigDecimal = bigDecimal.divide(new BigDecimal(readBigInteger(schema)), RoundingMode.CEILING);
             }
             return bigDecimal;
+        }
+
+        private static final int[] LIMIT_SCALES = {0, 500, 999, 1000, 1001, 1005, 1006, -1, -5, -1000};
+
+        private static BigDecimal maxDigitBigDecimal() {
+            var digits = new StringBuilder(BigNumbers.MAX_DIGITS);
+            digits.append((char) ('1' + randomInt(9)));
+            while (digits.length() < BigNumbers.MAX_DIGITS) {
+                digits.append((char) ('0' + randomInt(10)));
+            }
+            var unscaled = new BigInteger(digits.toString());
+            if (random().nextBoolean()) {
+                unscaled = unscaled.negate();
+            }
+            return new BigDecimal(unscaled, LIMIT_SCALES[randomInt(LIMIT_SCALES.length)]);
         }
 
         @Override
@@ -177,31 +199,49 @@ public class ShapeUtils {
 
         @Override
         public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
-            if (schema.type().isShapeType(ShapeType.UNION)) {
-                var member = schema.members().get(randomInt(schema.members().size()));
-                consumer.accept(state, member, this);
-            } else {
-                for (var member : schema.members()) {
-                    if (member.hasTrait(TraitKey.REQUIRED_TRAIT) || random().nextBoolean()) {
-                        consumer.accept(state, member, this);
+            boolean enclosing = sparse;
+            sparse = false;
+            try {
+                if (schema.type().isShapeType(ShapeType.UNION)) {
+                    var member = schema.members().get(randomInt(schema.members().size()));
+                    consumer.accept(state, member, this);
+                } else {
+                    for (var member : schema.members()) {
+                        if (member.hasTrait(TraitKey.REQUIRED_TRAIT) || random().nextBoolean()) {
+                            consumer.accept(state, member, this);
+                        }
                     }
                 }
+            } finally {
+                sparse = enclosing;
             }
         }
 
         @Override
         public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
-            IntStream.range(0, randomInt()).forEach(i -> consumer.accept(state, this));
+            boolean enclosing = sparse;
+            sparse = schema != null && schema.hasTrait(TraitKey.SPARSE_TRAIT);
+            try {
+                IntStream.range(0, randomInt()).forEach(i -> consumer.accept(state, this));
+            } finally {
+                sparse = enclosing;
+            }
         }
 
         @Override
         public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
-            IntStream.range(0, randomInt()).forEach(i -> consumer.accept(state, readString(schema), this));
+            boolean enclosing = sparse;
+            sparse = schema != null && schema.hasTrait(TraitKey.SPARSE_TRAIT);
+            try {
+                IntStream.range(0, randomInt()).forEach(i -> consumer.accept(state, readString(schema), this));
+            } finally {
+                sparse = enclosing;
+            }
         }
 
         @Override
         public boolean isNull() {
-            return random().nextBoolean();
+            return sparse && random().nextBoolean();
         }
 
         private static ThreadLocalRandom random() {

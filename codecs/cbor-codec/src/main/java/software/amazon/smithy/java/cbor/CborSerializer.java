@@ -541,7 +541,8 @@ final class CborSerializer implements ShapeSerializer {
         ensureCapacity(2);
         buf[pos++] = (byte) (TYPE_TAG | TAG_DECIMAL);
         tagAndLengthUnchecked(TYPE_ARRAY, 2);
-        writeLong(-value.scale());
+        // Widen the scale before negation to avoid overflow for Integer.MIN_VALUE.
+        writeLong(-(long) value.scale());
         writeBigInteger(value.unscaledValue());
     }
 

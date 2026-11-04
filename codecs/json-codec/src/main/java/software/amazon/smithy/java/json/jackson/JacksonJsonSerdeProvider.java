@@ -7,6 +7,7 @@ package software.amazon.smithy.java.json.jackson;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -17,6 +18,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.ObjectReadContext;
 import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.PrettyPrinter;
+import tools.jackson.core.StreamReadConstraints;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.util.DefaultPrettyPrinter;
@@ -31,6 +33,9 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     static {
         FACTORY = JsonFactory.builder()
                 .recyclerPool(JsonRecyclerPools.sharedBoundedPool())
+                .streamReadConstraints(StreamReadConstraints.builder()
+                        .maxNumberLength(BigNumbers.MAX_TEXT_DIGITS)
+                        .build())
                 .enable(StreamReadFeature.USE_FAST_DOUBLE_PARSER)
                 .enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER)
                 .build();
