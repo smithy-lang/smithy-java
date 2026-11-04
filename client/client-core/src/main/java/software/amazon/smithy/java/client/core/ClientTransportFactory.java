@@ -37,7 +37,8 @@ public interface ClientTransportFactory<RequestT, ResponseT> {
     /**
      * Priority used to select when deciding between multiple transport options.
      *
-     * <p>Higher numbers come before lower numbers.
+     * <p>Higher numbers come before lower numbers, and factories with the same priority keep their
+     * {@link ServiceLoader} order.
      *
      * @return the priority order.
      */
@@ -64,17 +65,17 @@ public interface ClientTransportFactory<RequestT, ResponseT> {
     ClientTransport<RequestT, ResponseT> createTransport(Document settings, Document pluginSettings);
 
     /**
-     * Loads all {@link ClientTransportFactory} implementations and sorts them by priority.
+     * Loads all {@link ClientTransportFactory} implementations and sorts them by priority, highest first.
      *
      * @param classLoader {@link ClassLoader} to use for loading service implementations
-     * @return list of discovered {@link ClientTransportFactory} implementations, sorted by priority
+     * @return list of discovered {@link ClientTransportFactory} implementations, sorted by descending priority
      */
     static List<ClientTransportFactory<?, ?>> load(ClassLoader classLoader) {
         List<ClientTransportFactory<?, ?>> factories = new ArrayList<>();
         for (var service : ServiceLoader.load(ClientTransportFactory.class, classLoader)) {
             factories.add(service);
         }
-        factories.sort(Comparator.comparingInt(ClientTransportFactory::priority));
+        factories.sort(Comparator.comparingInt(f -> -f.priority()));
         return factories;
     }
 }
