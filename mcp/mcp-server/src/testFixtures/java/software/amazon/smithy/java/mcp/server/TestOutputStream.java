@@ -26,21 +26,18 @@ final class TestOutputStream extends OutputStream {
 
     @Override
     public void write(byte[] b, int off, int len) {
-        int rem = len;
+        int end = off + len;
         int pos = off;
-        while (rem > 0) {
-            int nl = find(b, pos, pos + rem, (byte) '\n');
+        while (pos < end) {
+            int nl = find(b, pos, end, (byte) '\n');
             if (nl == -1) {
-                baos.write(b, off, len);
+                baos.write(b, pos, end - pos);
                 return;
-            } else {
-                int toWrite = nl - off;
-                baos.write(b, off, toWrite);
-                lines.add(baos.toString(StandardCharsets.UTF_8));
-                baos.reset();
-                rem -= toWrite;
-                pos += toWrite;
             }
+            baos.write(b, pos, nl - pos);
+            lines.add(baos.toString(StandardCharsets.UTF_8));
+            baos.reset();
+            pos = nl + 1;
         }
     }
 

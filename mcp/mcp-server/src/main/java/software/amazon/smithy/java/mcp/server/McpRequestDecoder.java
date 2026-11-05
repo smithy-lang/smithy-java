@@ -51,6 +51,10 @@ final class McpRequestDecoder {
                 new McpCall.SetLogLevel(request.getId(), optionalString(params, "level"), metadata);
             case McpMethod.Standard.RESOURCES_READ ->
                 new McpCall.ReadResource(request.getId(), requiredString(params, "uri"), metadata);
+            case McpMethod.Standard.SUBSCRIPTIONS_LISTEN -> new McpCall.Listen(
+                    request.getId(),
+                    McpSubscriptionFilter.decode(member(params, "notifications")),
+                    metadata);
             case McpMethod.Standard standard when standard.wireName().startsWith("notifications/") ->
                 new McpCall.Notification(standard, params, metadata);
             case McpMethod.Standard standard ->

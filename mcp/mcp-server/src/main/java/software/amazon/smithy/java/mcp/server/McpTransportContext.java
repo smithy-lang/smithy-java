@@ -23,9 +23,21 @@ public interface McpTransportContext {
         return false;
     }
 
+    /**
+     * Returns whether this transport can host long-lived {@code subscriptions/listen} streams.
+     */
+    default boolean supportsSubscriptions() {
+        return false;
+    }
+
     record Stdio() implements McpTransportContext {
         @Override
         public boolean supportsServerNotifications() {
+            return true;
+        }
+
+        @Override
+        public boolean supportsSubscriptions() {
             return true;
         }
     }
