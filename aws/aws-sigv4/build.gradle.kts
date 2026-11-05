@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.osdetector)
 }
 
-description = "This module provides AWS-Specific Sigv4 Signing capabilities"
+description = "This module provides AWS-Specific SigV4 and SigV4a Signing capabilities"
 
 extra["displayName"] = "Smithy :: Java :: AWS :: SigV4"
 extra["moduleName"] = "software.amazon.smithy.java.aws.sigv4"

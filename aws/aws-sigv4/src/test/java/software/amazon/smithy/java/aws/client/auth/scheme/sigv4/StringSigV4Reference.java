@@ -13,13 +13,14 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.core.settings.EndpointAuthSchemeSettings;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
@@ -30,7 +31,7 @@ import software.amazon.smithy.java.io.uri.SmithyUri;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 
 /**
- * This reference shares path normalization, percent-encoding, and the canonical-query shortcut with the production signer.
+ * The reference shares path normalization, percent-encoding, and the canonical-query shortcut with the production signer.
  */
 final class StringSigV4Reference {
 
@@ -43,23 +44,50 @@ final class StringSigV4Reference {
             "x-amzn-trace-id",
             "user-agent",
             "expect");
+    private static final String REGION_SET_HEADER = "x-amz-region-set";
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("uuuuMMdd'T'HHmmss'Z'")
             .withZone(ZoneOffset.UTC);
 
+    /**
+     * @param signature the hex signature for SigV4, or {@code null} for randomized SigV4a signatures.
+     *                  The SigV4a Authorization header in {@code headers} ends at {@code Signature=}.
+     */
+    record Expected(
+            String canonicalRequest,
+            String stringToSign,
+            String signature,
+            Map<String, List<String>> headers) {}
+
     private StringSigV4Reference() {}
 
-    static SignResult<HttpRequest> sign(HttpRequest request, AwsCredentialsIdentity identity, Context properties)
-            throws Exception {
+    static Expected sigV4(HttpRequest request, AwsCredentialsIdentity identity, Context properties) throws Exception {
+        return sign(request, identity, properties, false);
+    }
+
+    static Expected sigV4a(HttpRequest request, AwsCredentialsIdentity identity, Context properties) throws Exception {
+        return sign(request, identity, properties, true);
+    }
+
+    private static Expected sign(
+            HttpRequest request,
+            AwsCredentialsIdentity identity,
+            Context properties,
+            boolean asymmetric
+    ) throws Exception {
         String service = properties.get(EndpointAuthSchemeSettings.SIGNING_NAME);
         if (service == null) {
             service = properties.expect(SigV4Settings.SIGNING_NAME);
         }
-        String region = properties.get(EndpointAuthSchemeSettings.SIGNING_REGION);
-        if (region == null) {
-            region = properties.expect(RegionSetting.REGION);
-        }
+        String region = asymmetric ? null : region(properties);
+        String regionSet = asymmetric ? regionSet(properties) : null;
         Clock clock = properties.getOrDefault(SigV4Settings.CLOCK, Clock.systemUTC());
         boolean omitToken = properties.getOrDefault(SigV4Settings.OMIT_SECURITY_TOKEN, false);
+        boolean isS3 = service.equals("s3") || service.equals("s3express");
+        boolean normalize = pathFlag(properties.get(SigV4Settings.NORMALIZE_PATH), !isS3);
+        Boolean disableDouble = properties.get(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING);
+        boolean doubleEncode = disableDouble != null
+                ? !disableDouble
+                : pathFlag(properties.get(SigV4Settings.DOUBLE_URL_ENCODE), !isS3);
         String dateTime = STAMP.format(clock.instant());
         String dateStamp = dateTime.substring(0, 8);
 
@@ -73,13 +101,12 @@ final class StringSigV4Reference {
 
         var uri = request.uri();
         var requestHeaders = request.headers();
-        boolean isS3 = service.equals("s3") || service.equals("s3express");
         boolean addToken = !omitToken && identity.sessionToken() != null;
 
         var canonical = new TreeMap<String, List<String>>();
         requestHeaders.forEachEntry((name, value) -> {
             String lower = name.toLowerCase(Locale.ROOT);
-            if (!EXCLUDED.contains(lower)) {
+            if (!EXCLUDED.contains(lower) && !(asymmetric && lower.equals(REGION_SET_HEADER))) {
                 canonical.computeIfAbsent(lower, k -> new ArrayList<>()).add(canonicalHeaderValue(value));
             }
         });
@@ -87,11 +114,14 @@ final class StringSigV4Reference {
             canonical.put("host", List.of(hostHeader(uri)));
         }
         canonical.put("x-amz-date", List.of(dateTime));
-        if (addToken && !requestHeaders.hasHeader("x-amz-security-token")) {
-            canonical.put("x-amz-security-token", List.of(identity.sessionToken()));
+        if (asymmetric) {
+            canonical.put(REGION_SET_HEADER, List.of(regionSet));
         }
-        if (isS3 && !requestHeaders.hasHeader("x-amz-content-sha256")) {
-            canonical.put("x-amz-content-sha256", List.of(payloadHash));
+        if (addToken) {
+            canonical.put("x-amz-security-token", List.of(canonicalHeaderValue(identity.sessionToken())));
+        }
+        if (isS3) {
+            canonical.put("x-amz-content-sha256", List.of(canonicalHeaderValue(payloadHash)));
         }
 
         var headerLines = new StringBuilder();
@@ -105,7 +135,7 @@ final class StringSigV4Reference {
         }
 
         String canonicalRequest = request.method() + '\n'
-                + canonicalPath(uri)
+                + canonicalPath(uri, normalize, doubleEncode)
                 + '\n'
                 + canonicalQuery(uri.getQuery())
                 + '\n'
@@ -114,21 +144,32 @@ final class StringSigV4Reference {
                 + signedHeaders
                 + '\n'
                 + payloadHash;
-        String scope = dateStamp + '/' + region + '/' + service + "/aws4_request";
-        String stringToSign = "AWS4-HMAC-SHA256\n" + dateTime + '\n' + scope + '\n'
+        String algorithm = asymmetric ? "AWS4-ECDSA-P256-SHA256" : "AWS4-HMAC-SHA256";
+        String scope = dateStamp + '/' + (asymmetric ? "" : region + '/') + service + "/aws4_request";
+        String stringToSign = algorithm + '\n'
+                + dateTime
+                + '\n'
+                + scope
+                + '\n'
                 + sha256Hex(canonicalRequest.getBytes(StandardCharsets.UTF_8));
 
-        byte[] key = hmac(("AWS4" + identity.secretAccessKey()).getBytes(StandardCharsets.UTF_8), dateStamp);
-        key = hmac(key, region);
-        key = hmac(key, service);
-        key = hmac(key, "aws4_request");
-        String signature = HexFormat.of().formatHex(hmac(key, stringToSign));
-        String authorization = "AWS4-HMAC-SHA256 Credential=" + identity.accessKeyId() + '/' + scope
-                + ", SignedHeaders=" + signedHeaders + ", Signature=" + signature;
+        String signature = null;
+        if (!asymmetric) {
+            byte[] key = hmac(("AWS4" + identity.secretAccessKey()).getBytes(StandardCharsets.UTF_8), dateStamp);
+            key = hmac(key, region);
+            key = hmac(key, service);
+            key = hmac(key, "aws4_request");
+            signature = HexFormat.of().formatHex(hmac(key, stringToSign));
+        }
+        String authorization = algorithm + " Credential=" + identity.accessKeyId() + '/' + scope
+                + ", SignedHeaders=" + signedHeaders + ", Signature=" + (signature == null ? "" : signature);
 
         var signed = request.toModifiable();
         var headers = signed.headers();
         headers.setHeader("x-amz-date", dateTime);
+        if (asymmetric) {
+            headers.setHeader(REGION_SET_HEADER, regionSet);
+        }
         if (addToken) {
             headers.setHeader("x-amz-security-token", identity.sessionToken());
         }
@@ -136,7 +177,40 @@ final class StringSigV4Reference {
             headers.setHeader("x-amz-content-sha256", payloadHash);
         }
         headers.setHeader("authorization", authorization);
-        return new SignResult<>(signed, signature);
+        return new Expected(canonicalRequest, stringToSign, signature, new TreeMap<>(signed.headers().map()));
+    }
+
+    private static String region(Context properties) {
+        String region = properties.get(EndpointAuthSchemeSettings.SIGNING_REGION);
+        return region != null ? region : properties.expect(RegionSetting.REGION);
+    }
+
+    private static String regionSet(Context properties) {
+        List<String> set = properties.get(EndpointAuthSchemeSettings.SIGNING_REGION_SET);
+        if (set == null || set.isEmpty()) {
+            set = properties.get(SigV4aSettings.SIGNING_REGION_SET);
+        }
+        if (set == null || set.isEmpty()) {
+            return region(properties);
+        }
+        var regions = new LinkedHashSet<String>();
+        for (String region : set) {
+            if (region == null) {
+                throw new IllegalArgumentException("null region");
+            }
+            String trimmed = region.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            if (trimmed.contains(",") || trimmed.chars().anyMatch(Character::isWhitespace)) {
+                throw new IllegalArgumentException("invalid region " + region);
+            }
+            regions.add(trimmed);
+        }
+        if (regions.isEmpty()) {
+            throw new IllegalArgumentException("empty region set");
+        }
+        return String.join(",", regions);
     }
 
     static String canonicalHeaderValue(String value) {
@@ -177,15 +251,19 @@ final class StringSigV4Reference {
         return defaultPort ? uri.getHost() : uri.getHost() + ':' + port;
     }
 
-    static String canonicalPath(SmithyUri uri) {
-        String path = uri.getNormalizedPath();
+    private static boolean pathFlag(Boolean explicit, boolean fallback) {
+        return explicit != null ? explicit : fallback;
+    }
+
+    static String canonicalPath(SmithyUri uri, boolean normalize, boolean doubleEncode) {
+        String path = normalize ? uri.getNormalizedPath() : uri.getPath();
         if (path == null || path.isEmpty()) {
             return "/";
         }
         if (path.charAt(0) != '/') {
             path = "/" + path;
         }
-        return URLEncoding.encodeUnreserved(path, true);
+        return doubleEncode ? URLEncoding.encodeUnreserved(path, true) : path;
     }
 
     static String canonicalQuery(String query) {

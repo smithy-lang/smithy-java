@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class SignerCacheTest {
     @Test
     void cacheEvictsOldestEntryAtMax() {
-        var cache = new SigningCache(2);
+        var cache = new SigningCache<SigningCache.CacheKey, SigningKey>(2);
         var value = new SigningKey("".getBytes(), Instant.EPOCH);
         var first = new SigningCache.CacheKey("a", "b", "c");
         var second = new SigningCache.CacheKey("d", "e", "f");

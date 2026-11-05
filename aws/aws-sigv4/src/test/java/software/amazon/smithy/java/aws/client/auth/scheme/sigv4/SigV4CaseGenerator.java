@@ -201,6 +201,13 @@ final class SigV4CaseGenerator {
             new Credentials("AKID61", "z".repeat(61), null),
             new Credentials("AKIDLONG", "x".repeat(100), "t".repeat(300)),
     };
+    private static final List<List<String>> REGION_SETS = List.of(
+            List.of("*"),
+            List.of("us-east-1", "us-west-2"),
+            List.of(" eu-west-1 "),
+            List.of("us-east-1", "us-east-1", "ap-southeast-2"),
+            List.of(" ", ""),
+            List.of());
     private static final long[] ANCHOR_SECONDS = {
             0L,
             1_440_938_160L, // 2015-08-30T12:36:00Z, the official test vectors
@@ -291,6 +298,31 @@ final class SigV4CaseGenerator {
             String endpointRegion = s.pick(REGIONS);
             properties.put(EndpointAuthSchemeSettings.SIGNING_REGION, endpointRegion);
             description.append(" endpointRegion=").append(endpointRegion);
+        }
+        if (s.chance(15)) {
+            boolean disable = s.nextBoolean();
+            properties.put(EndpointAuthSchemeSettings.DISABLE_DOUBLE_ENCODING, disable);
+            description.append(" endpointDisableDoubleEncoding=").append(disable);
+        }
+        if (s.chance(15)) {
+            boolean normalize = s.nextBoolean();
+            properties.put(SigV4Settings.NORMALIZE_PATH, normalize);
+            description.append(" normalizePath=").append(normalize);
+        }
+        if (s.chance(15)) {
+            boolean doubleEncode = s.nextBoolean();
+            properties.put(SigV4Settings.DOUBLE_URL_ENCODE, doubleEncode);
+            description.append(" doubleUrlEncode=").append(doubleEncode);
+        }
+        if (s.chance(20)) {
+            List<String> set = REGION_SETS.get(s.nextInt(REGION_SETS.size()));
+            properties.put(SigV4aSettings.SIGNING_REGION_SET, set);
+            description.append(" regionSet=").append(set);
+        }
+        if (s.chance(15)) {
+            List<String> set = REGION_SETS.get(s.nextInt(REGION_SETS.size()));
+            properties.put(EndpointAuthSchemeSettings.SIGNING_REGION_SET, set);
+            description.append(" endpointRegionSet=").append(set);
         }
 
         return new SignCase(request.toUnmodifiable(), identity, properties, description.toString());

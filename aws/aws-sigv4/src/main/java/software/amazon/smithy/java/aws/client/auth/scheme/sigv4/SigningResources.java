@@ -11,10 +11,16 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.DigestException;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.interfaces.ECPrivateKey;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.ShortBufferException;
@@ -27,7 +33,16 @@ import software.amazon.smithy.java.io.datastream.DataStream;
  * Canonical requests use ASCII except for header values, which use UTF-8.
  */
 final class SigningResources {
+    private static final String SHA_256 = "SHA-256";
     private static final String HMAC_SHA_256 = "HmacSHA256";
+    private static final String SHA_256_WITH_ECDSA = "SHA256withECDSA";
+    private static final String JDK_DIGEST_PROVIDER = "SUN";
+    private static final String JDK_MAC_PROVIDER = "SunJCE";
+    static final String PREFER_BUILTIN_HASH_PROVIDERS_PROPERTY = "smithy.java.sigv4.preferBuiltinHashProviders";
+    private static final boolean PREFER_BUILTIN_HASH_PROVIDERS =
+            Boolean.getBoolean(PREFER_BUILTIN_HASH_PROVIDERS_PROPERTY);
+    /** A DER-encoded P-256 ECDSA signature requires at most 144 hexadecimal characters (72 bytes). */
+    static final int MAX_SIGNATURE_HEX_LENGTH = 144;
     private static final int BUFFER_SIZE = 512;
     private static final int INITIAL_HEADER_CAPACITY = 16;
     private static final long ONES = 0x0101010101010101L;
@@ -75,12 +90,13 @@ final class SigningResources {
     byte[] out;
     int outLength;
     byte[] stringToSignBytes;
+    int stringToSignLength;
     byte[] authorizationBytes;
     byte[] signedHeadersBytes;
     int signedHeadersLength;
     final byte[] hashBytes;
     final byte[] signatureBytes;
-    final byte[] signatureHexBytes;
+    final byte[] signatureHex;
     private byte[] scratch;
     final byte[] payloadHashHex;
     private final byte[] timestampBytes;
@@ -96,6 +112,14 @@ final class SigningResources {
     private long keyDays = Long.MIN_VALUE;
     private byte[] signingKey;
 
+    private Signature ecdsa;
+    private PrivateKey ecdsaInitializedKey;
+    private String ecdsaAccessKeyId;
+    private String ecdsaSecretAccessKey;
+    private ECPrivateKey ecdsaKey;
+    private List<String> regionSetList;
+    private String regionSetValue;
+
     private String[] memoNames = new String[0];
     private int[] memoOrder = new int[0];
     private String[] sortScratch = new String[INITIAL_HEADER_CAPACITY * 2];
@@ -110,17 +134,35 @@ final class SigningResources {
         this.signedHeadersBytes = new byte[256];
         this.hashBytes = new byte[32];
         this.signatureBytes = new byte[32];
-        this.signatureHexBytes = new byte[64];
+        this.signatureHex = new byte[MAX_SIGNATURE_HEX_LENGTH];
         this.payloadHashHex = new byte[64];
         this.timestampBytes = new byte[16];
 
+        this.sha256Digest = newSha256(PREFER_BUILTIN_HASH_PROVIDERS);
+        this.sha256Mac = newHmacSha256(PREFER_BUILTIN_HASH_PROVIDERS);
+    }
+
+    static MessageDigest newSha256(boolean preferBuiltin) {
+        if (preferBuiltin) {
+            try {
+                return MessageDigest.getInstance(SHA_256, JDK_DIGEST_PROVIDER);
+            } catch (NoSuchAlgorithmException | NoSuchProviderException e) {}
+        }
         try {
-            this.sha256Digest = MessageDigest.getInstance("SHA-256");
+            return MessageDigest.getInstance(SHA_256);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Unable to fetch message digest instance for SHA-256", e);
         }
+    }
+
+    static Mac newHmacSha256(boolean preferBuiltin) {
+        if (preferBuiltin) {
+            try {
+                return Mac.getInstance(HMAC_SHA_256, JDK_MAC_PROVIDER);
+            } catch (NoSuchAlgorithmException | NoSuchProviderException e) {}
+        }
         try {
-            this.sha256Mac = Mac.getInstance(HMAC_SHA_256);
+            return Mac.getInstance(HMAC_SHA_256);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Unable to fetch Mac instance for HmacSHA256", e);
         }
@@ -162,6 +204,7 @@ final class SigningResources {
         queryPairCount = 0;
         outLength = 0;
         signedHeadersLength = 0;
+        stringToSignLength = 0;
         sb.setLength(0);
     }
 
@@ -382,6 +425,51 @@ final class SigningResources {
         this.keyService = serviceName;
         this.keyDays = cachedDays;
         this.signingKey = key;
+    }
+
+    ECPrivateKey memoizedEcdsaKey(String accessKeyId, String secretAccessKey) {
+        if (ecdsaKey != null
+                && ecdsaAccessKeyId.equals(accessKeyId)
+                && ecdsaSecretAccessKey.equals(secretAccessKey)) {
+            return ecdsaKey;
+        }
+        return null;
+    }
+
+    void memoizeEcdsaKey(String accessKeyId, String secretAccessKey, ECPrivateKey key) {
+        this.ecdsaAccessKeyId = accessKeyId;
+        this.ecdsaSecretAccessKey = secretAccessKey;
+        this.ecdsaKey = key;
+    }
+
+    byte[] ecdsaSign(PrivateKey key, byte[] data, int offset, int length) {
+        try {
+            Signature signature = ecdsa;
+            if (signature == null) {
+                signature = ecdsa = Signature.getInstance(SHA_256_WITH_ECDSA);
+            }
+            if (ecdsaInitializedKey != key) {
+                signature.initSign(key);
+                ecdsaInitializedKey = key;
+            }
+            signature.update(data, offset, length);
+            return signature.sign();
+        } catch (GeneralSecurityException | RuntimeException e) {
+            // The engine may retain partial input after a failure. Initialize it again on the next call.
+            ecdsaInitializedKey = null;
+            throw e instanceof RuntimeException re ? re : new RuntimeException("Unable to compute ECDSA signature", e);
+        }
+    }
+
+    String regionSetHeaderValue(List<String> regions) {
+        // Callers can change the same region list between requests.
+        if (regions.equals(regionSetList)) {
+            return regionSetValue;
+        }
+        String joined = SigV4aSigner.joinRegionSet(regions);
+        regionSetList = List.copyOf(regions);
+        regionSetValue = joined;
+        return joined;
     }
 
     void addHeaderForSigning(String name, String value) {
