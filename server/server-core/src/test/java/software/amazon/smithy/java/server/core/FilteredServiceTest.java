@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server;
+package software.amazon.smithy.java.server.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,6 +23,9 @@ import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
+import software.amazon.smithy.java.server.Operation;
+import software.amazon.smithy.java.server.OperationFilters;
+import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.TestStructs.MockStruct;
 import software.amazon.smithy.model.shapes.ShapeId;
 

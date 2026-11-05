@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.server.ProxyService;
+import software.amazon.smithy.java.server.proxy.ProxyService;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 
