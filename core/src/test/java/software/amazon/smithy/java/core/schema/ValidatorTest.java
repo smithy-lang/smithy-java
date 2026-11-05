@@ -40,10 +40,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.core.TestHelper;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.event.EventStream;
 import software.amazon.smithy.java.core.testmodels.Person;
 import software.amazon.smithy.java.core.testmodels.PojoWithValidatedCollection;
 import software.amazon.smithy.java.core.testmodels.UnvalidatedPojo;
 import software.amazon.smithy.java.core.testmodels.ValidatedPojo;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -53,6 +55,7 @@ import software.amazon.smithy.model.traits.PatternTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 
@@ -275,6 +278,44 @@ public class ValidatorTest {
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0).path(), equalTo("/"));
         assertThat(errors.get(0).message(), equalTo("Value missing required member: a"));
+    }
+
+    @Test
+    public void requiredStreamingMembersArePresentWhenSet() {
+        Schema payload = Schema.createBlob(ShapeId.from("smithy.example#Payload"), new StreamingTrait());
+        Schema events = Schema.unionBuilder(ShapeId.from("smithy.example#Events"), new StreamingTrait())
+                .putMember("a", PreludeSchemas.STRING)
+                .build();
+        Schema struct = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
+                .putMember("body", payload, new RequiredTrait())
+                .putMember("events", events, new RequiredTrait())
+                .build();
+
+        Validator validator = Validator.builder().build();
+        var errors = validator.validate(encoder -> {
+            encoder.writeStruct(struct, TestHelper.create(struct, (schema, serializer) -> {
+                serializer.writeDataStream(schema.member("body"), DataStream.ofString("data"));
+                serializer.writeEventStream(schema.member("events"), EventStream.newWriter());
+            }));
+        });
+
+        assertThat(errors, empty());
+    }
+
+    @Test
+    public void requiredStreamingMembersAreMissingWhenNotSet() {
+        Schema payload = Schema.createBlob(ShapeId.from("smithy.example#Payload"), new StreamingTrait());
+        Schema struct = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
+                .putMember("body", payload, new RequiredTrait())
+                .build();
+
+        Validator validator = Validator.builder().build();
+        var errors = validator.validate(encoder -> {
+            encoder.writeStruct(struct, TestHelper.create(struct, (schema, serializer) -> {}));
+        });
+
+        assertThat(errors, hasSize(1));
+        assertThat(errors.get(0).message(), equalTo("Value missing required member: body"));
     }
 
     // Enum and intEnum validation

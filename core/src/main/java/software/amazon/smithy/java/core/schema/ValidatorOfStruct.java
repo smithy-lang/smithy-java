@@ -13,6 +13,8 @@ import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.event.EventStream;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * Validates structures that have required members and fewer than 64 total members.
@@ -164,6 +166,18 @@ final class ValidatorOfStruct implements ShapeSerializer {
         validator.pushPath(member.memberName());
         validator.writeStruct(member, struct);
         validator.popPath();
+    }
+
+    @Override
+    public void writeDataStream(Schema member, DataStream value) {
+        // A stream is only consumed after validation, so it only counts as present here.
+        structValidator.setMember(member);
+    }
+
+    @Override
+    public void writeEventStream(Schema member, EventStream<? extends SerializableStruct> value) {
+        // An event stream is only consumed after validation, so it only counts as present here.
+        structValidator.setMember(member);
     }
 
     @Override
