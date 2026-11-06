@@ -176,6 +176,13 @@ support stateless discovery, the engine initializes that remote independently
 using the proxy server's identity and the highest-priority compatible stateful
 protocol.
 
+By default, the engine initializes each remote with the proxy server's name and
+version as its `clientInfo`. A pass-through proxy that fronts a single client, such
+as a stdio server, can set `forwardClientInfo(true)` on `McpEngine.Builder` or
+`StdioMcpServerBuilder` to send the first client's `name`, `version` and `title` in
+that `initialize` instead. `McpRemoteClient.serverInfo()`
+returns the `serverInfo` a remote reported when it was initialized.
+
 ## HTTP parameter headers
 
 Annotate a Smithy input member with `smithy.ai#mcpHeader` to mirror that value in

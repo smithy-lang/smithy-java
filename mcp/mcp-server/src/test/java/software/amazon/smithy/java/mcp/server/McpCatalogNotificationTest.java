@@ -228,7 +228,7 @@ class McpCatalogNotificationTest {
                 clock,
                 SECONDS.toNanos(30));
         catalog.bindTransport(observed::add, ignored -> {});
-        catalog.initializeRemoteClients(BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25));
+        catalog.initializeRemoteClients(BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25), null);
         return catalog;
     }
 

@@ -30,6 +30,7 @@ final class McpDomainOperations implements McpOperations {
     private final McpMetricsObserver metricsObserver;
     private final McpToolExecutor toolExecutor;
     private final McpProtocolRegistry protocols;
+    private final boolean forwardClientInfo;
 
     McpDomainOperations(
             McpSources sources,
@@ -38,7 +39,8 @@ final class McpDomainOperations implements McpOperations {
             ToolFilter toolFilter,
             McpMetricsObserver metricsObserver,
             McpInterceptor interceptor,
-            McpProtocolRegistry protocols
+            McpProtocolRegistry protocols,
+            boolean forwardClientInfo
     ) {
         this.sources = sources;
         this.wireCodec = wireCodec;
@@ -46,6 +48,7 @@ final class McpDomainOperations implements McpOperations {
         this.toolFilter = toolFilter;
         this.metricsObserver = metricsObserver;
         this.protocols = protocols;
+        this.forwardClientInfo = forwardClientInfo;
         this.toolExecutor = new McpToolExecutor(
                 sources,
                 wireCodec,
@@ -58,7 +61,7 @@ final class McpDomainOperations implements McpOperations {
     public McpOutcome initialize(McpCall.Initialize call, McpRequestContext context) {
         observeInitialize(call);
         var protocol = protocols.require(context.protocolVersion());
-        sources.initializeRemoteClients(protocol);
+        sources.initializeRemoteClients(protocol, forwardClientInfo ? call.clientInfo() : null);
 
         var result = InitializeResult.builder()
                 .protocolVersion(context.protocolVersion().identifier())

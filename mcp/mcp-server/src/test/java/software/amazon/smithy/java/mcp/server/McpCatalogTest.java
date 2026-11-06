@@ -192,7 +192,8 @@ class McpCatalogTest {
         try (var catalog = new McpCatalog(Map.of(), List.of(remote))) {
             catalog.bindTransport(ignored -> {}, ignored -> {});
             catalog.initializeRemoteClients(
-                    BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25));
+                    BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25),
+                    null);
 
             var first = catalog.listTools(null);
             catalog.listTools(first.nextCursor());
@@ -333,6 +334,83 @@ class McpCatalogTest {
             assertEquals("mcp-server", clientName.get());
             assertNotNull(catalog.tool("LegacyTool"));
         }
+    }
+
+    @Test
+    void forwardsTheDownstreamNameTitleAndVersionToRemotes() {
+        var remote = new ClientInfoRecordingRemote();
+        var downstream = Document.of(Map.of(
+                "name",
+                Document.of("claude-code"),
+                "title",
+                Document.of("Claude Code"),
+                "version",
+                Document.of("2.0.0"),
+                "icons",
+                Document.of(List.of(Document.of(Map.of("src", Document.of("https://example.com/icon.png")))))));
+
+        try (var catalog = new McpCatalog(Map.of(), List.of(remote))) {
+            catalog.initializeRemoteClients(BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25), downstream);
+
+            var sent = remote.sentClientInfo.get().asStringMap();
+            assertEquals("claude-code", sent.get("name").asString());
+            assertEquals("Claude Code", sent.get("title").asString());
+            assertEquals("2.0.0", sent.get("version").asString());
+            assertEquals(3, sent.size(), sent::toString);
+        }
+    }
+
+    @Test
+    void forwardedClientInfoDropsANonStringTitle() {
+        var remote = new ClientInfoRecordingRemote();
+        var downstream = Document.of(Map.of(
+                "name",
+                Document.of("claude-code"),
+                "title",
+                Document.of(42),
+                "version",
+                Document.of("2.0.0")));
+
+        try (var catalog = new McpCatalog(Map.of(), List.of(remote))) {
+            catalog.initializeRemoteClients(BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25), downstream);
+
+            var sent = remote.sentClientInfo.get().asStringMap();
+            assertEquals("claude-code", sent.get("name").asString());
+            assertNull(sent.get("title"));
+        }
+    }
+
+    @Test
+    void malformedDownstreamClientInfoFallsBackToTheServerIdentity() {
+        var remote = new ClientInfoRecordingRemote();
+        var nameOnly = Document.of(Map.of("name", Document.of("claude-code")));
+
+        try (var catalog = new McpCatalog(Map.of(), List.of(remote))) {
+            catalog.initializeRemoteClients(BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25), nameOnly);
+
+            var sent = remote.sentClientInfo.get();
+            assertEquals("mcp-server", sent.getMember("name").asString());
+            assertEquals("1.0.0", sent.getMember("version").asString());
+        }
+    }
+
+    @Test
+    void firstValidDownstreamClientInfoIsKeptForLaterRemotes() {
+        var remote = new ClientInfoRecordingRemote();
+        var protocol = BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25);
+
+        try (var catalog = new McpCatalog(Map.of(), List.of())) {
+            catalog.initializeRemoteClients(protocol, Document.of(Map.of("name", Document.of("malformed"))));
+            catalog.initializeRemoteClients(protocol, clientInfo("first", "1.0.0"));
+            catalog.initializeRemoteClients(protocol, clientInfo("second", "2.0.0"));
+            catalog.addRemoteClient(remote);
+
+            assertEquals("first", remote.sentClientInfo.get().getMember("name").asString());
+        }
+    }
+
+    private static Document clientInfo(String name, String version) {
+        return Document.of(Map.of("name", Document.of(name), "version", Document.of(version)));
     }
 
     @Test
@@ -600,7 +678,8 @@ class McpCatalogTest {
             catalog.bindTransport(ignored -> first.incrementAndGet(), ignored -> {});
             catalog.bindTransport(ignored -> second.incrementAndGet(), ignored -> {});
             catalog.initializeRemoteClients(
-                    BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25));
+                    BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25),
+                    null);
 
             remote.sendNotification(JsonRpcRequest.builder()
                     .jsonrpc("2.0")
@@ -734,6 +813,22 @@ class McpCatalogTest {
 
         void sendNotification(JsonRpcRequest notification) {
             notify(notification);
+        }
+    }
+
+    private static final class ClientInfoRecordingRemote extends TestRemoteClient {
+        private final AtomicReference<Document> sentClientInfo = new AtomicReference<>();
+
+        ClientInfoRecordingRemote() {
+            super("recording");
+        }
+
+        @Override
+        protected JsonRpcResponse exchange(JsonRpcRequest request) {
+            if (McpHttpBinding.isInitialize(request)) {
+                sentClientInfo.set(request.getParams().getMember("clientInfo"));
+            }
+            return super.exchange(request);
         }
     }
 }
