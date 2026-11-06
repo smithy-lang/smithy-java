@@ -10,8 +10,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,10 +39,16 @@ import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
+import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
@@ -445,6 +455,239 @@ class HttpMcpClientTest {
         assertDoesNotThrow(() -> {
             proxy.start();
             proxy.close();
+        });
+    }
+
+    @Test
+    void testRequestsGzipAndDecodesGzipJsonResponse() {
+        var acceptEncoding = new AtomicReference<String>();
+        useGzipHandler(acceptEncoding, "application/json", "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"gzipped\"}");
+
+        JsonRpcResponse response = proxy.exchange(JsonRpcRequest.builder()
+                .method("test/method")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build());
+
+        assertEquals("gzip", acceptEncoding.get());
+        assertEquals("gzipped", response.getResult().asString());
+    }
+
+    @Test
+    void testDecodesGzipSseResponse() {
+        useGzipHandler(
+                new AtomicReference<>(),
+                "text/event-stream",
+                "data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"gzipped stream\"}\n\n");
+
+        JsonRpcResponse response = proxy.exchange(JsonRpcRequest.builder()
+                .method("test/streaming")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build());
+
+        assertEquals("gzipped stream", response.getResult().asString());
+    }
+
+    @Test
+    void testCorruptGzipResponseFailsTheExchange() {
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            byte[] body = "not gzip".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.getResponseHeaders().set("Content-Encoding", "gzip");
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(body);
+            }
+        });
+
+        var e = assertThrows(McpRemoteException.class,
+                () -> proxy.exchange(JsonRpcRequest.builder()
+                        .method("test/method")
+                        .id(Document.of(1))
+                        .jsonrpc("2.0")
+                        .build()));
+
+        var cause = assertInstanceOf(UncheckedIOException.class, e.getCause());
+        assertInstanceOf(ZipException.class, cause.getCause());
+    }
+
+    @Test
+    void testDecodesGzipErrorResponse() {
+        useGzipHandler(
+                new AtomicReference<>(),
+                400,
+                "application/json",
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"bad params\"}}");
+
+        JsonRpcResponse response = proxy.exchange(JsonRpcRequest.builder()
+                .method("test/method")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build());
+
+        assertEquals(-32602, response.getError().getCode());
+        assertEquals("bad params", response.getError().getMessage());
+    }
+
+    @Test
+    void testNotificationAcceptsEmptyGzipEncodedResponse() {
+        useEmptyGzipEncodedHandler(202);
+
+        var notification = JsonRpcRequest.builder()
+                .method(McpMethod.Standard.NOTIFICATIONS_INITIALIZED.wireName())
+                .jsonrpc("2.0")
+                .build();
+
+        assertNull(proxy.exchange(notification));
+    }
+
+    @Test
+    void testRpcAcceptsEmptyGzipEncodedResponse() {
+        useEmptyGzipEncodedHandler(200);
+
+        assertNull(proxy.exchange(JsonRpcRequest.builder()
+                .method("test/method")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build()));
+    }
+
+    @Test
+    void testDecodesStackedEncodingsInOneHeader() {
+        useStackedGzipHandler(List.of("gzip, identity, gzip"), 2);
+
+        assertEquals("stacked", exchangeForResult());
+    }
+
+    @Test
+    void testDecodesStackedEncodingsInRepeatedHeaders() {
+        useStackedGzipHandler(List.of("gzip", "gzip"), 2);
+
+        assertEquals("stacked", exchangeForResult());
+    }
+
+    @Test
+    void testLeavesResponseWithAnUnsupportedEncodingUndecoded() {
+        useStackedGzipHandler(List.of("unsupported, gzip"), 1);
+
+        var e = assertThrows(McpRemoteException.class, this::exchangeForResult);
+
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            assertFalse(cause instanceof ZipException, "the body must not be decoded: " + cause);
+        }
+    }
+
+    private String exchangeForResult() {
+        return proxy.exchange(JsonRpcRequest.builder()
+                .method("test/method")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build()).getResult().asString();
+    }
+
+    private void useStackedGzipHandler(List<String> contentEncodings, int gzipPasses) {
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            byte[] body = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"stacked\"}".getBytes(StandardCharsets.UTF_8);
+            for (int i = 0; i < gzipPasses; i++) {
+                var compressed = new ByteArrayOutputStream();
+                try (var gzip = new GZIPOutputStream(compressed)) {
+                    gzip.write(body);
+                }
+                body = compressed.toByteArray();
+            }
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            for (var encoding : contentEncodings) {
+                exchange.getResponseHeaders().add("Content-Encoding", encoding);
+            }
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(body);
+            }
+        });
+    }
+
+    @Test
+    void testPluginInterceptorsModifyRequestsAndResponses() throws IOException {
+        var receivedHeader = new AtomicReference<String>();
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            receivedHeader.set(exchange.getRequestHeaders().getFirst("X-Plugin"));
+            exchange.getRequestBody().readAllBytes();
+            writeJson(exchange, 200, "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"ok\"}");
+        });
+        var operations = new CopyOnWriteArrayList<String>();
+        ClientPlugin plugin = new ClientPlugin() {
+            @Override
+            public void configureClient(ClientConfig.Builder config) {
+                config.addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
+                        operations.add(hook.operation().schema().id().toString());
+                        var req = ((HttpRequest) hook.request()).toModifiableCopy()
+                                .setHeader("X-Plugin", "applied")
+                                .toUnmodifiable();
+                        return hook.asRequestType(req);
+                    }
+
+                    @Override
+                    public void readAfterTransmit(ResponseHook<?, ?, ?, ?> hook) {
+                        operations.add("status " + ((HttpResponse) hook.response()).statusCode());
+                    }
+                });
+            }
+        };
+        try (var client = HttpMcpClient.builder().endpoint(serverUrl).addPlugin(plugin).build()) {
+            var response = client.exchange(JsonRpcRequest.builder()
+                    .method("test/method")
+                    .id(Document.of(1))
+                    .jsonrpc("2.0")
+                    .build());
+
+            assertEquals("ok", response.getResult().asString());
+        }
+        assertEquals("applied", receivedHeader.get());
+        assertEquals(List.of("smithy.mcp#JsonRpc", "status 200"), operations);
+    }
+
+    private void useEmptyGzipEncodedHandler(int status) {
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.getResponseHeaders().set("Content-Encoding", "gzip");
+            exchange.sendResponseHeaders(status, -1);
+            exchange.close();
+        });
+    }
+
+    private void useGzipHandler(AtomicReference<String> acceptEncoding, String contentType, String body) {
+        useGzipHandler(acceptEncoding, 200, contentType, body);
+    }
+
+    private void useGzipHandler(
+            AtomicReference<String> acceptEncoding,
+            int status,
+            String contentType,
+            String body
+    ) {
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            acceptEncoding.set(exchange.getRequestHeaders().getFirst("Accept-Encoding"));
+            exchange.getRequestBody().readAllBytes();
+            var compressed = new ByteArrayOutputStream();
+            try (var gzip = new GZIPOutputStream(compressed)) {
+                gzip.write(body.getBytes(StandardCharsets.UTF_8));
+            }
+            exchange.getResponseHeaders().set("Content-Type", contentType);
+            exchange.getResponseHeaders().set("Content-Encoding", "gzip");
+            exchange.sendResponseHeaders(status, compressed.size());
+            try (OutputStream os = exchange.getResponseBody()) {
+                compressed.writeTo(os);
+            }
         });
     }
 
