@@ -699,6 +699,23 @@ class HttpMcpClientTest {
     }
 
     @Test
+    void sessionRecoveryResendsTheOriginalClientInfoAndRecordsTheNewServerInfo() throws IOException {
+        var handler = new RecoveringSessionHandler();
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+
+        proxy.initialize(new McpServerIdentity("claude-code", "2.0.0"), KnownProtocolVersion.V2025_11_25);
+        proxy.exchange(JsonRpcRequest.builder()
+                .method(McpMethod.Standard.PING.wireName())
+                .id(Document.of(2))
+                .jsonrpc("2.0")
+                .build());
+
+        assertEquals(List.of("claude-code", "claude-code"), handler.clientNames);
+        assertEquals("session-2", proxy.serverInfo().getMember("name").asString());
+    }
+
+    @Test
     void concurrentStaleSessionResponsesShareOneRecovery() throws Exception {
         var handler = new ConcurrentRecoveringSessionHandler();
         mockServer.removeContext("/mcp");
@@ -755,6 +772,7 @@ class HttpMcpClientTest {
 
     private static final class RecoveringSessionHandler implements HttpHandler {
         private final AtomicInteger initializeCount = new AtomicInteger();
+        private final List<String> clientNames = new CopyOnWriteArrayList<>();
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -769,13 +787,23 @@ class HttpMcpClientTest {
 
             if (McpHttpBinding.isInitialize(request)) {
                 var count = initializeCount.incrementAndGet();
+                var clientInfo = request.getParams().getMember("clientInfo");
+                if (clientInfo != null) {
+                    clientNames.add(clientInfo.getMember("name").asString());
+                }
                 exchange.getResponseHeaders().set("Mcp-Session-Id", "session-" + count);
                 writeResponse(
                         exchange,
                         request.getId(),
                         Document.of(Map.of(
                                 "protocolVersion",
-                                Document.of(KnownProtocolVersion.V2025_11_25.identifier()))));
+                                Document.of(KnownProtocolVersion.V2025_11_25.identifier()),
+                                "serverInfo",
+                                Document.of(Map.of(
+                                        "name",
+                                        Document.of("session-" + count),
+                                        "version",
+                                        Document.of("1.0.0"))))));
                 return;
             }
 

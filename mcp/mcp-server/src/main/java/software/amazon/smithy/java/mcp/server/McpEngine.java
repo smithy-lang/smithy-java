@@ -59,7 +59,8 @@ public final class McpEngine implements AutoCloseable {
                 builder.toolFilter,
                 builder.metricsObserver,
                 interceptor,
-                protocols);
+                protocols,
+                builder.forwardClientInfo);
     }
 
     /**
@@ -222,6 +223,7 @@ public final class McpEngine implements AutoCloseable {
         private boolean discoverProtocols = true;
         private Set<McpProtocolId> protocolVersions;
         private McpCachePolicy cachePolicy = McpCachePolicy.DEFAULT;
+        private boolean forwardClientInfo;
 
         public Builder services(Map<String, Service> services) {
             this.services.clear();
@@ -312,6 +314,33 @@ public final class McpEngine implements AutoCloseable {
 
         public Builder version(String version) {
             this.version = Objects.requireNonNull(version, "version");
+            return this;
+        }
+
+        /**
+         * Sends the downstream client's {@code clientInfo} to remote servers instead of this engine's identity.
+         *
+         * <p>By default, the {@code initialize} request this engine sends to a remote carries the engine's
+         * {@link #name(String) name} and {@link #version(String) version}. When enabled, the engine keeps the
+         * {@code name}, {@code version} and {@code title} from the first downstream {@code initialize} whose
+         * {@code clientInfo} has a string {@code name} and {@code version}, and sends them in that and every
+         * later remote {@code initialize}: remotes added later and retries after a failed initialization.
+         * Until then, remotes get the engine's identity. A remote that was already initialized keeps the
+         * identity it was initialized with, including across session recovery.
+         *
+         * <p>This is meant for single-client transports such as stdio, where a pass-through proxy fronts one
+         * client. When several clients share an engine, as over HTTP, every remote sees the first client.
+         *
+         * <p>Stateless protocol versions such as 2026-07-28 have no {@code initialize}, so their requests never
+         * set the forwarded identity. Calls forwarded to stateless remotes already carry the caller's
+         * {@code clientInfo} in {@code _meta}; a remote that must be initialized to serve them gets the identity
+         * described above.
+         *
+         * @param forwardClientInfo whether to forward the downstream client's {@code clientInfo}
+         * @return the builder
+         */
+        public Builder forwardClientInfo(boolean forwardClientInfo) {
+            this.forwardClientInfo = forwardClientInfo;
             return this;
         }
 

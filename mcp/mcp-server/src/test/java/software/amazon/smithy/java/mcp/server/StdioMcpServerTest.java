@@ -35,6 +35,7 @@ import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.mcp.model.JsonObjectSchema;
+import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.mcp.model.PromptInfo;
@@ -292,6 +293,179 @@ public class StdioMcpServerTest {
                     .protocolVersions(KnownProtocolVersion.V2025_11_25);
 
             assertThrows(IllegalStateException.class, builder::build);
+        }
+    }
+
+    @Test
+    public void prebuiltEngineCannotBeCombinedWithForwardClientInfo() {
+        try (var engine = McpEngine.builder().build()) {
+            var builder = StdioMcpServer.builder()
+                    .input(input)
+                    .output(output)
+                    .engine(engine)
+                    .forwardClientInfo(true);
+
+            assertThrows(IllegalStateException.class, builder::build);
+        }
+    }
+
+    @Test
+    void remotesSeeTheServerIdentityByDefault() {
+        var remote = new IdentityRecordingRemote();
+        server = StdioMcpServer.builder()
+                .name("proxy")
+                .version("3.0.0")
+                .input(input)
+                .output(output)
+                .addRemoteClient(remote)
+                .build();
+        server.start();
+
+        initializeAs("claude-code", "2.0.0");
+
+        assertEquals("proxy", remote.sentClientInfo.get().getMember("name").asString());
+        assertEquals("3.0.0", remote.sentClientInfo.get().getMember("version").asString());
+    }
+
+    @Test
+    void forwardClientInfoSendsTheClientIdentityToRemotes() {
+        var remote = new IdentityRecordingRemote();
+        server = StdioMcpServer.builder()
+                .name("proxy")
+                .version("3.0.0")
+                .forwardClientInfo(true)
+                .input(input)
+                .output(output)
+                .addRemoteClient(remote)
+                .build();
+        server.start();
+
+        initializeAs("claude-code", "2.0.0");
+
+        assertEquals("claude-code", remote.sentClientInfo.get().getMember("name").asString());
+        assertEquals("2.0.0", remote.sentClientInfo.get().getMember("version").asString());
+    }
+
+    @Test
+    void statelessRequestsInitializeLegacyRemotesWithTheServerIdentity() {
+        var remote = new IdentityRecordingRemote();
+        server = StdioMcpServer.builder()
+                .name("proxy")
+                .version("3.0.0")
+                .forwardClientInfo(true)
+                .input(input)
+                .output(output)
+                .addRemoteClient(remote)
+                .build();
+        server.start();
+
+        write("tools/list", modernParams(Map.of()));
+        assertNull(read().getError());
+
+        assertEquals("proxy", remote.sentClientInfo.get().getMember("name").asString());
+    }
+
+    @Test
+    void interceptorCanAnswerInitializeWithTheRemoteServerInfo() {
+        var remote = new IdentityRecordingRemote();
+        server = StdioMcpServer.builder()
+                .name("proxy")
+                .input(input)
+                .output(output)
+                .addRemoteClient(remote)
+                .interceptor(new McpInterceptor() {
+                    @Override
+                    public McpOutcome modifyAfterExecution(
+                            McpExecutionContext context,
+                            McpOutcome outcome,
+                            RuntimeException error
+                    ) {
+                        if (error != null) {
+                            throw error;
+                        }
+                        if (context.call() instanceof McpCall.Initialize
+                                && outcome instanceof McpOutcome.Success success
+                                && remote.serverInfo() != null) {
+                            var result = new HashMap<>(success.result().asStringMap());
+                            result.put("serverInfo", remote.serverInfo());
+                            return new McpOutcome.Success(success.id(), Document.of(result));
+                        }
+                        return outcome;
+                    }
+                })
+                .build();
+        server.start();
+
+        var serverInfo = initializeAs("claude-code", "2.0.0").getMember("serverInfo");
+
+        assertEquals("upstream", serverInfo.getMember("name").asString());
+        assertEquals("9.9.9", serverInfo.getMember("version").asString());
+    }
+
+    private Document initializeAs(String clientName, String clientVersion) {
+        write("initialize",
+                Document.of(Map.of(
+                        "protocolVersion",
+                        Document.of(KnownProtocolVersion.V2025_11_25.identifier()),
+                        "capabilities",
+                        Document.of(Map.of()),
+                        "clientInfo",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of(clientName),
+                                "version",
+                                Document.of(clientVersion))))));
+        return read().getResult();
+    }
+
+    /**
+     * A session-only remote that records the clientInfo it is initialized with and reports its own serverInfo.
+     */
+    private static final class IdentityRecordingRemote extends McpRemoteClient {
+        private final AtomicReference<Document> sentClientInfo = new AtomicReference<>();
+
+        @Override
+        protected JsonRpcResponse exchange(JsonRpcRequest request) {
+            if (request.getId() == null) {
+                return null;
+            }
+            var response = JsonRpcResponse.builder().jsonrpc("2.0").id(request.getId());
+            if (McpMethod.Standard.SERVER_DISCOVER.wireName().equals(request.getMethod())) {
+                return response.error(JsonRpcErrorResponse.builder()
+                        .code(-32601)
+                        .message("Method not found")
+                        .build())
+                        .build();
+            }
+            Document result;
+            if (McpHttpBinding.isInitialize(request)) {
+                sentClientInfo.set(request.getParams().getMember("clientInfo"));
+                result = Document.of(Map.of(
+                        "protocolVersion",
+                        request.getParams().getMember("protocolVersion"),
+                        "capabilities",
+                        Document.of(Map.of("tools", Document.of(Map.of()))),
+                        "serverInfo",
+                        Document.of(Map.of("name", Document.of("upstream"), "version", Document.of("9.9.9")))));
+            } else if (McpMethod.Standard.TOOLS_LIST.wireName().equals(request.getMethod())) {
+                result = Document.of(Map.of("tools", Document.of(List.of())));
+            } else if (McpMethod.Standard.PROMPTS_LIST.wireName().equals(request.getMethod())) {
+                result = Document.of(Map.of("prompts", Document.of(List.of())));
+            } else {
+                result = Document.of(Map.of());
+            }
+            return response.result(result).build();
+        }
+
+        @Override
+        public void start() {}
+
+        @Override
+        public void close() {}
+
+        @Override
+        public String name() {
+            return "identity";
         }
     }
 

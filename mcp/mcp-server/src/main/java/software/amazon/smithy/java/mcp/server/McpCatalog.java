@@ -64,6 +64,8 @@ final class McpCatalog implements McpSources {
             new CopyOnWriteArrayList<>();
     private volatile JsonRpcRequest initializeRequest;
     private volatile McpProtocol initializeProtocol;
+    // First valid downstream clientInfo; once set, every remote initialize sends it instead of our identity.
+    private final AtomicReference<Document> forwardedClientInfo = new AtomicReference<>();
 
     McpCatalog(Map<String, Service> services, List<McpRemoteClient> remoteClients) {
         this(
@@ -207,7 +209,11 @@ final class McpCatalog implements McpSources {
     }
 
     @Override
-    public void initializeRemoteClients(McpProtocol protocol) {
+    public void initializeRemoteClients(McpProtocol protocol, Document clientInfo) {
+        var forwarded = forwardableClientInfo(clientInfo);
+        if (forwarded != null) {
+            forwardedClientInfo.compareAndSet(null, forwarded);
+        }
         var request = initializeRequest(protocol);
         initializeRequest = request;
         initializeProtocol = protocol;
@@ -400,12 +406,41 @@ final class McpCatalog implements McpSources {
                         "capabilities",
                         Document.of(Map.of()),
                         "clientInfo",
-                        Document.of(Map.of(
-                                "name",
-                                Document.of(identity.name()),
-                                "version",
-                                Document.of(identity.version()))))))
+                        clientInfo())))
                 .build();
+    }
+
+    private Document clientInfo() {
+        var forwarded = forwardedClientInfo.get();
+        if (forwarded != null) {
+            return forwarded;
+        }
+        return Document.of(Map.of(
+                "name",
+                Document.of(identity.name()),
+                "version",
+                Document.of(identity.version())));
+    }
+
+    /**
+     * Keeps {@code name}, {@code version} and {@code title} and drops members added later, such as {@code icons}
+     * and {@code websiteUrl}, so a remote that validates {@code initialize} can't reject what we forward. Returns
+     * null unless {@code name} and {@code version} are strings.
+     */
+    private static Document forwardableClientInfo(Document clientInfo) {
+        var name = McpHttpBinding.stringMember(clientInfo, "name");
+        var version = McpHttpBinding.stringMember(clientInfo, "version");
+        if (name == null || version == null) {
+            return null;
+        }
+        var members = new HashMap<String, Document>();
+        members.put("name", Document.of(name));
+        members.put("version", Document.of(version));
+        var title = McpHttpBinding.stringMember(clientInfo, "title");
+        if (title != null) {
+            members.put("title", Document.of(title));
+        }
+        return Document.of(members);
     }
 
     private void onRemoteNotification(McpRemoteClient client, JsonRpcRequest notification) {

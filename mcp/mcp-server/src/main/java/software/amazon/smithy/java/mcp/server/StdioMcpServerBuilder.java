@@ -35,6 +35,7 @@ public final class StdioMcpServerBuilder {
     private boolean discoverProtocols = true;
     private ProtocolVersion[] protocolVersions;
     private McpCachePolicy cachePolicy = McpCachePolicy.DEFAULT;
+    private boolean forwardClientInfo;
 
     StdioMcpServerBuilder() {}
 
@@ -132,6 +133,16 @@ public final class StdioMcpServerBuilder {
         return this;
     }
 
+    /**
+     * Sends the client's {@code clientInfo} to remote servers instead of this server's identity.
+     *
+     * @see McpEngine.Builder#forwardClientInfo(boolean)
+     */
+    public StdioMcpServerBuilder forwardClientInfo(boolean forwardClientInfo) {
+        this.forwardClientInfo = forwardClientInfo;
+        return this;
+    }
+
     public StdioMcpServer build() {
         Objects.requireNonNull(input, "MCP server input stream is required");
         Objects.requireNonNull(output, "MCP server output stream is required");
@@ -149,7 +160,8 @@ public final class StdioMcpServerBuilder {
                     .metricsObserver(metricsObserver)
                     .interceptor(interceptor)
                     .cachePolicy(cachePolicy)
-                    .discoverProtocols(discoverProtocols);
+                    .discoverProtocols(discoverProtocols)
+                    .forwardClientInfo(forwardClientInfo);
             protocols.values().forEach(engineBuilder::addProtocol);
             protocolOverrides.values().forEach(engineBuilder::overrideProtocol);
             if (protocolVersions != null) {
@@ -160,7 +172,8 @@ public final class StdioMcpServerBuilder {
                 || !remoteClients.isEmpty()
                 || !protocols.isEmpty()
                 || !protocolOverrides.isEmpty()
-                || protocolVersions != null) {
+                || protocolVersions != null
+                || forwardClientInfo) {
             throw new IllegalStateException("Cannot combine a prebuilt engine with builder-managed sources");
         }
         return new StdioMcpServer(this);
