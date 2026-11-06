@@ -96,6 +96,8 @@ structure ToolInfo {
     @required
     name: String
 
+    title: String
+
     description: String
 
     inputSchema: JsonObjectSchema
@@ -106,8 +108,11 @@ structure ToolInfo {
 }
 
 structure ToolAnnotations {
+    title: String
     readOnlyHint: Boolean
+    destructiveHint: Boolean
     idempotentHint: Boolean
+    openWorldHint: Boolean
 }
 
 list ToolInfoList {

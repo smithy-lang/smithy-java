@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.context.Context;
@@ -714,6 +716,103 @@ public class StdioMcpServerTest {
                 .asStringMap();
 
         assertNull(tool.get("annotations"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = KnownProtocolVersion.class, names = {"V2025_03_26", "V2025_06_18", "V2025_11_25"})
+    void remoteToolTitleAndEveryAnnotationReachTheClient(KnownProtocolVersion version) {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addRemoteClient(new AnnotatedToolRemote())
+                .build();
+        server.start();
+
+        initializeWithProtocolVersion(version);
+        write("tools/list", Document.of(Map.of()));
+        var tool = read().getResult().getMember("tools").asList().getFirst().asStringMap();
+
+        assertEquals("Write", tool.get("title").asString());
+        var annotations = tool.get("annotations").asStringMap();
+        assertEquals("Write a file", annotations.get("title").asString());
+        assertFalse(annotations.get("readOnlyHint").asBoolean());
+        assertFalse(annotations.get("destructiveHint").asBoolean());
+        assertTrue(annotations.get("idempotentHint").asBoolean());
+        assertFalse(annotations.get("openWorldHint").asBoolean());
+    }
+
+    @Test
+    void remoteToolTitleReachesClientsThatPredateAnnotations() {
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addRemoteClient(new AnnotatedToolRemote())
+                .build();
+        server.start();
+
+        initializeWithProtocolVersion(KnownProtocolVersion.V2024_11_05);
+        write("tools/list", Document.of(Map.of()));
+        var tool = read().getResult().getMember("tools").asList().getFirst().asStringMap();
+
+        assertEquals("Write", tool.get("title").asString());
+        assertNull(tool.get("annotations"));
+    }
+    /** A remote whose only tool sets a title and every MCP tool annotation. */
+    private static final class AnnotatedToolRemote extends McpRemoteClient {
+        @Override
+        protected JsonRpcResponse exchange(JsonRpcRequest request) {
+            if (request.getId() == null) {
+                return null;
+            }
+            Document result;
+            if (McpHttpBinding.isInitialize(request)) {
+                result = Document.of(Map.of(
+                        "protocolVersion",
+                        request.getParams().getMember("protocolVersion"),
+                        "capabilities",
+                        Document.of(Map.of("tools", Document.of(Map.of()))),
+                        "serverInfo",
+                        Document.of(Map.of("name", Document.of("remote"), "version", Document.of("1.0.0")))));
+            } else if (McpMethod.Standard.TOOLS_LIST.wireName().equals(request.getMethod())) {
+                var annotations = Document.of(Map.of(
+                        "title",
+                        Document.of("Write a file"),
+                        "readOnlyHint",
+                        Document.of(false),
+                        "destructiveHint",
+                        Document.of(false),
+                        "idempotentHint",
+                        Document.of(true),
+                        "openWorldHint",
+                        Document.of(false)));
+                var tool = Document.of(Map.of(
+                        "name",
+                        Document.of("write"),
+                        "title",
+                        Document.of("Write"),
+                        "inputSchema",
+                        Document.of(Map.of("type", Document.of("object"))),
+                        "annotations",
+                        annotations));
+                result = Document.of(Map.of("tools", Document.of(List.of(tool))));
+            } else {
+                result = Document.of(Map.of());
+            }
+            return JsonRpcResponse.builder().jsonrpc("2.0").id(request.getId()).result(result).build();
+        }
+
+        @Override
+        public void start() {}
+
+        @Override
+        public void close() {}
+
+        @Override
+        public String name() {
+            return "annotated";
+        }
     }
 
     @Test
