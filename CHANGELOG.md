@@ -1,5 +1,40 @@
 # Change Log
 
+## 1.9.0 (11/11/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+* Added `ApiService.getOperation(ShapeId)` to look up an operation of a
+  service by its shape ID.
+  ([#1430](https://github.com/smithy-lang/smithy-java/pull/1430))
+
+### Bug Fixes
+
+* Fixed unbounded big integer and big decimal parsing by limiting them to
+  1,000 digits.
+  ([#1442](https://github.com/smithy-lang/smithy-java/pull/1442))
+* Fixed generated recursive union schemas being typed as structures.
+  ([#1431](https://github.com/smithy-lang/smithy-java/pull/1431))
+* Fixed deserializers throwing exceptions other than `SerializationException`
+  on malformed input.
+  ([#1418](https://github.com/smithy-lang/smithy-java/pull/1418))
+* Fixed generated waiters being emitted in a nondeterministic order.
+  ([#1428](https://github.com/smithy-lang/smithy-java/pull/1428))
+* Fixed a regression in 1.7.0 where struct HTTP payloads ignored the schema
+  passed to the serializer.
+  ([#1426](https://github.com/smithy-lang/smithy-java/pull/1426))
+
+### Improvements
+
+* Reduced generated code size by about 30% for large models such as EC2.
+  ([#1430](https://github.com/smithy-lang/smithy-java/pull/1430))
+
 ## 1.8.0 (10/20/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
