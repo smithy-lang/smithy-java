@@ -16,7 +16,7 @@ application {
 }
 
 val sharedModelDir = layout.projectDirectory.dir("../serde-benchmarks/model")
-val netty = "4.2.18.Final"
+val netty = "4.2.20.Final"
 
 dependencies {
     implementation(project(":benchmarks:benchmark-commons"))
