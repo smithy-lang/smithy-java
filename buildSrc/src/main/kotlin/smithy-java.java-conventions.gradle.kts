@@ -1,5 +1,6 @@
 import com.github.spotbugs.snom.Effort
 import org.gradle.accessors.dm.LibrariesForLibs
+import com.diffplug.gradle.spotless.SpotlessTask
 import software.amazon.smithy.java.buildtools.ShortenFullyQualifiedNames
 
 plugins {
@@ -93,8 +94,6 @@ spotless {
         // Static first, then everything else alphabetically
         removeUnusedImports()
         importOrder("\\#", "")
-        // Ignore generated generated code for formatter check
-        targetExclude("**/build/**/*.java", "**/build/generated-src*/*.*")
     }
 
     // Formatting for build.gradle.kts files
@@ -105,6 +104,16 @@ spotless {
         leadingTabsToSpaces()
         trimTrailingWhitespace()
         endWithNewline()
+    }
+}
+
+// don't format files from build/ - generated dirs are added as source dirs without a task dependency
+// which otherwise fails Gradle's validation. Spotless assigns each task's target in afterEvaluate,
+// so filter it in a later afterEvaluate.
+afterEvaluate {
+    tasks.withType<SpotlessTask>().configureEach {
+        val buildDir = layout.buildDirectory.get().asFile
+        setTarget(target.filter { !it.startsWith(buildDir) })
     }
 }
 

@@ -9,7 +9,7 @@ extra["displayName"] = "Smithy :: Java :: Version SPI"
 extra["moduleName"] = "software.amazon.smithy.java.versionspi"
 
 group = "software.amazon.smithy.java"
-version = project.file("${project.rootDir}/VERSION").readText().replace(System.lineSeparator(), "")
+version = project.file("${project.rootDir}/VERSION").readText().trim()
 
 java {
     withJavadocJar()
