@@ -215,6 +215,48 @@ public class ValidatorTest {
         assertThat(errors, empty());
     }
 
+    @ParameterizedTest
+    @MethodSource("pathResizeCases")
+    public void resizesPathArrayUpToMaxDepth(int maxDepth, int nesting, boolean expectDepthFailure) {
+        var schemas = createListSchemas(nesting);
+        Validator validator = Validator.builder().maxDepth(maxDepth).build();
+
+        var errors = validator.validate(s -> writeNestedLists(s, schemas, 0));
+
+        if (expectDepthFailure) {
+            assertThat(errors, hasSize(1));
+            assertThat(errors.get(0), instanceOf(ValidationError.DepthValidationFailure.class));
+            assertThat(errors.get(0).path(), equalTo("/0".repeat(maxDepth)));
+        } else {
+            assertThat(errors, empty());
+        }
+    }
+
+    static List<Arguments> pathResizeCases() {
+        List<Arguments> cases = new ArrayList<>();
+        // Specific regression cases: just past maxDepth / 2, exactly maxDepth, and maxDepth + 1.
+        cases.add(Arguments.of(100, 59, false));
+        cases.add(Arguments.of(100, 100, false));
+        cases.add(Arguments.of(100, 101, true));
+        cases.add(Arguments.of(10, 6, false));
+        cases.add(Arguments.of(10, 10, false));
+        cases.add(Arguments.of(10, 11, true));
+        // Sweep a range of max depths to exercise every resize sequence.
+        for (int maxDepth = 1; maxDepth <= 64; maxDepth++) {
+            cases.add(Arguments.of(maxDepth, maxDepth, false));
+            cases.add(Arguments.of(maxDepth, maxDepth + 1, true));
+        }
+        return cases;
+    }
+
+    private static void writeNestedLists(ShapeSerializer serializer, List<Schema> schemas, int index) {
+        if (index == schemas.size()) {
+            serializer.writeString(PreludeSchemas.STRING, "Hi");
+        } else {
+            serializer.writeList(schemas.get(index), null, 1, (v, s) -> writeNestedLists(s, schemas, index + 1));
+        }
+    }
+
     @Test
     public void validatesStringPattern() {
         Validator validator = Validator.builder().build();
