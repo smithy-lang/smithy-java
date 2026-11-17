@@ -217,12 +217,15 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             return;
         }
         // The codec's readStruct callback receives every member; filter to body members using the direction-specific
-        // bindings array (which was already chosen by the caller).
-        payloadCodec.createDeserializer(bb).readStruct(schema, bindings, (body, m, de) -> {
-            if (body[m.memberIndex()] == HttpBindingSchemaExtensions.Binding.BODY) {
-                structMemberConsumer.accept(state, m, de);
-            }
-        });
+        // bindings array (which was already chosen by the caller). Closing the deserializer rejects any content after
+        // the body document.
+        try (ShapeDeserializer deser = payloadCodec.createDeserializer(bb)) {
+            deser.readStruct(schema, bindings, (body, m, de) -> {
+                if (body[m.memberIndex()] == HttpBindingSchemaExtensions.Binding.BODY) {
+                    structMemberConsumer.accept(state, m, de);
+                }
+            });
+        }
     }
 
     private <T> void handlePayload(Schema member, T state, StructMemberConsumer<T> structMemberConsumer) {
