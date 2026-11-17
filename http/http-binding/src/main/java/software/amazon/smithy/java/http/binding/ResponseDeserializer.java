@@ -12,6 +12,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -125,6 +126,10 @@ public final class ResponseDeserializer {
         Throwable failure = null;
         try {
             target.deserialize(deserializer);
+        } catch (RuntimeException e) {
+            var wrapped = SerializationException.wrap(e);
+            failure = wrapped;
+            throw wrapped;
         } catch (Throwable t) {
             failure = t;
             throw t;

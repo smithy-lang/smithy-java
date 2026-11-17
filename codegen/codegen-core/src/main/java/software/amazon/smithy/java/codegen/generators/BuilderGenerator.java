@@ -14,7 +14,6 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -28,19 +27,22 @@ abstract class BuilderGenerator implements Runnable {
     protected final SymbolProvider symbolProvider;
     protected final Model model;
     protected final Map<ShapeId, String> renames;
+    protected final SchemaFieldOrder schemaFieldOrder;
 
     protected BuilderGenerator(
             JavaWriter writer,
             Shape shape,
             SymbolProvider symbolProvider,
             Model model,
-            Map<ShapeId, String> renames
+            Map<ShapeId, String> renames,
+            SchemaFieldOrder schemaFieldOrder
     ) {
         this.writer = writer;
         this.shape = shape;
         this.symbolProvider = symbolProvider;
         this.model = model;
         this.renames = renames;
+        this.schemaFieldOrder = schemaFieldOrder;
     }
 
     @Override
@@ -112,7 +114,9 @@ abstract class BuilderGenerator implements Runnable {
     }
 
     protected void generateDeserialization(JavaWriter writer) {
-        writer.writeInline("${C|}", new StructureDeserializerGenerator(writer, shape, symbolProvider, model, renames));
+        writer.writeInline(
+                "${C|}",
+                new StructureDeserializerGenerator(writer, shape, symbolProvider, model, renames, schemaFieldOrder));
     }
 
     protected abstract void generateProperties(JavaWriter writer);
@@ -137,10 +141,6 @@ abstract class BuilderGenerator implements Runnable {
         return false;
     }
 
-    protected String getMemberSchemaName(MemberShape member) {
-        return CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member));
-    }
-
     protected void generateSetMemberValue(JavaWriter writer) {
         // Don't override the default implementation that throws if there are no members.
         if (shape.members().isEmpty() || (shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)) {
@@ -151,13 +151,14 @@ abstract class BuilderGenerator implements Runnable {
                 @Override
                 @SuppressWarnings("unchecked")
                 public void setMemberValue(${sdkSchema:T} member, ${object:T} value) {
+                    ${schemaUtilsClass:T}.validateMemberOf($$SCHEMA, member);
                     switch (member.memberIndex()) {
                         ${memberSetters:C|}
-                        default -> ${shapeBuilderClass:T}.super.setMemberValue(member, value);
+                        default -> throw ${schemaUtilsClass:T}.unknownMember(member);
                     }
                 }""";
         writer.putContext("memberSetters", writer.consumer(this::generateMemberValueSetters));
-        writer.putContext("shapeBuilderClass", ShapeBuilder.class);
+        writer.putContext("schemaUtilsClass", SchemaUtils.class);
         writer.putContext("sdkSchema", Schema.class);
         writer.putContext("object", Object.class);
         writer.write(template);
@@ -170,11 +171,9 @@ abstract class BuilderGenerator implements Runnable {
             writer.pushState();
             writer.putContext("memberName", symbolProvider.toMemberName(member));
             writer.putContext("type", symbolProvider.toSymbol(member));
-            writer.putContext("memberSchema", getMemberSchemaName(member));
-            writer.putContext("schemaUtilsClass", SchemaUtils.class);
             writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
             writer.write(
-                    "case $L -> ${memberName:L}((${?isNullable}${type:B}${/isNullable}${^isNullable}${type:T}${/isNullable}) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, value));",
+                    "case $L -> ${memberName:L}((${?isNullable}${type:B}${/isNullable}${^isNullable}${type:T}${/isNullable}) value);",
                     idx);
             writer.popState();
         }

@@ -11,6 +11,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.RandomAccess;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
@@ -19,6 +22,8 @@ import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
@@ -482,29 +487,32 @@ final class QueryFormSerializer implements ShapeSerializer {
 
     @Override
     public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
-        if (variant == QueryVariant.EC2_QUERY) {
-            writeEc2List(schema, listState, size, consumer);
-        } else {
-            writeAwsQueryList(schema, listState, size, consumer);
+        if (!beginList(schema, size)) {
+            return;
         }
+        consumer.accept(listState, listSerializer);
+        endList(schema);
     }
 
-    private <T> void writeAwsQueryList(
-            Schema schema,
-            T listState,
-            int size,
-            BiConsumer<T, ShapeSerializer> consumer
-    ) {
+    // Call endList only when this method returns true.
+    private boolean beginList(Schema schema, int size) {
         if (schema.isMember()) {
             pushPrefix(getMemberNameBytes(schema));
         }
 
         if (size == 0) {
-            writeEmptyValue();
+            if (variant != QueryVariant.EC2_QUERY) {
+                writeEmptyValue();
+            }
             if (schema.isMember()) {
                 popPrefix();
             }
-            return;
+            return false;
+        }
+
+        if (variant == QueryVariant.EC2_QUERY) {
+            listSerializer.push(null, true);
+            return true;
         }
 
         var ext = schema.getExtension(AwsQuerySchemaExtensions.KEY);
@@ -527,48 +535,12 @@ final class QueryFormSerializer implements ShapeSerializer {
             }
         }
 
-        // Save/restore: a nested collection re-enters and reset()s this shared instance, which would
-        // otherwise clobber the outer index mid-iteration.
-        var savedMemberNameBytes = listSerializer.memberNameBytes;
-        var savedFlattened = listSerializer.flattened;
-        var savedIndex = listSerializer.index;
-
-        listSerializer.reset(memberNameBytes, flattened);
-        consumer.accept(listState, listSerializer);
-
-        listSerializer.memberNameBytes = savedMemberNameBytes;
-        listSerializer.flattened = savedFlattened;
-        listSerializer.index = savedIndex;
-
-        if (schema.isMember()) {
-            popPrefix();
-        }
+        listSerializer.push(memberNameBytes, flattened);
+        return true;
     }
 
-    private <T> void writeEc2List(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
-        if (schema.isMember()) {
-            pushPrefix(getMemberNameBytes(schema));
-        }
-
-        if (size == 0) {
-            if (schema.isMember()) {
-                popPrefix();
-            }
-            return;
-        }
-
-        // Save/restore for the same reason writeAwsQueryList does it.
-        var savedMemberNameBytes = listSerializer.memberNameBytes;
-        var savedFlattened = listSerializer.flattened;
-        var savedIndex = listSerializer.index;
-
-        listSerializer.reset(null, true);
-        consumer.accept(listState, listSerializer);
-
-        listSerializer.memberNameBytes = savedMemberNameBytes;
-        listSerializer.flattened = savedFlattened;
-        listSerializer.index = savedIndex;
-
+    private void endList(Schema schema) {
+        listSerializer.pop();
         if (schema.isMember()) {
             popPrefix();
         }
@@ -593,6 +565,32 @@ final class QueryFormSerializer implements ShapeSerializer {
             this.memberNameBytes = memberNameBytes;
             this.flattened = flattened;
             this.index = 1;
+        }
+
+        // Nested collections reuse this serializer. Save the enclosing list's state until endList.
+        private byte[][] savedMemberNameBytes = new byte[4][];
+        private boolean[] savedFlattened = new boolean[4];
+        private int[] savedIndex = new int[4];
+        private int depth;
+
+        void push(byte[] memberNameBytes, boolean flattened) {
+            if (depth == savedIndex.length) {
+                savedMemberNameBytes = Arrays.copyOf(savedMemberNameBytes, depth * 2);
+                savedFlattened = Arrays.copyOf(savedFlattened, depth * 2);
+                savedIndex = Arrays.copyOf(savedIndex, depth * 2);
+            }
+            savedMemberNameBytes[depth] = this.memberNameBytes;
+            savedFlattened[depth] = this.flattened;
+            savedIndex[depth] = this.index;
+            depth++;
+            reset(memberNameBytes, flattened);
+        }
+
+        void pop() {
+            depth--;
+            this.memberNameBytes = savedMemberNameBytes[depth];
+            this.flattened = savedFlattened[depth];
+            this.index = savedIndex[depth];
         }
 
         private void pushIndexedMemberPrefix() {
@@ -772,10 +770,639 @@ final class QueryFormSerializer implements ShapeSerializer {
             pos = NumberCodec.writeInt(buf, pos, value);
             index++;
         }
+
+        @Override
+        public void writeBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeBooleanList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseBooleanList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeBooleanMap(Schema schema, Map<String, Boolean> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeBooleanMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseBooleanMap(
+                Schema schema,
+                Map<String, Boolean> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseBooleanMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeByteList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseByteList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeByteMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseByteMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeShortList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseShortList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeShortMap(Schema schema, Map<String, Short> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeShortMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseShortMap(
+                Schema schema,
+                Map<String, Short> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseShortMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeIntegerList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseIntegerList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeIntegerMap(Schema schema, Map<String, Integer> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeIntegerMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseIntegerMap(
+                Schema schema,
+                Map<String, Integer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseIntegerMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeLongList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseLongList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeLongMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseLongMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeFloatList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseFloatList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeFloatMap(Schema schema, Map<String, Float> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeFloatMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseFloatMap(
+                Schema schema,
+                Map<String, Float> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseFloatMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeDoubleList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseDoubleList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeDoubleMap(Schema schema, Map<String, Double> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeDoubleMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseDoubleMap(
+                Schema schema,
+                Map<String, Double> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseDoubleMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeBigIntegerList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseBigIntegerList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeBigIntegerMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseBigIntegerMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeBigDecimalList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseBigDecimalList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeBigDecimalMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseBigDecimalMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeStringList(Schema schema, List<String> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeStringList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseStringList(Schema schema, List<String> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseStringList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeStringMap(Schema schema, Map<String, String> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeStringMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseStringMap(
+                Schema schema,
+                Map<String, String> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseStringMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeBlobList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseBlobList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeBlobMap(Schema schema, Map<String, ByteBuffer> values, Schema keySchema, Schema valueSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeBlobMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseBlobMap(
+                Schema schema,
+                Map<String, ByteBuffer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseBlobMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeTimestampList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseTimestampList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeTimestampMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseTimestampMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeDocumentList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseDocumentList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeDocumentMap(
+                Schema schema,
+                Map<String, Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeDocumentMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseDocumentMap(
+                Schema schema,
+                Map<String, Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseDocumentMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeEnumList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseEnumList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeEnumMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseEnumMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeIntEnumList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseIntEnumList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeIntEnumMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseIntEnumMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeStructList(Schema schema, List<? extends SerializableStruct> values, Schema memberSchema) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeStructList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseStructList(
+                Schema schema,
+                List<? extends SerializableStruct> values,
+                Schema memberSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseStructList(schema, values, memberSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeStructMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
+
+        @Override
+        public void writeSparseStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            pushIndexedMemberPrefix();
+            index++;
+            QueryFormSerializer.this.writeSparseStructMap(schema, values, keySchema, valueSchema);
+            popPrefix();
+        }
     }
 
     @Override
     public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
+        if (!beginMap(schema, size)) {
+            return;
+        }
+        consumer.accept(mapState, mapSerializer);
+        endMap(schema);
+    }
+
+    private boolean beginMap(Schema schema, int size) {
         if (variant == QueryVariant.EC2_QUERY) {
             throw new SerializationException("EC2 Query protocol does not support map serialization");
         }
@@ -784,10 +1411,6 @@ final class QueryFormSerializer implements ShapeSerializer {
         Schema keySchema = schema.mapKeyMember();
         Schema valueSchema = schema.mapValueMember();
 
-        if (schema.isMember()) {
-            pushPrefix(getMemberNameBytes(schema));
-        }
-
         var keyXmlName = keySchema.getTrait(TraitKey.XML_NAME_TRAIT);
         var valueXmlName = valueSchema.getTrait(TraitKey.XML_NAME_TRAIT);
 
@@ -795,22 +1418,15 @@ final class QueryFormSerializer implements ShapeSerializer {
         byte[] valueNameBytes = valueXmlName != null ? valueXmlName.getValue().getBytes(StandardCharsets.UTF_8) : VALUE;
         byte[] entryNameBytes = flattened ? null : ENTRY;
 
-        // Save/restore: a nested collection re-enters and reset()s this shared instance (see writeList).
-        var savedEntry = mapSerializer.entryNameBytes;
-        var savedKey = mapSerializer.keyNameBytes;
-        var savedValue = mapSerializer.valueNameBytes;
-        var savedFlattened = mapSerializer.flattened;
-        var savedIndex = mapSerializer.index;
+        if (schema.isMember()) {
+            pushPrefix(getMemberNameBytes(schema));
+        }
+        mapSerializer.push(entryNameBytes, keyNameBytes, valueNameBytes, flattened);
+        return true;
+    }
 
-        mapSerializer.reset(entryNameBytes, keyNameBytes, valueNameBytes, flattened);
-        consumer.accept(mapState, mapSerializer);
-
-        mapSerializer.entryNameBytes = savedEntry;
-        mapSerializer.keyNameBytes = savedKey;
-        mapSerializer.valueNameBytes = savedValue;
-        mapSerializer.flattened = savedFlattened;
-        mapSerializer.index = savedIndex;
-
+    private void endMap(Schema schema) {
+        mapSerializer.pop();
         if (schema.isMember()) {
             popPrefix();
         }
@@ -831,6 +1447,54 @@ final class QueryFormSerializer implements ShapeSerializer {
             this.index = 1;
         }
 
+        // Nested collections reuse this serializer. Save the enclosing map's state until endMap.
+        private byte[][] savedNameBytes = new byte[12][];
+        private boolean[] savedFlattened = new boolean[4];
+        private int[] savedIndex = new int[4];
+        private int depth;
+
+        void push(byte[] entryNameBytes, byte[] keyNameBytes, byte[] valueNameBytes, boolean flattened) {
+            if (depth == savedIndex.length) {
+                savedNameBytes = Arrays.copyOf(savedNameBytes, depth * 6);
+                savedFlattened = Arrays.copyOf(savedFlattened, depth * 2);
+                savedIndex = Arrays.copyOf(savedIndex, depth * 2);
+            }
+            int base = depth * 3;
+            savedNameBytes[base] = this.entryNameBytes;
+            savedNameBytes[base + 1] = this.keyNameBytes;
+            savedNameBytes[base + 2] = this.valueNameBytes;
+            savedFlattened[depth] = this.flattened;
+            savedIndex[depth] = this.index;
+            depth++;
+            reset(entryNameBytes, keyNameBytes, valueNameBytes, flattened);
+        }
+
+        void pop() {
+            depth--;
+            int base = depth * 3;
+            this.entryNameBytes = savedNameBytes[base];
+            this.keyNameBytes = savedNameBytes[base + 1];
+            this.valueNameBytes = savedNameBytes[base + 2];
+            this.flattened = savedFlattened[depth];
+            this.index = savedIndex[depth];
+        }
+
+        void beginEntry(String key) {
+            if (flattened) {
+                pushIndexPrefix(index);
+            } else {
+                pushPrefixWithIndex(entryNameBytes, index);
+            }
+            writeParam(keyNameBytes, key);
+            pushPrefix(valueNameBytes);
+        }
+
+        void endEntry() {
+            popPrefix();
+            popPrefix();
+            index++;
+        }
+
         @Override
         public <T> void writeEntry(
                 Schema keySchema,
@@ -838,20 +1502,9 @@ final class QueryFormSerializer implements ShapeSerializer {
                 T state,
                 BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
-            if (flattened) {
-                pushIndexPrefix(index);
-            } else {
-                pushPrefixWithIndex(entryNameBytes, index);
-            }
-
-            writeParam(keyNameBytes, key);
-
-            pushPrefix(valueNameBytes);
+            beginEntry(key);
             valueSerializer.accept(state, mapValueSerializer);
-            popPrefix();
-
-            popPrefix();
-            index++;
+            endEntry();
         }
     }
 
@@ -879,16 +1532,9 @@ final class QueryFormSerializer implements ShapeSerializer {
                 memberNameBytes = xmlName != null ? xmlName.getValue().getBytes(StandardCharsets.UTF_8) : MEMBER;
             }
 
-            var savedMemberNameBytes = listSerializer.memberNameBytes;
-            var savedFlattened = listSerializer.flattened;
-            var savedIndex = listSerializer.index;
-
-            listSerializer.reset(memberNameBytes, flattened);
+            listSerializer.push(memberNameBytes, flattened);
             consumer.accept(listState, listSerializer);
-
-            listSerializer.memberNameBytes = savedMemberNameBytes;
-            listSerializer.flattened = savedFlattened;
-            listSerializer.index = savedIndex;
+            listSerializer.pop();
         }
 
         @Override
@@ -905,20 +1551,9 @@ final class QueryFormSerializer implements ShapeSerializer {
                     valueXmlName != null ? valueXmlName.getValue().getBytes(StandardCharsets.UTF_8) : VALUE;
             byte[] entryNameBytes = flattened ? null : ENTRY;
 
-            var savedEntry = mapSerializer.entryNameBytes;
-            var savedKey = mapSerializer.keyNameBytes;
-            var savedValue = mapSerializer.valueNameBytes;
-            var savedFlattened = mapSerializer.flattened;
-            var savedIndex = mapSerializer.index;
-
-            mapSerializer.reset(entryNameBytes, keyNameBytes, valueNameBytes, flattened);
+            mapSerializer.push(entryNameBytes, keyNameBytes, valueNameBytes, flattened);
             consumer.accept(mapState, mapSerializer);
-
-            mapSerializer.entryNameBytes = savedEntry;
-            mapSerializer.keyNameBytes = savedKey;
-            mapSerializer.valueNameBytes = savedValue;
-            mapSerializer.flattened = savedFlattened;
-            mapSerializer.index = savedIndex;
+            mapSerializer.pop();
         }
 
         @Override
@@ -1143,5 +1778,1264 @@ final class QueryFormSerializer implements ShapeSerializer {
         }
         var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
         return trait != null ? trait.getFormat() : TimestampFormatTrait.Format.DATE_TIME;
+    }
+
+    @Override
+    public void writeBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeBoolean(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeBoolean(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeBoolean(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeBoolean(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeBooleanMap(Schema schema, Map<String, Boolean> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeBoolean(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseBooleanMap(
+            Schema schema,
+            Map<String, Boolean> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeBoolean(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeByte(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeByte(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeByte(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeByte(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeByte(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeByte(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeShortList(Schema schema, List<Short> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeShort(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeShort(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseShortList(Schema schema, List<Short> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeShort(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeShort(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeShortMap(Schema schema, Map<String, Short> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeShort(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseShortMap(Schema schema, Map<String, Short> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeShort(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeInteger(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeInteger(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeInteger(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeInteger(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeIntegerMap(Schema schema, Map<String, Integer> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeInteger(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseIntegerMap(
+            Schema schema,
+            Map<String, Integer> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeInteger(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeLongList(Schema schema, List<Long> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeLong(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeLong(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseLongList(Schema schema, List<Long> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeLong(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeLong(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeLong(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeLong(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeFloat(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeFloat(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeFloat(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeFloat(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeFloatMap(Schema schema, Map<String, Float> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeFloat(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseFloatMap(Schema schema, Map<String, Float> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeFloat(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeDouble(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeDouble(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeDouble(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeDouble(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeDoubleMap(Schema schema, Map<String, Double> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeDouble(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseDoubleMap(Schema schema, Map<String, Double> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeDouble(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeBigInteger(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeBigInteger(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeBigInteger(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeBigInteger(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeBigIntegerMap(
+            Schema schema,
+            Map<String, BigInteger> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeBigInteger(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseBigIntegerMap(
+            Schema schema,
+            Map<String, BigInteger> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeBigInteger(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeBigDecimal(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeBigDecimal(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeBigDecimal(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeBigDecimal(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeBigDecimalMap(
+            Schema schema,
+            Map<String, BigDecimal> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeBigDecimal(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseBigDecimalMap(
+            Schema schema,
+            Map<String, BigDecimal> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeBigDecimal(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeStringList(Schema schema, List<String> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeString(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeString(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseStringList(Schema schema, List<String> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeString(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeString(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeStringMap(Schema schema, Map<String, String> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeString(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseStringMap(Schema schema, Map<String, String> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeString(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeBlob(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeBlob(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeBlob(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeBlob(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeBlobMap(Schema schema, Map<String, ByteBuffer> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeBlob(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseBlobMap(
+            Schema schema,
+            Map<String, ByteBuffer> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeBlob(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeTimestamp(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeTimestamp(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeTimestamp(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeTimestamp(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeTimestampMap(Schema schema, Map<String, Instant> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeTimestamp(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseTimestampMap(
+            Schema schema,
+            Map<String, Instant> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeTimestamp(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeDocument(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeDocument(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeDocument(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeDocument(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeDocumentMap(Schema schema, Map<String, Document> values, Schema keySchema, Schema valueSchema) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeDocument(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseDocumentMap(
+            Schema schema,
+            Map<String, Document> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeDocument(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeString(memberSchema, v.getValue());
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeString(memberSchema, v.getValue());
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeString(memberSchema, v.getValue());
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeString(memberSchema, v.getValue());
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeString(valueSchema, v.getValue());
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeString(valueSchema, v.getValue());
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeInteger(memberSchema, v.getValue());
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeInteger(memberSchema, v.getValue());
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeInteger(memberSchema, v.getValue());
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeInteger(memberSchema, v.getValue());
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeIntEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyIntEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeInteger(valueSchema, v.getValue());
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseIntEnumMap(
+            Schema schema,
+            Map<String, ? extends SmithyIntEnum> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeInteger(valueSchema, v.getValue());
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeStructList(Schema schema, List<? extends SerializableStruct> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                listSerializer.writeStruct(memberSchema, v);
+            }
+        } else {
+            for (var v : values) {
+                listSerializer.writeStruct(memberSchema, v);
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeSparseStructList(Schema schema, List<? extends SerializableStruct> values, Schema memberSchema) {
+        if (!beginList(schema, values.size())) {
+            return;
+        }
+        if (values instanceof RandomAccess) {
+            for (int i = 0, n = values.size(); i < n; i++) {
+                var v = values.get(i);
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeStruct(memberSchema, v);
+                }
+            }
+        } else {
+            for (var v : values) {
+                if (v == null) {
+                    listSerializer.writeNull(memberSchema);
+                } else {
+                    listSerializer.writeStruct(memberSchema, v);
+                }
+            }
+        }
+        endList(schema);
+    }
+
+    @Override
+    public void writeStructMap(
+            Schema schema,
+            Map<String, ? extends SerializableStruct> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            mapValueSerializer.writeStruct(valueSchema, v);
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
+    }
+
+    @Override
+    public void writeSparseStructMap(
+            Schema schema,
+            Map<String, ? extends SerializableStruct> values,
+            Schema keySchema,
+            Schema valueSchema
+    ) {
+        if (!beginMap(schema, values.size())) {
+            return;
+        }
+        values.forEach((k, v) -> {
+            mapSerializer.beginEntry(k);
+            if (v == null) {
+                mapValueSerializer.writeNull(valueSchema);
+            } else {
+                mapValueSerializer.writeStruct(valueSchema, v);
+            }
+            mapSerializer.endEntry();
+        });
+        endMap(schema);
     }
 }

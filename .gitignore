@@ -32,3 +32,5 @@ mise.toml
 **/bin
 
 benchmarks/e2e-benchmarks/profiles
+
+*.swp

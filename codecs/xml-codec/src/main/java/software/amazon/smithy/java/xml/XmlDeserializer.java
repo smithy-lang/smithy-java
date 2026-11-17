@@ -16,6 +16,7 @@ import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLStreamException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
@@ -424,12 +425,20 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
 
         @Override
         public BigDecimal readBigDecimal(Schema schema) {
-            return new BigDecimal(value);
+            try {
+                return BigNumbers.parseBigDecimal(value);
+            } catch (NumberFormatException e) {
+                throw error(reader, "Failed to read BigDecimal", e);
+            }
         }
 
         @Override
         public BigInteger readBigInteger(Schema schema) {
-            return new BigInteger(value);
+            try {
+                return BigNumbers.parseBigInteger(value);
+            } catch (NumberFormatException e) {
+                throw error(reader, "Failed to read BigInteger", e);
+            }
         }
 
         @Override
@@ -539,7 +548,7 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
         @Override
         public BigInteger readBigInteger(Schema schema) {
             try {
-                return new BigInteger(reader.getText());
+                return BigNumbers.parseBigInteger(reader.getText());
             } catch (XMLStreamException | NumberFormatException e) {
                 throw error("Failed to read BigInteger", e);
             }
@@ -548,7 +557,7 @@ final class XmlDeserializer implements ShapeDeserializer, XmlErrorCodeParser {
         @Override
         public BigDecimal readBigDecimal(Schema schema) {
             try {
-                return new BigDecimal(reader.getText());
+                return BigNumbers.parseBigDecimal(reader.getText());
             } catch (XMLStreamException | NumberFormatException e) {
                 throw error("Failed to read BigDecimal", e);
             }

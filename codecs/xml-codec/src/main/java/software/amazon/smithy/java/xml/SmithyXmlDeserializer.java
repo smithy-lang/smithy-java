@@ -22,6 +22,7 @@ import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.TimestampCodec;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
@@ -1594,17 +1595,25 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
     }
 
     private BigInteger parseBigIntegerFromSpan() {
-        if (spanHasCdataFallback()) {
-            return new BigInteger(textFallback.trim());
+        try {
+            if (spanHasCdataFallback()) {
+                return BigNumbers.parseBigInteger(textFallback.trim());
+            }
+            return BigNumbers.parseBigInteger(buf, textSpanStart, textSpanEnd - textSpanStart);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Failed to read BigInteger", e);
         }
-        return new BigInteger(new String(buf, textSpanStart, textSpanEnd - textSpanStart, StandardCharsets.US_ASCII));
     }
 
     private BigDecimal parseBigDecimalFromSpan() {
-        if (spanHasCdataFallback()) {
-            return new BigDecimal(textFallback.trim());
+        try {
+            if (spanHasCdataFallback()) {
+                return BigNumbers.parseBigDecimal(textFallback.trim());
+            }
+            return BigNumbers.parseBigDecimal(buf, textSpanStart, textSpanEnd - textSpanStart);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Failed to read BigDecimal", e);
         }
-        return new BigDecimal(new String(buf, textSpanStart, textSpanEnd - textSpanStart, StandardCharsets.US_ASCII));
     }
 
     private ByteBuffer parseBlobFromSpan() {
@@ -1838,12 +1847,20 @@ final class SmithyXmlDeserializer implements ShapeDeserializer, XmlErrorCodePars
 
         @Override
         public BigDecimal readBigDecimal(Schema schema) {
-            return new BigDecimal(value);
+            try {
+                return BigNumbers.parseBigDecimal(value);
+            } catch (NumberFormatException e) {
+                throw new SerializationException("Failed to read BigDecimal", e);
+            }
         }
 
         @Override
         public BigInteger readBigInteger(Schema schema) {
-            return new BigInteger(value);
+            try {
+                return BigNumbers.parseBigInteger(value);
+            } catch (NumberFormatException e) {
+                throw new SerializationException("Failed to read BigInteger", e);
+            }
         }
     }
 

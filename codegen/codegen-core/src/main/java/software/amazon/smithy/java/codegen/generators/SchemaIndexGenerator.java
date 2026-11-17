@@ -160,16 +160,9 @@ public final class SchemaIndexGenerator
             // One method per schema partition
             for (int i = 0; i < partitions.size(); i++) {
                 writer.openBlock("private static void _init$L() {", i);
-                for (var schemaField : partitions.get(i)) {
-                    if (schemaField.isExternal()) {
-                        continue;
-                    }
-                    var schemaReference = schemaField.classRef().className() + "." + schemaField.fieldName();
-                    writer.pushState();
-                    writer.putContext("schemaReference", schemaReference);
-                    writer.write("SCHEMA_MAP.put(${schemaReference:L}.id(), ${schemaReference:L});");
-                    writer.popState();
-                }
+                writer.openBlock("for (var schema : $L.$$ALL) {", partitions.get(i).getFirst().classRef().className());
+                writer.write("SCHEMA_MAP.put(schema.id(), schema);");
+                writer.closeBlock("}");
                 writer.closeBlock("}");
                 writer.write("");
             }

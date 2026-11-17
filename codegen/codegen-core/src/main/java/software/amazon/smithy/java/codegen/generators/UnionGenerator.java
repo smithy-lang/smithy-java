@@ -25,7 +25,6 @@ import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.UnionShape;
@@ -98,7 +97,8 @@ public final class UnionGenerator
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.getRenames()));
+                            directive.getRenames(),
+                            directive.context().schemaFieldOrder()));
             writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
@@ -117,6 +117,7 @@ public final class UnionGenerator
             writer.pushState();
             writer.putContext("objects", Objects.class);
             writer.putContext("collections", Collections.class);
+            var sortedMembers = CodegenUtils.getSortedMembers(shape);
             for (var member : shape.members()) {
                 writer.pushState();
                 writer.injectSection(new ClassSection(member));
@@ -127,7 +128,7 @@ public final class UnionGenerator
                 var template =
                         """
                                 record ${memberName:U}Member(${^unit}${member:T} ${memberName:L}${/unit}) implements ${shape:T} {
-                                    private static final ${schemaClass:T} ${memberSchema:L} = $$SCHEMA.member(${memberSchemaName:S});
+                                    private static final ${schemaClass:T} ${memberSchema:L} = $$SCHEMA.member(${memberIndex:L}); // ${memberSchemaName:L}
                                     ${?needsConstructor}
                                     public ${memberName:U}Member {
                                         ${?col}${memberName:L} = ${collections:T}.${wrap:L}(${/col}${^primitive}${objects:T}.requireNonNull(${/primitive}${memberName:L}${^primitive}, "Union value cannot be null")${/primitive}${?col})${/col};
@@ -152,7 +153,8 @@ public final class UnionGenerator
                 writer.putContext("member", memberSymbol);
                 writer.putContext("memberName", memberName);
                 writer.putContext("memberSchemaName", member.getMemberName());
-                writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(memberName));
+                writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(shape, member));
+                writer.putContext("memberIndex", sortedMembers.indexOf(member));
                 writer.putContext("schemaClass", Schema.class);
                 writer.putContext("toString", new ToStringGenerator(writer));
                 writer.putContext("valueGetter", writer.consumer((writer) -> {
@@ -191,7 +193,7 @@ public final class UnionGenerator
                             record $$Unknown(${string:T} memberName) implements ${shape:T} {
                                 @Override
                                 public void serialize(${shapeSerializer:T} serializer) {
-                                    throw new ${unsupportedOperation:T}("Cannot serialize union with unknown member " + this.memberName);
+                                    throw new ${unsupportedOperation:T}("Cannot serialize union with unknown member ".concat(this.memberName));
                                 }
 
                                 @Override
@@ -228,9 +230,10 @@ public final class UnionGenerator
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                Map<ShapeId, String> renames
+                Map<ShapeId, String> renames,
+                SchemaFieldOrder schemaFieldOrder
         ) {
-            super(writer, shape, symbolProvider, model, renames);
+            super(writer, shape, symbolProvider, model, renames, schemaFieldOrder);
         }
 
         @Override
@@ -302,12 +305,6 @@ public final class UnionGenerator
                         return ${objects:T}.requireNonNull(value, "no union value set");
                     }
                     """);
-        }
-
-        @Override
-        protected String getMemberSchemaName(MemberShape member) {
-            return writer.format("${memberName:U}Member") + "." + super.getMemberSchemaName(member);
-
         }
     }
 }

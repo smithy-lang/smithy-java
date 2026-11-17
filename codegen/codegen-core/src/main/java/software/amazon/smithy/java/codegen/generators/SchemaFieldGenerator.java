@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.List;
 import java.util.Set;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ContextualDirective;
@@ -78,8 +79,9 @@ public final class SchemaFieldGenerator extends ShapeVisitor.Default<Void> imple
         writer.putContext("name", schemaFieldOrder.getSchemaFieldName(shape, writer));
         writer.write("public static final ${schemaClass:T} $$SCHEMA = ${name:L};");
 
-        for (var member : shape.members()) {
-            writeMemberProperty(member);
+        int index = 0;
+        for (var member : CodegenUtils.getSortedMembers(shape)) {
+            writeMemberProperty(shape, member, index++);
         }
 
         writer.popState();
@@ -132,13 +134,13 @@ public final class SchemaFieldGenerator extends ShapeVisitor.Default<Void> imple
     public Void enumShape(EnumShape shape) {
         writer.pushState();
         writer.putContext("name", "$SCHEMA");
-        writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
+        writer.putContext("values", List.copyOf(shape.getEnumValues().values()));
         writer.putContext("set", Set.class);
         writer.putContext("shapeTypeClass", symbolProvider.toSymbol(shape));
         writer.write(
                 """
                         ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum(${shapeId:T}.from(${id:S}),
-                            ${set:T}.of(${#variants}${value:L}.getValue()${^key.last}, ${/key.last}${/variants}), ${shapeTypeClass:T}.class${traits:C}
+                            ${set:T}.of(${#values}${value:S}${^key.last}, ${/key.last}${/values}), ${shapeTypeClass:T}.class${traits:C}
                         );
                         """);
         writer.popState();
@@ -149,24 +151,26 @@ public final class SchemaFieldGenerator extends ShapeVisitor.Default<Void> imple
     public Void intEnumShape(IntEnumShape shape) {
         writer.pushState();
         writer.putContext("name", "$SCHEMA");
-        writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
+        writer.putContext("values", List.copyOf(shape.getEnumValues().values()));
         writer.putContext("set", Set.class);
         writer.putContext("shapeTypeClass", symbolProvider.toSymbol(shape));
         writer.write(
                 """
                         ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum(${shapeId:T}.from(${id:S}),
-                            ${set:T}.of(${#variants}${value:L}.getValue()${^key.last}, ${/key.last}${/variants}), ${shapeTypeClass:T}.class${traits:C}
+                            ${set:T}.of(${#values}${value:L}${^key.last}, ${/key.last}${/values}), ${shapeTypeClass:T}.class${traits:C}
                         );
                         """);
         writer.popState();
         return null;
     }
 
-    private void writeMemberProperty(MemberShape member) {
+    private void writeMemberProperty(Shape container, MemberShape member, int index) {
         writer.pushState();
         writer.putContext("memberName", member.getMemberName());
-        writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
-        writer.write("private static final ${schemaClass:T} ${memberSchema:L} = $$SCHEMA.member(${memberName:S});");
+        writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(container, member));
+        writer.putContext("memberIndex", index);
+        writer.write(
+                "private static final ${schemaClass:T} ${memberSchema:L} = $$SCHEMA.member(${memberIndex:L}); // ${memberName:L}");
         writer.popState();
     }
 }

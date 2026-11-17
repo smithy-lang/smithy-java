@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.Base64;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
@@ -103,7 +104,7 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
     @Override
     public BigInteger readBigInteger(Schema schema) {
         try {
-            return new BigInteger(value);
+            return BigNumbers.parseBigInteger(value);
         } catch (NumberFormatException e) {
             throw new SerializationException("Invalid BigInteger", e);
         }
@@ -112,7 +113,7 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
     @Override
     public BigDecimal readBigDecimal(Schema schema) {
         try {
-            return new BigDecimal(value);
+            return BigNumbers.parseBigDecimal(value);
         } catch (NumberFormatException e) {
             throw new SerializationException("Invalid BigDecimal", e);
         }

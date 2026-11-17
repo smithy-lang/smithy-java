@@ -20,16 +20,22 @@ tasks.register<Test>("integ") {
     classpath = project.the<SourceSetContainer>()["it"].runtimeClasspath
 }
 
-// Extension for configuring integration test behavior.
-// Projects can opt in to AWS API model tests by adding:
-//   configureIntegTests { awsModelTests = true }
-// Models are only resolved when the `-PawsModelTests` Gradle property is also set.
+// Enable model resolution with configureIntegTests { awsModelTests = true } and -PawsModelsTests.
+// The awsModels configuration contains the jars.
+// Set awsModelsOnTestClasspath = false to exclude them from the it classpath.
 interface IntegTestExtension {
     var awsModelTests: Boolean
+    var awsModelsOnTestClasspath: Boolean
+}
+
+val awsModels by configurations.creating {
+    description = "AWS API model jars pinned by the aws-api-models BOM; empty unless -PawsModelsTests is set"
+    isCanBeConsumed = false
 }
 
 val configureIntegTests = extensions.create<IntegTestExtension>("configureIntegTests").apply {
     awsModelTests = false
+    awsModelsOnTestClasspath = true
 }
 
 afterEvaluate {
@@ -52,8 +58,12 @@ afterEvaluate {
         .newDocumentBuilder()
         .parse(bomFile)
 
+    val onTestClasspath = configureIntegTests.awsModelsOnTestClasspath
     val deps = doc.getElementsByTagName("dependency")
-    dependencies.add("itImplementation", dependencies.platform(bomCoords))
+    dependencies.add(awsModels.name, dependencies.platform(bomCoords))
+    if (onTestClasspath) {
+        dependencies.add("itImplementation", dependencies.platform(bomCoords))
+    }
 
     for (i in 0 until deps.length) {
         val dep = deps.item(i) as? Element ?: continue
@@ -61,12 +71,17 @@ afterEvaluate {
         val a = dep.getElementsByTagName("artifactId").item(0)?.textContent ?: continue
 
         if (g == "software.amazon.api.models") {
-            dependencies.add("itImplementation", "$g:$a")
+            dependencies.add(awsModels.name, "$g:$a")
+            if (onTestClasspath) {
+                dependencies.add("itImplementation", "$g:$a")
+            }
         }
     }
 
-    tasks.named<Test>("integ") {
-        systemProperty("awsModelsTests", "true")
-        maxHeapSize = "4g"
+    if (onTestClasspath) {
+        tasks.named<Test>("integ") {
+            systemProperty("awsModelsTests", "true")
+            maxHeapSize = "4g"
+        }
     }
 }

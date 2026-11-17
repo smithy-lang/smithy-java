@@ -14,6 +14,7 @@ dependencies {
     api(project(":core"))
     api(project(":codecs:codec-commons", configuration = "shadow"))
     smithyBuild(project(":codegen:codegen-plugin"))
+    testImplementation(testFixtures(project(":core")))
 }
 
 afterEvaluate {

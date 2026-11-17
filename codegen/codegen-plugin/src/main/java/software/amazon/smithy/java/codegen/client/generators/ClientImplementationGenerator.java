@@ -8,7 +8,6 @@ package software.amazon.smithy.java.codegen.client.generators;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -81,7 +80,6 @@ public final class ClientImplementationGenerator
             writer.putContext("impl", impl);
             writer.putContext("future", CompletableFuture.class);
             writer.putContext("typeRegistryClass", TypeRegistry.class);
-            writer.putContext("completionException", CompletionException.class);
             writer.putContext("versionCheck", VersionCheck.class);
             writer.putContext("moduleVersion", ModuleVersion.class);
             var versionParts = Version.VERSION.split("\\.");
@@ -123,11 +121,7 @@ public final class ClientImplementationGenerator
                     """
                             @Override
                             public ${output:T} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {
-                                try {
-                                    return call(input, ${operation:T}.instance(), overrideConfig);
-                                } catch (${completionException:T} e) {
-                                    throw unwrapAndThrow(e);
-                                }
+                                return call(input, ${operation:T}.instance(), overrideConfig);
                             }
                             """;
             writer.putContext("overrideConfig", RequestOverrideConfig.class);

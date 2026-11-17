@@ -14,6 +14,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.MemberSubsetCodec;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
@@ -100,36 +101,44 @@ public final class JsonCodec implements Codec, MemberSubsetCodec {
 
     @Override
     public <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
-        if (settings.provider() instanceof CodegenJsonSerdeProvider generated) {
-            return generated.deserialize(source, builder, settings);
-        }
-        var deserializer = createDeserializer(source);
-        T result;
         try {
-            result = builder.deserialize(deserializer).errorCorrection().build();
-        } catch (Exception e) {
-            closeQuietly(deserializer);
-            throw e;
+            if (settings.provider() instanceof CodegenJsonSerdeProvider generated) {
+                return generated.deserialize(source, builder, settings);
+            }
+            var deserializer = createDeserializer(source);
+            T result;
+            try {
+                result = builder.deserialize(deserializer).errorCorrection().build();
+            } catch (Exception e) {
+                closeQuietly(deserializer);
+                throw e;
+            }
+            deserializer.close();
+            return result;
+        } catch (RuntimeException e) {
+            throw SerializationException.wrap(e);
         }
-        deserializer.close();
-        return result;
     }
 
     @Override
     public <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
-        if (settings.provider() instanceof CodegenJsonSerdeProvider generated) {
-            return generated.deserialize(source, builder, settings);
-        }
-        var deserializer = createDeserializer(source);
-        T result;
         try {
-            result = builder.deserialize(deserializer).errorCorrection().build();
-        } catch (Exception e) {
-            closeQuietly(deserializer);
-            throw e;
+            if (settings.provider() instanceof CodegenJsonSerdeProvider generated) {
+                return generated.deserialize(source, builder, settings);
+            }
+            var deserializer = createDeserializer(source);
+            T result;
+            try {
+                result = builder.deserialize(deserializer).errorCorrection().build();
+            } catch (Exception e) {
+                closeQuietly(deserializer);
+                throw e;
+            }
+            deserializer.close();
+            return result;
+        } catch (RuntimeException e) {
+            throw SerializationException.wrap(e);
         }
-        deserializer.close();
-        return result;
     }
 
     private static void closeQuietly(ShapeDeserializer deserializer) {

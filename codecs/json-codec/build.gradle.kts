@@ -21,6 +21,7 @@ dependencies {
     compileOnly(libs.jackson.core)
     testRuntimeOnly(libs.jackson.core)
     smithyBuild(project(":codegen:codegen-plugin"))
+    testImplementation(testFixtures(project(":core")))
 }
 
 tasks {

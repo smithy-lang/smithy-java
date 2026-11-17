@@ -7,12 +7,15 @@ package software.amazon.smithy.java.xml;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -21,10 +24,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -32,6 +37,7 @@ import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.XmlAttributeTrait;
 
 public class XmlCodecTest extends ProviderTestBase {
 
@@ -302,6 +308,111 @@ public class XmlCodecTest extends ProviderTestBase {
         }
     }
 
+    private static final String MAX_DIGITS = "7".repeat(BigNumbers.MAX_DIGITS);
+    private static final String TOO_MANY_DIGITS = "7".repeat(BigNumbers.MAX_TEXT_DIGITS + 1);
+    private static final String TOO_MANY_SIGNIFICANT_DIGITS = "7".repeat(BigNumbers.MAX_TEXT_DIGITS);
+    private static final String TOO_MANY_FULLWIDTH_DIGITS = "\uFF17".repeat(BigNumbers.MAX_TEXT_DIGITS + 1);
+    private static final String FAR_TOO_MANY_DIGITS = "1".repeat(2_000_000);
+
+    @PerProvider
+    @Timeout(10)
+    public void readsBigNumbersWithMaxDigits(boolean useNative) {
+        var decimal = "-" + "1".repeat(BigNumbers.MAX_DIGITS - 1) + ".1";
+        var xml = "<Foo bigAttribute=\"-" + MAX_DIGITS + "\"><bigInteger>" + MAX_DIGITS + "</bigInteger><bigDecimal>"
+                + decimal + "</bigDecimal></Foo>";
+        var pojo = deserializePojo(useNative, xml);
+        assertThat(pojo.bigInteger, equalTo(new BigInteger(MAX_DIGITS)));
+        assertThat(pojo.bigDecimal, equalTo(new BigDecimal(decimal)));
+        assertThat(pojo.bigAttribute, equalTo(new BigInteger("-" + MAX_DIGITS)));
+    }
+
+    @PerProvider
+    @Timeout(10)
+    public void rejectsBigNumberElementsOverMaxDigits(boolean useNative) {
+        for (var digits : List.of(TOO_MANY_DIGITS, FAR_TOO_MANY_DIGITS, TOO_MANY_SIGNIFICANT_DIGITS)) {
+            assertThrows(SerializationException.class,
+                    () -> deserializePojo(useNative, "<Foo><bigInteger>" + digits + "</bigInteger></Foo>"));
+            assertThrows(SerializationException.class,
+                    () -> deserializePojo(useNative, "<Foo><bigDecimal>" + digits + ".5</bigDecimal></Foo>"));
+        }
+    }
+
+    @PerProvider
+    @Timeout(10)
+    public void rejectsBigNumberCdataOverMaxDigits(boolean useNative) {
+        var ok = deserializePojo(useNative, "<Foo><bigInteger><![CDATA[" + MAX_DIGITS + "]]></bigInteger></Foo>");
+        assertThat(ok.bigInteger, equalTo(new BigInteger(MAX_DIGITS)));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative,
+                        "<Foo><bigInteger><![CDATA[" + TOO_MANY_DIGITS + "]]></bigInteger></Foo>"));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative,
+                        "<Foo><bigDecimal><![CDATA[" + FAR_TOO_MANY_DIGITS + "]]></bigDecimal></Foo>"));
+    }
+
+    @PerProvider
+    @Timeout(10)
+    public void rejectsBigNumberAttributesOverMaxDigits(boolean useNative) {
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo bigAttribute=\"" + TOO_MANY_DIGITS + "\"/>"));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo bigAttribute=\"" + FAR_TOO_MANY_DIGITS + "\"/>"));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo bigAttribute=\"" + TOO_MANY_SIGNIFICANT_DIGITS + "\"/>"));
+        var zeros = "0".repeat(BigNumbers.MAX_TEXT_DIGITS - BigNumbers.MAX_DIGITS);
+        var padded = deserializePojo(useNative, "<Foo bigAttribute=\"" + zeros + MAX_DIGITS + "\"/>");
+        assertThat(padded.bigAttribute, equalTo(new BigInteger(MAX_DIGITS)));
+    }
+
+    @PerProvider
+    @Timeout(10)
+    public void rejectsNonAsciiDigitsOverMaxDigits(boolean useNative) {
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo bigAttribute=\"" + TOO_MANY_FULLWIDTH_DIGITS + "\"/>"));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative,
+                        "<Foo><bigInteger><![CDATA[" + TOO_MANY_FULLWIDTH_DIGITS + "]]></bigInteger></Foo>"));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative,
+                        "<Foo><bigDecimal>" + TOO_MANY_FULLWIDTH_DIGITS + ".5</bigDecimal></Foo>"));
+        var huge = "\uFF17".repeat(300_000);
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo bigAttribute=\"" + huge + "\"/>"));
+    }
+
+    @PerProvider
+    public void malformedBigNumbersFailAsSerializationException(boolean useNative) {
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo><bigInteger>1.5</bigInteger></Foo>"));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo><bigDecimal>abc</bigDecimal></Foo>"));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo><bigInteger><![CDATA[1.5]]></bigInteger></Foo>"));
+        assertThrows(SerializationException.class,
+                () -> deserializePojo(useNative, "<Foo bigAttribute=\"abc\"/>"));
+    }
+
+    @PerProvider
+    public void bigDecimalWithExtremeScaleRoundTripsWithoutExpansion(boolean useNative) throws Exception {
+        var builder = new TestPojo.Builder();
+        builder.bigDecimal = new BigDecimal("1812031E+900000000");
+        var pojo = builder.build();
+        try (var codec = codec(useNative); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                pojo.serialize(serializer);
+            }
+            var xml = output.toString(StandardCharsets.UTF_8);
+            assertThat(xml, containsString("1.812031E+900000006"));
+            assertThat(deserializePojo(useNative, xml).bigDecimal, equalTo(pojo.bigDecimal));
+        }
+    }
+
+    private static TestPojo deserializePojo(boolean useNative, String xml) {
+        try (var codec = codec(useNative)) {
+            return codec.deserializeShape(xml, new TestPojo.Builder());
+        }
+    }
+
     private static final class TestPojo implements SerializableStruct {
 
         private static final ShapeId ID = ShapeId.from("smithy.example#Foo");
@@ -315,23 +426,35 @@ public class XmlCodecTest extends ProviderTestBase {
                 .putMember("binary", PreludeSchemas.BLOB, new JsonNameTrait("BINARY"))
                 .putMember("date", PreludeSchemas.TIMESTAMP, new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
                 .putMember("numbers", NUMBERS_LIST)
+                .putMember("bigInteger", PreludeSchemas.BIG_INTEGER)
+                .putMember("bigDecimal", PreludeSchemas.BIG_DECIMAL)
+                .putMember("bigAttribute", PreludeSchemas.BIG_INTEGER, new XmlAttributeTrait())
                 .build();
 
         private static final Schema NAME = SCHEMA.member("name");
         private static final Schema BINARY = SCHEMA.member("binary");
         private static final Schema DATE = SCHEMA.member("date");
         private static final Schema NUMBERS = SCHEMA.member("numbers");
+        private static final Schema BIG_INTEGER = SCHEMA.member("bigInteger");
+        private static final Schema BIG_DECIMAL = SCHEMA.member("bigDecimal");
+        private static final Schema BIG_ATTRIBUTE = SCHEMA.member("bigAttribute");
 
         private final String name;
         private final ByteBuffer binary;
         private final Instant date;
         private final List<Integer> numbers;
+        private final BigInteger bigInteger;
+        private final BigDecimal bigDecimal;
+        private final BigInteger bigAttribute;
 
         TestPojo(Builder builder) {
             this.name = builder.name;
             this.binary = builder.binary;
             this.date = builder.date;
             this.numbers = builder.numbers;
+            this.bigInteger = builder.bigInteger;
+            this.bigDecimal = builder.bigDecimal;
+            this.bigAttribute = builder.bigAttribute;
         }
 
         @Override
@@ -341,6 +464,9 @@ public class XmlCodecTest extends ProviderTestBase {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
+            if (bigAttribute != null) {
+                serializer.writeBigInteger(BIG_ATTRIBUTE, bigAttribute);
+            }
             if (name != null) {
                 serializer.writeString(NAME, name);
             }
@@ -356,6 +482,12 @@ public class XmlCodecTest extends ProviderTestBase {
                         ser.writeInteger(PreludeSchemas.INTEGER, e);
                     }
                 });
+            }
+            if (bigInteger != null) {
+                serializer.writeBigInteger(BIG_INTEGER, bigInteger);
+            }
+            if (bigDecimal != null) {
+                serializer.writeBigDecimal(BIG_DECIMAL, bigDecimal);
             }
         }
 
@@ -375,6 +507,9 @@ public class XmlCodecTest extends ProviderTestBase {
             private ByteBuffer binary;
             private Instant date;
             private final List<Integer> numbers = new ArrayList<>();
+            private BigInteger bigInteger;
+            private BigDecimal bigDecimal;
+            private BigInteger bigAttribute;
 
             @Override
             public Schema schema() {
@@ -393,6 +528,9 @@ public class XmlCodecTest extends ProviderTestBase {
                                 values.add(de.readInteger(NUMBERS_LIST.member("member")));
                             });
                         }
+                        case "bigInteger" -> pojo.bigInteger = deser.readBigInteger(BIG_INTEGER);
+                        case "bigDecimal" -> pojo.bigDecimal = deser.readBigDecimal(BIG_DECIMAL);
+                        case "bigAttribute" -> pojo.bigAttribute = deser.readBigInteger(BIG_ATTRIBUTE);
                         default -> throw new UnsupportedOperationException(member.toString());
                     }
                 });

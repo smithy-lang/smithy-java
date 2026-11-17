@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
@@ -28,12 +29,14 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
@@ -751,6 +754,197 @@ class CborCodecTest {
 
         void entry(String key, Consumer<ShapeSerializer> val) {
             m.writeEntry(null, key, null, ($, s) -> val.accept(s));
+        }
+    }
+
+    @Nested
+    @Timeout(10)
+    class BigNumberLimitsTest {
+
+        private static byte[] magnitude(BigInteger value) {
+            byte[] bytes = value.toByteArray();
+            return bytes[0] == 0 ? Arrays.copyOfRange(bytes, 1, bytes.length) : bytes;
+        }
+
+        private static byte[] ones(int count) {
+            byte[] bytes = new byte[count];
+            Arrays.fill(bytes, (byte) 0xFF);
+            return bytes;
+        }
+
+        private static byte[] leadingZeros(int count, byte[] magnitude) {
+            byte[] padded = new byte[count + magnitude.length];
+            System.arraycopy(magnitude, 0, padded, count, magnitude.length);
+            return padded;
+        }
+
+        private static void writeByteStringHeader(ByteArrayOutputStream out, int length) {
+            if (length < 24) {
+                out.write(0x40 | length);
+            } else if (length < 256) {
+                out.write(0x58);
+                out.write(length);
+            } else {
+                out.write(0x59);
+                out.write(length >>> 8);
+                out.write(length & 0xFF);
+            }
+        }
+
+        // CBOR tag 2 encodes a positive bignum. Tag 3 encodes -1 - magnitude.
+        private static byte[] bignum(int tag, byte[] magnitude) {
+            var out = new ByteArrayOutputStream();
+            out.write(0xC0 | tag);
+            writeByteStringHeader(out, magnitude.length);
+            out.writeBytes(magnitude);
+            return out.toByteArray();
+        }
+
+        private static byte[] indefiniteBignum(byte[] magnitude) {
+            return indefiniteBignum(magnitude, 2);
+        }
+
+        private static byte[] indefiniteBignum(byte[] magnitude, int tag) {
+            var out = new ByteArrayOutputStream();
+            out.write(0xC0 | tag);
+            out.write(0x5F);
+            int first = magnitude.length / 2;
+            writeByteStringHeader(out, first);
+            out.write(magnitude, 0, first);
+            writeByteStringHeader(out, magnitude.length - first);
+            out.write(magnitude, first, magnitude.length - first);
+            out.write(0xFF);
+            return out.toByteArray();
+        }
+
+        // CBOR tag 4 requires [exponent, mantissa].
+        private static byte[] decimalFraction(byte[] exponent, byte[] mantissa) {
+            var out = new ByteArrayOutputStream();
+            out.write(0xC4);
+            out.write(0x82);
+            out.writeBytes(exponent);
+            out.writeBytes(mantissa);
+            return out.toByteArray();
+        }
+
+        private static BigInteger read(byte[] payload) {
+            return CODEC.newDeserializer(payload, SETTINGS).readBigInteger(PreludeSchemas.BIG_INTEGER);
+        }
+
+        @Test
+        void readsEveryMaxDigitValue() {
+            var largest = BigInteger.TEN.pow(BigNumbers.MAX_DIGITS).subtract(BigInteger.ONE);
+            byte[] bytes = magnitude(largest);
+            assertEquals(BigNumbers.MAX_BIG_INTEGER_BYTES, bytes.length);
+            assertEquals(largest, read(bignum(2, bytes)));
+            assertEquals(largest, read(indefiniteBignum(bytes)));
+            assertEquals(largest.negate(), read(bignum(3, magnitude(largest.subtract(BigInteger.ONE)))));
+        }
+
+        @Test
+        void rejectsOneDigitOverTheBoundWithinTheByteBound() {
+            byte[] bytes = magnitude(BigInteger.TEN.pow(BigNumbers.MAX_DIGITS));
+            assertEquals(BigNumbers.MAX_BIG_INTEGER_BYTES, bytes.length);
+            assertThrows(SerializationException.class, () -> read(bignum(2, bytes)));
+            assertThrows(SerializationException.class, () -> read(indefiniteBignum(bytes)));
+            byte[] largest = magnitude(BigInteger.TEN.pow(BigNumbers.MAX_DIGITS).subtract(BigInteger.ONE));
+            assertThrows(SerializationException.class, () -> read(bignum(3, largest)));
+            assertThrows(SerializationException.class, () -> read(bignum(2, ones(BigNumbers.MAX_BIG_INTEGER_BYTES))));
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {BigNumbers.MAX_BIG_INTEGER_BYTES + 1, 4096, 60_000})
+        void rejectsBignumOverTheByteBound(int length) {
+            byte[] bytes = ones(length);
+            assertThrows(SerializationException.class, () -> read(bignum(2, bytes)));
+            assertThrows(SerializationException.class, () -> read(bignum(3, bytes)));
+            assertThrows(SerializationException.class, () -> read(indefiniteBignum(bytes)));
+            byte[] fraction = decimalFraction(new byte[] {0x00}, bignum(2, bytes));
+            assertThrows(SerializationException.class,
+                    () -> CODEC.newDeserializer(fraction, SETTINGS).readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+            assertThrows(SerializationException.class,
+                    () -> CODEC.newDeserializer(fraction, SETTINGS).readDocument());
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {1, BigNumbers.MAX_BIG_INTEGER_BYTES, 4096})
+        void leadingZeroBytesDoNotCountTowardTheByteBound(int zeros) {
+            var largest = BigInteger.TEN.pow(BigNumbers.MAX_DIGITS).subtract(BigInteger.ONE);
+            byte[] padded = leadingZeros(zeros, magnitude(largest));
+            assertEquals(largest, read(bignum(2, padded)));
+            assertEquals(largest, read(indefiniteBignum(padded)));
+            byte[] paddedNegative = leadingZeros(zeros, magnitude(largest.subtract(BigInteger.ONE)));
+            assertEquals(largest.negate(), read(bignum(3, paddedNegative)));
+            int width = BigNumbers.MAX_BIG_INTEGER_BYTES - 1;
+            byte[] highBit = leadingZeros(zeros, ones(width));
+            var expected = BigInteger.ONE.shiftLeft(width * 8).subtract(BigInteger.ONE);
+            assertEquals(expected, read(bignum(2, highBit)));
+            assertEquals(expected.negate().subtract(BigInteger.ONE), read(bignum(3, highBit)));
+            assertEquals(expected, read(indefiniteBignum(highBit)));
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {0, 1, BigNumbers.MAX_BIG_INTEGER_BYTES + 1})
+        void zeroMagnitudeOfAnyLengthIsZero(int length) {
+            byte[] zeros = new byte[length];
+            assertEquals(BigInteger.ZERO, read(bignum(2, zeros)));
+            assertEquals(BigInteger.ONE.negate(), read(bignum(3, zeros)));
+            assertEquals(BigInteger.ZERO, read(indefiniteBignum(zeros)));
+            assertEquals(BigInteger.ONE.negate(), read(indefiniteBignum(zeros, 3)));
+        }
+
+        @Test
+        void leadingZeroBytesDoNotBypassTheBounds() {
+            byte[] oneDigitOver = leadingZeros(8, magnitude(BigInteger.TEN.pow(BigNumbers.MAX_DIGITS)));
+            assertThrows(SerializationException.class, () -> read(bignum(2, oneDigitOver)));
+            assertThrows(SerializationException.class, () -> read(indefiniteBignum(oneDigitOver)));
+            byte[] oneByteOver = leadingZeros(8, ones(BigNumbers.MAX_BIG_INTEGER_BYTES + 1));
+            assertThrows(SerializationException.class, () -> read(bignum(2, oneByteOver)));
+            assertThrows(SerializationException.class, () -> read(bignum(3, oneByteOver)));
+            assertThrows(SerializationException.class, () -> read(indefiniteBignum(oneByteOver)));
+        }
+
+        @Test
+        void largestTextualValueRoundTripsThroughCbor() {
+            var largest = BigInteger.TEN.pow(BigNumbers.MAX_DIGITS).subtract(BigInteger.ONE);
+            var output = new ByteArrayOutputStream();
+            try (var serializer = CODEC.newSerializer(output, SETTINGS)) {
+                serializer.writeBigInteger(PreludeSchemas.BIG_INTEGER, largest);
+            }
+            assertEquals(largest, read(output.toByteArray()));
+        }
+
+        @Test
+        void extremeExponentsRoundTripWithoutExpansion() {
+            for (var value : List.of(
+                    new BigDecimal("1812031E+900000000"),
+                    new BigDecimal(BigInteger.valueOf(7), Integer.MIN_VALUE + 1),
+                    new BigDecimal(BigInteger.valueOf(7), Integer.MAX_VALUE))) {
+                var output = new ByteArrayOutputStream();
+                try (var serializer = CODEC.newSerializer(output, SETTINGS)) {
+                    serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
+                }
+                byte[] encoded = output.toByteArray();
+                assertEquals(value,
+                        CODEC.newDeserializer(encoded, SETTINGS).readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+                assertEquals(value, CODEC.newDeserializer(encoded, SETTINGS).readDocument().asBigDecimal());
+            }
+        }
+
+        @Test
+        void minimumScaleIsWrittenWithTheRightSign() {
+            var value = new BigDecimal(BigInteger.valueOf(7), Integer.MIN_VALUE);
+            var output = new ByteArrayOutputStream();
+            try (var serializer = CODEC.newSerializer(output, SETTINGS)) {
+                serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
+            }
+            byte[] encoded = output.toByteArray();
+            assertEquals((byte) 0xC4, encoded[0]);
+            assertEquals((byte) 0x82, encoded[1]);
+            assertEquals((byte) 0x1A, encoded[2]);
+            assertEquals(1L << 31, ByteBuffer.wrap(encoded, 3, 4).getInt() & 0xFFFFFFFFL);
+            assertThrows(SerializationException.class,
+                    () -> CODEC.newDeserializer(encoded, SETTINGS).readBigDecimal(PreludeSchemas.BIG_DECIMAL));
         }
     }
 }

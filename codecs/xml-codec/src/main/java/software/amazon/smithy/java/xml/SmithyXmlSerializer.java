@@ -12,12 +12,17 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.RandomAccess;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.codecs.commons.NumberCodec;
 import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.codecs.commons.StripedPool;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SmithyEnum;
+import software.amazon.smithy.java.core.schema.SmithyIntEnum;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
@@ -508,6 +513,10 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
 
         @Override
         public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+            consumer.accept(listState, beginList(schema));
+        }
+
+        private ListItemSerializer beginList(Schema schema) {
             closePendingTag();
             var ext = schema.getExtension(XmlSchemaExtensions.KEY);
             byte[] memberNameBytes;
@@ -523,11 +532,15 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
             if (ns != null) {
                 memberNsBytes = buildNamespaceBytes(ns);
             }
-            consumer.accept(listState, new ListItemSerializer(memberNameBytes, memberNsBytes));
+            return new ListItemSerializer(memberNameBytes, memberNsBytes);
         }
 
         @Override
         public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
+            consumer.accept(mapState, beginMap(schema));
+        }
+
+        private XmlMapEntrySerializer beginMap(Schema schema) {
             closePendingTag();
             var ext = schema.getExtension(XmlSchemaExtensions.KEY);
             byte[] entryBytes, keyBytes, valueBytes;
@@ -553,12 +566,7 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
             if (valueNs != null) {
                 valueNsBytes = buildNamespaceBytes(valueNs);
             }
-            consumer.accept(mapState,
-                    new XmlMapEntrySerializer(entryBytes,
-                            keyBytes,
-                            valueBytes,
-                            keyNsBytes,
-                            valueNsBytes));
+            return new XmlMapEntrySerializer(entryBytes, keyBytes, valueBytes, keyNsBytes, valueNsBytes);
         }
 
         @Override
@@ -667,6 +675,1171 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
             ensureCapacity(XmlWriteUtils.maxEscapedTextBytes(value));
             pos = XmlWriteUtils.writeEscapedText(buf, pos, value);
         }
+
+        @Override
+        public void writeBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeBoolean(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeBoolean(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseBooleanList(Schema schema, List<Boolean> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeBoolean(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeBoolean(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeBooleanMap(Schema schema, Map<String, Boolean> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeBoolean(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseBooleanMap(
+                Schema schema,
+                Map<String, Boolean> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeBoolean(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeByte(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeByte(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseByteList(Schema schema, List<Byte> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeByte(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeByte(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeByte(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseByteMap(Schema schema, Map<String, Byte> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeByte(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeShort(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeShort(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseShortList(Schema schema, List<Short> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeShort(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeShort(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeShortMap(Schema schema, Map<String, Short> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeShort(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseShortMap(
+                Schema schema,
+                Map<String, Short> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeShort(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeInteger(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeInteger(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseIntegerList(Schema schema, List<Integer> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeInteger(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeInteger(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeIntegerMap(Schema schema, Map<String, Integer> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeInteger(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseIntegerMap(
+                Schema schema,
+                Map<String, Integer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeInteger(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeLong(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeLong(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseLongList(Schema schema, List<Long> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeLong(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeLong(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeLong(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseLongMap(Schema schema, Map<String, Long> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeLong(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeFloat(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeFloat(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseFloatList(Schema schema, List<Float> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeFloat(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeFloat(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeFloatMap(Schema schema, Map<String, Float> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeFloat(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseFloatMap(
+                Schema schema,
+                Map<String, Float> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeFloat(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeDouble(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeDouble(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseDoubleList(Schema schema, List<Double> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeDouble(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeDouble(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeDoubleMap(Schema schema, Map<String, Double> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeDouble(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseDoubleMap(
+                Schema schema,
+                Map<String, Double> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeDouble(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeBigInteger(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeBigInteger(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseBigIntegerList(Schema schema, List<BigInteger> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeBigInteger(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeBigInteger(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeBigInteger(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseBigIntegerMap(
+                Schema schema,
+                Map<String, BigInteger> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeBigInteger(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeBigDecimal(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeBigDecimal(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseBigDecimalList(Schema schema, List<BigDecimal> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeBigDecimal(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeBigDecimal(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeBigDecimal(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseBigDecimalMap(
+                Schema schema,
+                Map<String, BigDecimal> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeBigDecimal(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeStringList(Schema schema, List<String> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeString(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeString(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseStringList(Schema schema, List<String> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeString(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeString(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeStringMap(Schema schema, Map<String, String> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeString(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseStringMap(
+                Schema schema,
+                Map<String, String> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeString(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeBlob(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeBlob(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseBlobList(Schema schema, List<ByteBuffer> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeBlob(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeBlob(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeBlobMap(Schema schema, Map<String, ByteBuffer> values, Schema keySchema, Schema valueSchema) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeBlob(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseBlobMap(
+                Schema schema,
+                Map<String, ByteBuffer> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeBlob(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeTimestamp(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeTimestamp(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseTimestampList(Schema schema, List<Instant> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeTimestamp(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeTimestamp(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeTimestamp(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseTimestampMap(
+                Schema schema,
+                Map<String, Instant> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeTimestamp(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeDocument(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeDocument(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseDocumentList(Schema schema, List<Document> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeDocument(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeDocument(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeDocumentMap(
+                Schema schema,
+                Map<String, Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeDocument(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseDocumentMap(
+                Schema schema,
+                Map<String, Document> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeDocument(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeString(memberSchema, v.getValue());
+                }
+            } else {
+                for (var v : values) {
+                    e.writeString(memberSchema, v.getValue());
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseEnumList(Schema schema, List<? extends SmithyEnum> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeString(memberSchema, v.getValue());
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeString(memberSchema, v.getValue());
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeString(valueSchema, v.getValue());
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeString(valueSchema, v.getValue());
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeInteger(memberSchema, v.getValue());
+                }
+            } else {
+                for (var v : values) {
+                    e.writeInteger(memberSchema, v.getValue());
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseIntEnumList(Schema schema, List<? extends SmithyIntEnum> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeInteger(memberSchema, v.getValue());
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeInteger(memberSchema, v.getValue());
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeInteger(valueSchema, v.getValue());
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseIntEnumMap(
+                Schema schema,
+                Map<String, ? extends SmithyIntEnum> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeInteger(valueSchema, v.getValue());
+                }
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeStructList(Schema schema, List<? extends SerializableStruct> values, Schema memberSchema) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    e.writeStruct(memberSchema, v);
+                }
+            } else {
+                for (var v : values) {
+                    e.writeStruct(memberSchema, v);
+                }
+            }
+
+        }
+
+        @Override
+        public void writeSparseStructList(
+                Schema schema,
+                List<? extends SerializableStruct> values,
+                Schema memberSchema
+        ) {
+            var e = beginList(schema);
+            if (values instanceof RandomAccess) {
+                for (int i = 0, n = values.size(); i < n; i++) {
+                    var v = values.get(i);
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeStruct(memberSchema, v);
+                    }
+                }
+            } else {
+                for (var v : values) {
+                    if (v == null) {
+                        e.writeNull(memberSchema);
+                    } else {
+                        e.writeStruct(memberSchema, v);
+                    }
+                }
+            }
+
+        }
+
+        @Override
+        public void writeStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                SmithyXmlSerializer.this.valueSerializer.writeStruct(valueSchema, v);
+                m.endEntry();
+            });
+
+        }
+
+        @Override
+        public void writeSparseStructMap(
+                Schema schema,
+                Map<String, ? extends SerializableStruct> values,
+                Schema keySchema,
+                Schema valueSchema
+        ) {
+            var m = beginMap(schema);
+            values.forEach((k, v) -> {
+                m.beginEntry(k);
+                if (v == null) {
+                    SmithyXmlSerializer.this.valueSerializer.writeNull(valueSchema);
+                } else {
+                    SmithyXmlSerializer.this.valueSerializer.writeStruct(valueSchema, v);
+                }
+                m.endEntry();
+            });
+
+        }
     }
 
     private final class ListItemSerializer extends InterceptingSerializer {
@@ -727,6 +1900,12 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
                 T state,
                 BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
+            beginEntry(key);
+            valueSerializer.accept(state, SmithyXmlSerializer.this.valueSerializer);
+            endEntry();
+        }
+
+        void beginEntry(String key) {
             writeOpenTag(entryBytes);
 
             writeTagWithNsClosed(keyBytes, keyNsBytes);
@@ -736,9 +1915,10 @@ final class SmithyXmlSerializer extends InterceptingSerializer {
 
             writeTagWithNsOpen(valueBytes, valueNsBytes);
             pendingClose = true;
-            valueSerializer.accept(state, SmithyXmlSerializer.this.valueSerializer);
-            writeCloseTag(valueBytes);
+        }
 
+        void endEntry() {
+            writeCloseTag(valueBytes);
             writeCloseTag(entryBytes);
         }
 

@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -50,7 +51,7 @@ public final class DocumentUtils {
         if (number instanceof BigInteger b) {
             return b;
         } else if (number instanceof BigDecimal b) {
-            return b.toBigInteger();
+            return BigNumbers.toBigInteger(b);
         } else {
             return BigInteger.valueOf(number.longValue());
         }

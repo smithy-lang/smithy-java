@@ -24,6 +24,7 @@ import java.math.BigInteger;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.codecs.commons.CompactStringAccess;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -107,32 +108,30 @@ public final class CborReadUtil {
         if (isPosInt || context == CborDeserializer.Token.NEG_INT) {
             return readSmallBigInteger(buffer, context, off, len, isPosInt);
         }
-        final byte[] buff;
+        final BigInteger magnitude;
         if (len >= 0) {
             checkInvalidLength(buffer, off, len);
-            final int desOff;
-            if (buffer[off] >= 0) {
-                buff = new byte[len];
-                desOff = 0;
-            } else {
-                buff = new byte[len + 1];
-                desOff = 1;
-            }
-            CborReadUtil.readByteString(buffer, off, buff, desOff, len);
+            magnitude = readMagnitude(buffer, off, len);
         } else {
-            //Handle indefinite length string
+            // The deserializer validates all chunks against the payload, which bounds the assembled size.
             byte[] indefBuf = CborReadUtil.readByteString(buffer, off, len);
-            if (indefBuf.length == 0 || indefBuf[0] < 0) {
-                buff = new byte[indefBuf.length + 1];
-                System.arraycopy(indefBuf, 0, buff, 1, indefBuf.length);
-            } else {
-                buff = indefBuf;
-            }
+            magnitude = readMagnitude(indefBuf, 0, indefBuf.length);
         }
-        if (context == CborDeserializer.Token.NEG_BIGINT) {
-            CborReadUtil.flipBytes(buff);
+        // Tag 3 encodes -1 - n, which is the bitwise complement of n.
+        BigInteger value = context == CborDeserializer.Token.NEG_BIGINT ? magnitude.not() : magnitude;
+        return BigNumbers.checkBigIntegerDigits(value);
+    }
+
+    // RFC 8949 section 3.4.3 requires support for leading zero bytes. Exclude them from the significant-byte limit.
+    private static BigInteger readMagnitude(byte[] src, int off, int len) {
+        int end = off + len;
+        int start = off;
+        while (start < end && src[start] == 0) {
+            start++;
         }
-        return new BigInteger(buff);
+        int significant = end - start;
+        BigNumbers.checkBigIntegerBytes(significant);
+        return new BigInteger(1, src, start, significant);
     }
 
     private static BigInteger readSmallBigInteger(byte[] buffer, byte context, int off, int len, boolean isPosInt) {

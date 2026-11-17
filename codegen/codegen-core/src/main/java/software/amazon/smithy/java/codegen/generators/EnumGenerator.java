@@ -19,6 +19,8 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.sections.EnumVariantSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.schema.EnumValue;
+import software.amazon.smithy.java.core.schema.IntEnumValue;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SmithyEnum;
 import software.amazon.smithy.java.core.schema.SmithyIntEnum;
@@ -29,6 +31,7 @@ import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -44,28 +47,29 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
-            var template = """
-                    public sealed interface ${shape:T} extends ${enum:T}, ${serializableShape:T} {
-                        ${staticImpls:C|}
+            var template =
+                    """
+                            public sealed interface ${shape:T} extends ${enum:T}, ${serializableShape:T} permits ${#variants}${shape:T}.${value:L}, ${/variants}${shape:T}.$$Unknown, ${hidden:L} {
+                                ${staticImpls:C|}
 
-                        ${schema:C|}
+                                ${schema:C|}
 
-                        ${id:C|}
+                                ${id:C|}
 
-                        ${value:T} getValue();
+                                ${value:T} getValue();
 
-                        @Override
-                        default void serialize(${shapeSerializer:T} serializer) {
-                            serializer.${writeMethod:L}($$SCHEMA, getValue());
-                        }
+                                @Override
+                                default void serialize(${shapeSerializer:T} serializer) {
+                                    serializer.${writeMethod:L}($$SCHEMA, getValue());
+                                }
 
-                        ${staticMethods:C|}
+                                ${staticMethods:C|}
 
-                        ${variantClasses:C|}
+                                ${variantClasses:C|}
 
-                        ${builder:C|}
-                    }
-                    """;
+                                ${builder:C|}
+                            }
+                            """;
             var shapeSymbol = directive.symbolProvider().toSymbol(shape);
             writer.putContext("shape", shapeSymbol);
             writer.putContext("serializableShape", SerializableShape.class);
@@ -75,6 +79,16 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.putContext("value", valueSymbol);
             writer.putContext("string", shape.isEnumShape());
             writer.putContext("writeMethod", shape.isEnumShape() ? "writeString" : "writeInteger");
+            List<String> variants = new ArrayList<>();
+            for (var member : shape.members()) {
+                variants.add(directive.symbolProvider()
+                        .toSymbol(member)
+                        .expectProperty(SymbolProperties.ENUM_VARIANT_CLASS_NAME));
+            }
+            writer.putContext("variants", variants);
+            writer.putContext(
+                    "hidden",
+                    EnumHiddenVariantGenerator.classNameFor(directive, directive.symbolProvider(), shape));
 
             writer.putContext("id", new IdStringGenerator(writer, shape, true));
             writer.putContext("staticImpls", new StaticImplGenerator(writer, shape, directive.symbolProvider()));
@@ -97,7 +111,8 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                             shape,
                             directive.symbolProvider(),
                             directive.model(),
-                            directive.getRenames()));
+                            directive.getRenames(),
+                            directive.context().schemaFieldOrder()));
             writer.writeNullMarkedAnnotation();
             writer.write(template);
             writer.popState();
@@ -113,11 +128,10 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             for (var member : shape.members()) {
                 writer.pushState(new EnumVariantSection(member));
                 var fieldName = symbolProvider.toMemberName(member);
-                var className =
-                        symbolProvider.toSymbol(member).expectProperty(SymbolProperties.ENUM_VARIANT_CLASS_NAME);
                 types.add(fieldName);
                 writer.putContext("fieldName", fieldName);
-                writer.putContext("className", className);
+                writer.putContext("className",
+                        symbolProvider.toSymbol(member).expectProperty(SymbolProperties.ENUM_VARIANT_CLASS_NAME));
                 writer.write("${shape:T} ${fieldName:L} = new ${className:L}();");
                 writer.popState();
             }
@@ -136,36 +150,64 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.pushState();
             writer.putContext("list", List.class);
             writer.putContext("illegalArg", IllegalArgumentException.class);
-            var template = """
-                    /**
-                     * Create an unknown enum variant with the given value.
-                     *
-                     * @param value value for the unknown variant.
-                     */
-                    static ${shape:T} unknown(${value:T} value) {
-                        return new $$Unknown(value);
-                    }
+            var template =
+                    """
+                            /**
+                             * Create an unknown enum variant with the given value.
+                             *
+                             * @param value value for the unknown variant.
+                             */
+                            static ${shape:T} unknown(${value:T} value) {
+                                return new $$Unknown(value);
+                            }
 
-                    /**
-                     * Returns an unmodifiable list containing the constants of this enum type, in the order declared.
-                     */
-                    static ${list:T}<${shape:T}> values() {
-                        return $$TYPES;
-                    }
+                            /**
+                             * Returns an unmodifiable list containing the constants of this enum type, in the order declared.
+                             */
+                            static ${list:T}<${shape:T}> values() {
+                                return $$TYPES;
+                            }
 
-                    /**
-                     * Returns a {@link ${shape:T}} constant with the specified value.
-                     *
-                     * @param value value to create {@code ${shape:T}} from.
-                     * @throws ${illegalArg:T} if value does not match a known value.
-                     */
-                    static ${shape:T} from(${value:T} value) {
-                        return switch (value) {
-                            ${fromCases:C|}
-                            default -> throw new ${illegalArg:T}("Unknown value: " + value);
-                        };
-                    }
-                    """;
+                            /**
+                             * Returns a {@link ${shape:T}} constant with the specified value.
+                             *
+                             * <p>Use {@link #fromValue} when reading values from a service, since a newer service may
+                             * return values that this client does not know.
+                             *
+                             * @param value value to create {@code ${shape:T}} from.
+                             * @throws ${illegalArg:T} if value does not match a known value.
+                             */
+                            static ${shape:T} from(${value:T} value) {
+                                var result = $$lookup(value);
+                                if (result == null) {
+                                    throw new ${illegalArg:T}("Unknown value: ".concat(${?string}value${/string}${^string}${integer:T}.toString(value)${/string}));
+                                }
+                                return result;
+                            }
+
+                            /**
+                             * Returns the {@link ${shape:T}} constant with the specified value, or an unknown variant
+                             * if no constant matches.
+                             *
+                             * <p>This method never throws for unrecognized values. Use it when reading values from a
+                             * service, since a newer service may return values that this client does not know.
+                             * Use {@link #from} when the value must be one of the known constants.
+                             *
+                             * @param value value to create {@code ${shape:T}} from.
+                             */
+                            static ${shape:T} fromValue(${value:T} value) {
+                                var result = $$lookup(value);
+                                return result != null ? result : new $$Unknown(value);
+                            }
+
+                            private static ${shape:T} $$lookup(${value:T} value) {
+                                return switch (value) {
+                                    ${fromCases:C|}
+                                    default -> null;
+                                };
+                            }
+                            """;
+            writer.putContext("integer", Integer.class);
             writer.putContext("fromCases", writer.consumer(w -> generateSwitchCases(w, shape, symbolProvider)));
             writer.write(template);
             writer.popState();
@@ -180,31 +222,25 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         @Override
         public void run() {
             writer.pushState();
-            var enumValues = getEnumValues(shape);
 
-            // Generate known enum variant classes
+            boolean string = shape.isEnumShape();
+            writer.putContext("knownBase", string ? EnumValue.class : IntEnumValue.class);
+            writer.putContext("sensitive", shape.hasTrait(SensitiveTrait.class));
+            writer.putContext("objects", Objects.class);
+            writer.putContext("integer", Integer.class);
+            var enumValues = getEnumValues(shape);
             for (var member : shape.members()) {
                 writer.pushState();
-                var className =
-                        symbolProvider.toSymbol(member).expectProperty(SymbolProperties.ENUM_VARIANT_CLASS_NAME);
-                var memberValue = enumValues.get(member.getMemberName());
-
-                var template = """
-                        final class ${className:L} implements ${shape:T} {
-                            private ${className:L}() {}
-
-                            @Override
-                            public ${value:T} getValue() {
-                                return ${?string}${memberValue:S}${/string}${^string}${memberValue:L}${/string};
+                writer.putContext("className",
+                        symbolProvider.toSymbol(member).expectProperty(SymbolProperties.ENUM_VARIANT_CLASS_NAME));
+                writer.putContext("memberValue", enumValues.get(member.getMemberName()));
+                writer.write("""
+                        final class ${className:L} extends ${knownBase:T} implements ${shape:T} {
+                            private ${className:L}() {
+                                super(${?string}${memberValue:S}${/string}${^string}${memberValue:L}${/string});
                             }
-
-                            ${toString:C|}
                         }
-                        """;
-                writer.putContext("className", className);
-                writer.putContext("memberValue", memberValue);
-                writer.putContext("toString", new ToStringGenerator(writer));
-                writer.write(template);
+                        """);
                 writer.popState();
             }
 
@@ -213,33 +249,38 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.popState();
         }
 
+        /**
+         * Explicit methods avoid the {@code ObjectMethods} bootstrap and reduce generated class size.
+         */
         private void generateUnknownVariant() {
-            writer.pushState();
-            writer.putContext("objects", Objects.class);
-            writer.putContext("toString", new ToStringGenerator(writer));
-            var template = """
-                    record $$Unknown(${value:T} value) implements ${shape:T} {${?string}
-                        public $$Unknown {
-                            ${objects:T}.requireNonNull(value, "Value cannot be null");
-                        }${/string}
+            writer.write(
+                    """
+                            record $$Unknown(${value:T} value) implements ${shape:T} {${?string}
+                                public $$Unknown {
+                                    ${objects:T}.requireNonNull(value, "Value cannot be null");
+                                }${/string}
 
-                        @Override
-                        public ${value:T} getValue() {
-                            return value;
-                        }
+                                @Override
+                                public ${value:T} getValue() {
+                                    return value;
+                                }
 
-                        ${toString:C|}
+                                @Override
+                                public boolean equals(Object other) {
+                                    return other instanceof $$Unknown that && ${?string}value.equals(that.value)${/string}${^string}value == that.value${/string};
+                                }
 
-                        private final class $$Hidden implements ${shape:T} {
-                            @Override
-                            public ${value:T} getValue() {
-                                return ${?string}null${/string}${^string}0${/string};
+                                @Override
+                                public int hashCode() {
+                                    return ${?string}value.hashCode()${/string}${^string}value${/string};
+                                }
+
+                                @Override
+                                public String toString() {
+                                    return ${?sensitive}"*REDACTED*"${/sensitive}${^sensitive}${?string}value${/string}${^string}${integer:T}.toString(value)${/string}${/sensitive};
+                                }
                             }
-                        }
-                    }
-                    """;
-            writer.write(template);
-            writer.popState();
+                            """);
         }
     }
 
@@ -250,9 +291,10 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 Shape shape,
                 SymbolProvider symbolProvider,
                 Model model,
-                Map<ShapeId, String> renames
+                Map<ShapeId, String> renames,
+                SchemaFieldOrder schemaFieldOrder
         ) {
-            super(writer, shape, symbolProvider, model, renames);
+            super(writer, shape, symbolProvider, model, renames, schemaFieldOrder);
         }
 
         @Override
@@ -303,12 +345,9 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.write("""
                     @Override
                     public ${shape:T} build() {
-                        return switch (value) {
-                            ${C|}
-                            default -> new $$Unknown(value);
-                        };
+                        return fromValue(value);
                     }
-                    """, writer.consumer(w -> generateSwitchCases(w, shape, symbolProvider)));
+                    """);
         }
     }
 

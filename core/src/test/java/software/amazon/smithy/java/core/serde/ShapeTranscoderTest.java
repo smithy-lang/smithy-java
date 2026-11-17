@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
@@ -789,5 +790,55 @@ final class ShapeTranscoderTest {
         public Schema schema() {
             return TARGET;
         }
+    }
+
+    @Test
+    @Timeout(10)
+    void bigDecimalWithExtremeScaleCannotBeConvertedToIntegers() {
+        var hugeScale = new BigDecimal("1812031E+900000000");
+        var tinyScale = new BigDecimal("1E-2000000000");
+        for (var value : List.of(hugeScale, tinyScale)) {
+            SerializableShape source = serializer -> serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
+            assertThrows(SerializationException.class,
+                    () -> ShapeTranscoder.convertStrict(source,
+                            new ScalarBuilder(PreludeSchemas.LONG, d -> d.readLong(PreludeSchemas.LONG))));
+            assertThrows(SerializationException.class,
+                    () -> ShapeTranscoder.convertStrict(source,
+                            new ScalarBuilder(PreludeSchemas.BIG_INTEGER,
+                                    d -> d.readBigInteger(PreludeSchemas.BIG_INTEGER))));
+        }
+        SerializableShape huge = serializer -> serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, hugeScale);
+        assertThrows(SerializationException.class,
+                () -> ShapeTranscoder.convert(huge,
+                        new ScalarBuilder(PreludeSchemas.BIG_INTEGER,
+                                d -> d.readBigInteger(PreludeSchemas.BIG_INTEGER))));
+        SerializableShape tiny = serializer -> serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, tinyScale);
+        var zero = ShapeTranscoder.convert(tiny,
+                new ScalarBuilder(PreludeSchemas.BIG_INTEGER, d -> d.readBigInteger(PreludeSchemas.BIG_INTEGER)));
+        assertEquals(BigInteger.ZERO, zero.value());
+        var zeroLong = ShapeTranscoder.convert(tiny,
+                new ScalarBuilder(PreludeSchemas.LONG, d -> d.readLong(PreludeSchemas.LONG)));
+        assertEquals(0L, zeroLong.value());
+    }
+
+    @Test
+    void bigDecimalWithinScaleBoundConvertsToBigInteger() {
+        var value = new BigDecimal("1.5E+5");
+        assertEquals(
+                BigInteger.valueOf(150_000),
+                transcodeScalarStrict(
+                        serializer -> serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value),
+                        PreludeSchemas.BIG_INTEGER,
+                        deserializer -> deserializer.readBigInteger(PreludeSchemas.BIG_INTEGER)));
+        assertEquals(
+                150_000L,
+                transcodeScalarStrict(
+                        serializer -> serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value),
+                        PreludeSchemas.LONG,
+                        deserializer -> deserializer.readLong(PreludeSchemas.LONG)));
+        var truncated = ShapeTranscoder.convert(
+                serializer -> serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, new BigDecimal("-7.9")),
+                new ScalarBuilder(PreludeSchemas.BIG_INTEGER, d -> d.readBigInteger(PreludeSchemas.BIG_INTEGER)));
+        assertEquals(BigInteger.valueOf(-7), truncated.value());
     }
 }

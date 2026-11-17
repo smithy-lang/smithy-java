@@ -7,14 +7,21 @@ package software.amazon.smithy.java.codecs.commons;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Random;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 
 class NumberCodecTest {
 
@@ -256,7 +263,25 @@ class NumberCodecTest {
                 new BigInteger("1" + "0".repeat(54)),
                 // Way above 10^54 (deep in toString() fallback)
                 new BigInteger("1" + "0".repeat(55)),
-                new BigInteger("-99999999999999999999"))
+                new BigInteger("-99999999999999999999"),
+                BigInteger.ONE.shiftLeft(63),
+                BigInteger.ONE.shiftLeft(63).negate(),
+                BigInteger.ONE.shiftLeft(63).negate().subtract(BigInteger.ONE),
+                BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE),
+                BigInteger.ONE.shiftLeft(64),
+                BigInteger.ONE.shiftLeft(64).negate(),
+                new BigInteger("9999999999999999999"),
+                new BigInteger("10000000000000000000"),
+                BigInteger.TEN.pow(27).subtract(BigInteger.ONE),
+                BigInteger.TEN.pow(27),
+                BigInteger.TEN.pow(36),
+                BigInteger.ONE.shiftLeft(96),
+                BigInteger.ONE.shiftLeft(127),
+                BigInteger.ONE.shiftLeft(128).subtract(BigInteger.ONE),
+                BigInteger.ONE.shiftLeft(128),
+                BigInteger.ONE.shiftLeft(128).negate(),
+                BigInteger.ONE.shiftLeft(128).negate().subtract(BigInteger.ONE),
+                new BigInteger("7".repeat(1000)))
                 .map(Arguments::of);
     }
 
@@ -264,9 +289,25 @@ class NumberCodecTest {
     @MethodSource("writeBigIntegerCases")
     void writeBigInteger(BigInteger value) {
         String expected = value.toString();
-        byte[] buf = new byte[80];
+        byte[] buf = new byte[expected.length() + 8];
         int end = NumberCodec.writeBigInteger(buf, 0, value);
         assertEquals(expected, new String(buf, 0, end, StandardCharsets.US_ASCII));
+    }
+
+    @Test
+    void writeBigIntegerMatchesToStringForRandomMagnitudes() {
+        var random = new Random(0x5EED);
+        byte[] buf = new byte[64];
+        for (int bits = 60; bits <= 132; bits++) {
+            for (int i = 0; i < 200; i++) {
+                var value = new BigInteger(bits, random);
+                if (random.nextBoolean()) {
+                    value = value.negate();
+                }
+                int end = NumberCodec.writeBigInteger(buf, 0, value);
+                assertEquals(value.toString(), new String(buf, 0, end, StandardCharsets.US_ASCII));
+            }
+        }
     }
 
     // --- writeDouble ---
@@ -474,6 +515,155 @@ class NumberCodecTest {
         } else {
             assertEquals("\"-Infinity\"", actual);
         }
+    }
+
+    static Stream<BigDecimal> writeBigDecimalCases() {
+        var huge = new BigInteger("1" + "2345678901234567890".repeat(6));
+        var textual = Stream.of(
+                "0",
+                "1",
+                "-1",
+                "42",
+                "99999.99999",
+                "-123.45",
+                "1.005",
+                "0.005",
+                "-0.005",
+                "0.000",
+                "123456789012345678.9",
+                "1E-19",
+                "1E-25",
+                "-1E-25",
+                "0E-25",
+                "0.0000000000000000000000001",
+                "1E+1",
+                "1E+5",
+                "-1E+5",
+                "0E+5",
+                "12345E+3",
+                "123456789012345678901234567890E+10",
+                "123456789012345678901234567890.5",
+                "1234567890123456789012345678.90",
+                "0.123456789012345678901234567890",
+                "0.000123456789012345678901234567890",
+                "-0.000123456789012345678901234567890",
+                "9223372036854775808",
+                "-9223372036854775808.5",
+                "18446744073709551616E-5",
+                "1E+" + (BigNumbers.MAX_DIGITS - 1),
+                "-1E+" + (BigNumbers.MAX_DIGITS - 1),
+                "1E-" + (BigNumbers.MAX_DIGITS - 1),
+                "-1E-" + (BigNumbers.MAX_DIGITS - 1),
+                "123456789E-" + (BigNumbers.MAX_DIGITS - 1),
+                "0E-" + (BigNumbers.MAX_DIGITS - 1),
+                "7".repeat(BigNumbers.MAX_DIGITS),
+                "-" + "7".repeat(BigNumbers.MAX_DIGITS - 1) + ".7",
+                "0." + "7".repeat(BigNumbers.MAX_DIGITS - 1),
+                "0E+5000",
+                "0E+2147483647")
+                .map(BigDecimal::new)
+                .toList();
+        return Stream.concat(
+                textual.stream(),
+                Stream.of(
+                        new BigDecimal(BigInteger.valueOf(Long.MIN_VALUE), 0),
+                        new BigDecimal(BigInteger.valueOf(Long.MIN_VALUE), 2),
+                        new BigDecimal(BigInteger.valueOf(Long.MIN_VALUE), 18),
+                        new BigDecimal(BigInteger.valueOf(Long.MIN_VALUE), 19),
+                        new BigDecimal(BigInteger.valueOf(Long.MIN_VALUE), 25),
+                        new BigDecimal(BigInteger.valueOf(Long.MIN_VALUE), -3),
+                        new BigDecimal(BigInteger.valueOf(Long.MAX_VALUE), 5),
+                        new BigDecimal(huge, 0),
+                        new BigDecimal(huge, 60),
+                        new BigDecimal(huge, 115),
+                        new BigDecimal(huge, 116),
+                        new BigDecimal(huge, 200),
+                        new BigDecimal(huge, -7),
+                        new BigDecimal(huge.negate(), 200),
+                        new BigDecimal(huge, BigNumbers.MAX_DIGITS - 1),
+                        new BigDecimal(huge, -(BigNumbers.MAX_DIGITS - 115))));
+    }
+
+    @ParameterizedTest
+    @MethodSource("writeBigDecimalCases")
+    void writeBigDecimalMatchesToPlainString(BigDecimal value) {
+        String expected = value.toPlainString();
+        int capacity = NumberCodec.maxBigDecimalLength(value);
+        assertTrue(capacity >= expected.length(),
+                () -> "capacity " + capacity + " < plain length " + expected.length() + " for " + value);
+
+        byte[] buf = new byte[capacity + 8];
+        Arrays.fill(buf, (byte) 'X');
+        int end = NumberCodec.writeBigDecimal(buf, 4, value);
+        assertEquals(expected, new String(buf, 4, end - 4, StandardCharsets.US_ASCII));
+        assertTrue(end - 4 <= capacity);
+        for (int i = 0; i < 4; i++) {
+            assertEquals('X', buf[i]);
+        }
+        for (int i = end; i < buf.length; i++) {
+            assertEquals('X', buf[i], "byte " + i + " past the end was modified");
+        }
+    }
+
+    static Stream<BigDecimal> beyondPlainDigitBound() {
+        var huge = new BigInteger("1" + "2345678901234567890".repeat(6));
+        return Stream.of(
+                new BigDecimal("1E+" + BigNumbers.MAX_DIGITS),
+                new BigDecimal("1E-" + BigNumbers.MAX_DIGITS),
+                new BigDecimal("0E-" + BigNumbers.MAX_DIGITS),
+                new BigDecimal("7".repeat(BigNumbers.MAX_DIGITS) + "E+1"),
+                new BigDecimal(huge, -(BigNumbers.MAX_DIGITS - 115 + 1)),
+                new BigDecimal(huge, BigNumbers.MAX_DIGITS),
+                new BigDecimal("1E+" + (BigNumbers.MAX_DIGITS + 1)),
+                new BigDecimal("-1E-" + (BigNumbers.MAX_DIGITS + 1)),
+                new BigDecimal("7".repeat(BigNumbers.MAX_DIGITS) + "E+2"),
+                new BigDecimal(huge.negate(), -(BigNumbers.MAX_DIGITS - 115 + 2)),
+                new BigDecimal("1812031E+900000000"),
+                new BigDecimal("712.E74126375"),
+                new BigDecimal(BigInteger.ONE, Integer.MIN_VALUE + 1),
+                new BigDecimal(BigInteger.ONE, Integer.MIN_VALUE),
+                new BigDecimal(BigInteger.ONE, Integer.MAX_VALUE));
+    }
+
+    @ParameterizedTest
+    @MethodSource("beyondPlainDigitBound")
+    @Timeout(10)
+    void writesScientificNotationBeyondPlainDigitBound(BigDecimal value) {
+        String expected = value.toString();
+        int capacity = NumberCodec.maxBigDecimalLength(value);
+        assertTrue(capacity >= expected.length(), () -> "capacity " + capacity + " < " + expected.length());
+        assertTrue(capacity <= BigNumbers.MAX_DIGITS + 20, "capacity " + capacity);
+
+        byte[] buf = new byte[capacity + 8];
+        Arrays.fill(buf, (byte) 'X');
+        int end = NumberCodec.writeBigDecimal(buf, 4, value);
+        String written = new String(buf, 4, end - 4, StandardCharsets.US_ASCII);
+        assertEquals(expected, written);
+        assertEquals(value, new BigDecimal(written));
+        for (int i = end; i < buf.length; i++) {
+            assertEquals('X', buf[i], "byte " + i + " past the end was modified");
+        }
+    }
+
+    @Test
+    void plainAndScientificSplitExactlyAtTheDigitBound() {
+        var plain = new BigDecimal("1E+" + (BigNumbers.MAX_DIGITS - 1));
+        var scientific = new BigDecimal("1E+" + BigNumbers.MAX_DIGITS);
+        assertEquals(plain.toPlainString(), writeBigDecimal(plain));
+        assertEquals(BigNumbers.MAX_DIGITS, writeBigDecimal(plain).length());
+        assertEquals(scientific.toString(), writeBigDecimal(scientific));
+    }
+
+    private static String writeBigDecimal(BigDecimal value) {
+        byte[] buf = new byte[NumberCodec.maxBigDecimalLength(value)];
+        int end = NumberCodec.writeBigDecimal(buf, 0, value);
+        return new String(buf, 0, end, StandardCharsets.US_ASCII);
+    }
+
+    @ParameterizedTest
+    @MethodSource("writeBigDecimalCases")
+    void maxBigDecimalLengthIsSmallForPlainValues(BigDecimal value) {
+        assertTrue(NumberCodec.maxBigDecimalLength(value) <= BigNumbers.MAX_DIGITS + 20);
     }
 
 }

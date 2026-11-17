@@ -45,6 +45,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     private final SymbolProvider symbolProvider;
     private final Model model;
     private final Map<ShapeId, String> renames;
+    private final SchemaFieldOrder schemaFieldOrder;
     private final String deserializer;
     private final String schemaName;
 
@@ -54,6 +55,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
             SymbolProvider symbolProvider,
             Model model,
             Map<ShapeId, String> renames,
+            SchemaFieldOrder schemaFieldOrder,
             String deserializer,
             String schemaName
     ) {
@@ -62,6 +64,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
         this.symbolProvider = symbolProvider;
         this.model = model;
         this.renames = renames;
+        this.schemaFieldOrder = schemaFieldOrder;
         this.deserializer = deserializer;
         this.schemaName = schemaName;
     }
@@ -93,8 +96,10 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void listShape(ListShape listShape) {
+        // Keep per-shape deserializers so the JIT can inline element consumers at codec call sites.
         writer.write(
-                "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
+                "$L.deserialize$L(${schemaName:L}, ${deserializer:L})",
+                SharedSerdeGenerator.getClassName(schemaFieldOrder, listShape),
                 CodegenUtils.getDefaultName(listShape, renames));
         return null;
     }
@@ -102,7 +107,8 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     @Override
     public Void mapShape(MapShape mapShape) {
         writer.write(
-                "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
+                "$L.deserialize$L(${schemaName:L}, ${deserializer:L})",
+                SharedSerdeGenerator.getClassName(schemaFieldOrder, mapShape),
                 CodegenUtils.getDefaultName(mapShape, renames));
         return null;
     }
@@ -127,7 +133,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void intEnumShape(IntEnumShape shape) {
-        delegateDeser();
+        writer.write("$T.fromValue(${deserializer:L}.readInteger(${schemaName:L}))", symbolProvider.toSymbol(shape));
         return null;
     }
 
@@ -179,7 +185,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void enumShape(EnumShape shape) {
-        delegateDeser();
+        writer.write("$T.fromValue(${deserializer:L}.readString(${schemaName:L}))", symbolProvider.toSymbol(shape));
         return null;
     }
 

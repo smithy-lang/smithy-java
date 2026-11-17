@@ -8,6 +8,7 @@ package software.amazon.smithy.java.json;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,7 +25,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -32,6 +35,8 @@ import software.amazon.smithy.java.codecs.commons.OutputBuffers;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.BigNumbers;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.datastream.PooledDataStream;
@@ -877,5 +882,123 @@ public class JsonSerializerTest extends ProviderTestBase {
         Assertions.assertThrows(
                 software.amazon.smithy.java.core.serde.SerializationException.class,
                 serializer::close);
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    public void writesBigDecimalUpToPlainDigitBound(JsonSerdeProvider provider) throws Exception {
+        var expanding = new BigDecimal("1E+" + (BigNumbers.MAX_DIGITS - 1));
+        var fraction = new BigDecimal("-1E-" + (BigNumbers.MAX_DIGITS - 1));
+        for (var value : List.of(expanding, fraction)) {
+            try (var codec = codec(provider)) {
+                byte[] written = writeBigDecimal(codec, value);
+                assertThat(new String(written, StandardCharsets.UTF_8), equalTo(value.toPlainString()));
+                BigDecimal read;
+                try (var de = codec.createDeserializer(written)) {
+                    read = de.readBigDecimal(PreludeSchemas.BIG_DECIMAL);
+                }
+                assertThat(read.compareTo(value), equalTo(0));
+                assertThat(writeBigDecimal(codec, read), equalTo(written));
+            }
+        }
+    }
+
+    private static byte[] writeBigDecimal(JsonCodec codec, BigDecimal value) throws Exception {
+        try (var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
+            }
+            return output.toByteArray();
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("smithyOnly")
+    @Timeout(10)
+    public void writesScientificNotationBeyondPlainDigitBound(JsonSerdeProvider provider) throws Exception {
+        var values = List.of(
+                new BigDecimal("1E+" + BigNumbers.MAX_DIGITS),
+                new BigDecimal("1E-" + BigNumbers.MAX_DIGITS),
+                new BigDecimal("1812031E+900000000"),
+                new BigDecimal(BigInteger.ONE, Integer.MIN_VALUE + 1));
+        for (var value : values) {
+            try (var codec = codec(provider)) {
+                byte[] written = writeBigDecimal(codec, value);
+                assertThat(new String(written, StandardCharsets.UTF_8), equalTo(value.toString()));
+                try (var de = codec.createDeserializer(written)) {
+                    assertThat(de.readBigDecimal(PreludeSchemas.BIG_DECIMAL), equalTo(value));
+                }
+            }
+            try (var codec = codecBuilder(provider).useStringForArbitraryPrecision(true).build()) {
+                byte[] written = writeBigDecimal(codec, value);
+                assertThat(new String(written, StandardCharsets.UTF_8), equalTo("\"" + value + "\""));
+                try (var de = codec.createDeserializer(written)) {
+                    assertThat(de.readBigDecimal(PreludeSchemas.BIG_DECIMAL), equalTo(value));
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("crossProviders")
+    @Timeout(10)
+    public void extremeScalesRoundTripAcrossProviders(JsonSerdeProvider writer, JsonSerdeProvider reader)
+            throws Exception {
+        var value = new BigDecimal("1812031e900000000");
+        try (var writerCodec = codec(writer); var readerCodec = codec(reader)) {
+            byte[] written = writeBigDecimal(writerCodec, value);
+            assertThat(written.length < 40, equalTo(true));
+            try (var de = readerCodec.createDeserializer(written)) {
+                assertThat(de.readBigDecimal(PreludeSchemas.BIG_DECIMAL), equalTo(value));
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("crossProviders")
+    @Timeout(10)
+    public void maxDigitValuesRoundTripAtEveryScale(JsonSerdeProvider writer, JsonSerdeProvider reader)
+            throws Exception {
+        var largest = BigInteger.TEN.pow(BigNumbers.MAX_DIGITS).subtract(BigInteger.ONE);
+        for (int scale : new int[] {0, 500, 999, 1000, 1001, 1005, 1006, -1, -5, -1000}) {
+            var value = new BigDecimal(largest, scale);
+            for (boolean asString : new boolean[] {false, true}) {
+                try (var writerCodec = codecBuilder(writer).useStringForArbitraryPrecision(asString).build();
+                        var readerCodec = codecBuilder(reader).useStringForArbitraryPrecision(asString).build()) {
+                    byte[] written = writeBigDecimal(writerCodec, value);
+                    try (var de = readerCodec.createDeserializer(written)) {
+                        assertThat("scale " + scale, de.readBigDecimal(PreludeSchemas.BIG_DECIMAL), equalTo(value));
+                    }
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("crossProviders")
+    @Timeout(10)
+    public void valuesBeyondMaxDigitsAreRejectedOnRead(JsonSerdeProvider writer, JsonSerdeProvider reader)
+            throws Exception {
+        var values = List.of(
+                new BigDecimal("7".repeat(BigNumbers.MAX_TEXT_DIGITS)),
+                new BigDecimal("7".repeat(BigNumbers.MAX_DIGITS + 6) + "E+9999"),
+                new BigDecimal("7".repeat(BigNumbers.MAX_DIGITS) + ".5"));
+        for (var value : values) {
+            for (boolean asString : new boolean[] {false, true}) {
+                try (var writerCodec = codecBuilder(writer).useStringForArbitraryPrecision(asString).build();
+                        var readerCodec = codecBuilder(reader).useStringForArbitraryPrecision(asString).build()) {
+                    byte[] written = writeBigDecimal(writerCodec, value);
+                    assertThrows(SerializationException.class, () -> {
+                        try (var de = readerCodec.createDeserializer(written)) {
+                            de.readBigDecimal(PreludeSchemas.BIG_DECIMAL);
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    static List<Arguments> smithyOnly() {
+        return List.of(Arguments.of(Named.of(SMITHY.getName(), SMITHY)));
     }
 }

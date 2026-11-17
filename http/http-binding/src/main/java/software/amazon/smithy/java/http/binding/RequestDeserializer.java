@@ -8,6 +8,7 @@ package software.amazon.smithy.java.http.binding;
 import java.util.Map;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -101,6 +102,10 @@ public final class RequestDeserializer {
         deserBuilder.isResponse(false).directBodyBuilder(inputShapeBuilder);
         HttpBindingDeserializer deserializer = deserBuilder.build();
 
-        inputShapeBuilder.deserialize(deserializer);
+        try {
+            inputShapeBuilder.deserialize(deserializer);
+        } catch (RuntimeException e) {
+            throw SerializationException.wrap(e);
+        }
     }
 }

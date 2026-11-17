@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import software.amazon.smithy.java.core.serde.ToStringSerializer;
+
 public final class SchemaUtils {
 
     private SchemaUtils() {}
@@ -19,12 +21,8 @@ public final class SchemaUtils {
      * @return the given {@code value}.
      */
     public static <T> T validateMemberInSchema(Schema parent, Schema member, T value) {
-        try {
-            if (member == parent.members().get(member.memberIndex())) {
-                return value;
-            }
-        } catch (IndexOutOfBoundsException ignored) {}
-        throw illegalMemberAccess(parent, member);
+        validateMemberOf(parent, member);
+        return value;
     }
 
     private static RuntimeException illegalMemberAccess(Schema parent, Schema member) {
@@ -49,6 +47,48 @@ public final class SchemaUtils {
         throw new IllegalArgumentException(
                 "Attempted to read or write a non-existent member of " + expected.id()
                         + ": " + actual.id());
+    }
+
+    /**
+     * Validates that {@code member} is a member schema of {@code parent}.
+     *
+     * <p>This is the check behind {@link #validateMemberInSchema}; use it when there is no value to pass through.
+     *
+     * @throws IllegalArgumentException if the member does not belong to the parent.
+     */
+    public static void validateMemberOf(Schema parent, Schema member) {
+        var members = parent.members();
+        int index = member.memberIndex();
+        if (index < 0 || index >= members.size() || members.get(index) != member) {
+            throw illegalMemberAccess(parent, member);
+        }
+    }
+
+    /**
+     * Creates an {@link IllegalArgumentException} for an unknown member schema.
+     */
+    public static RuntimeException unknownMember(Schema member) {
+        return new IllegalArgumentException("Unknown member: " + member.id());
+    }
+
+    /**
+     * Formats a shape with {@link ToStringSerializer}.
+     */
+    public static String toString(SerializableShape shape) {
+        return ToStringSerializer.serialize(shape);
+    }
+
+    /**
+     * Returns the member value if it is not null.
+     *
+     * @param member Schema of the member being set.
+     * @throws NullPointerException if the value is null.
+     */
+    public static <T> T requireNonNull(T value, Schema member) {
+        if (value == null) {
+            throw new NullPointerException(member.memberName() + " cannot be null");
+        }
+        return value;
     }
 
 }

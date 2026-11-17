@@ -3,6 +3,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.jmh-conventions")
+    `java-test-fixtures`
 }
 
 description = "This module provides the core functionality for Smithy java"
@@ -40,4 +41,11 @@ tasks {
         // Add version property to test version replacement
         systemProperty("smithy.java.version", version)
     }
+}
+
+// Test fixtures are build-internal. Keep them out of the published "java" component so no
+// -test-fixtures artifact ships with core.
+(components["java"] as AdhocComponentWithVariants).apply {
+    withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
+    withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }
 }

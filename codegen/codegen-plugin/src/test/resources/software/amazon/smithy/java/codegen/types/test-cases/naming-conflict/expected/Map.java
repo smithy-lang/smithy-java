@@ -1,18 +1,18 @@
 package software.amazon.smithy.java.example.standalone.model;
 
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
 public final class Map implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.MAP;
+    public static final Schema $SCHEMA = Schemas.$3;
 
     public static final ShapeId $ID = $SCHEMA.id();
 
@@ -21,7 +21,7 @@ public final class Map implements SerializableStruct {
 
     @Override
     public String toString() {
-        return ToStringSerializer.serialize(this);
+        return SchemaUtils.toString(this);
     }
 
     @Override
@@ -29,7 +29,7 @@ public final class Map implements SerializableStruct {
         if (other == this) {
             return true;
         }
-        return other != null && getClass() == other.getClass();
+        return other instanceof Map;
     }
 
     @Override
@@ -48,9 +48,8 @@ public final class Map implements SerializableStruct {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+        throw SchemaUtils.unknownMember(member);
     }
 
     /**
@@ -91,22 +90,22 @@ public final class Map implements SerializableStruct {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct($SCHEMA, this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct($SCHEMA, this, Builder::$deserializeMember);
             return this;
         }
 
         @Override
         public Builder deserializeMember(ShapeDeserializer decoder, Schema schema) {
-            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, Builder::$deserializeMember);
             return this;
         }
 
-        private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
-            private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void accept(Builder builder, Schema member, ShapeDeserializer de) {}
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {
+            throw SchemaUtils.unknownMember(member);
         }
     }
 }

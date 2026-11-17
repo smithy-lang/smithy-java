@@ -10,18 +10,17 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
 public final class CollectionsStruct implements SerializableStruct {
 
-    public static final Schema $SCHEMA = Schemas.COLLECTIONS_STRUCT;
-    private static final Schema $SCHEMA_DENSE_LIST = $SCHEMA.member("denseList");
-    private static final Schema $SCHEMA_SPARSE_LIST = $SCHEMA.member("sparseList");
-    private static final Schema $SCHEMA_DENSE_MAP = $SCHEMA.member("denseMap");
-    private static final Schema $SCHEMA_SPARSE_MAP = $SCHEMA.member("sparseMap");
+    public static final Schema $SCHEMA = Schemas.$4;
+    private static final Schema $0 = $SCHEMA.member(0); // denseList
+    private static final Schema $1 = $SCHEMA.member(1); // sparseList
+    private static final Schema $2 = $SCHEMA.member(2); // denseMap
+    private static final Schema $3 = $SCHEMA.member(3); // sparseMap
 
     public static final ShapeId $ID = $SCHEMA.id();
 
@@ -83,7 +82,7 @@ public final class CollectionsStruct implements SerializableStruct {
 
     @Override
     public String toString() {
-        return ToStringSerializer.serialize(this);
+        return SchemaUtils.toString(this);
     }
 
     @Override
@@ -91,10 +90,9 @@ public final class CollectionsStruct implements SerializableStruct {
         if (other == this) {
             return true;
         }
-        if (other == null || getClass() != other.getClass()) {
+        if (!(other instanceof CollectionsStruct that)) {
             return false;
         }
-        CollectionsStruct that = (CollectionsStruct) other;
         return Objects.equals(this.denseList, that.denseList)
                && Objects.equals(this.sparseList, that.sparseList)
                && Objects.equals(this.denseMap, that.denseMap)
@@ -118,28 +116,29 @@ public final class CollectionsStruct implements SerializableStruct {
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         if (denseList != null) {
-            serializer.writeList($SCHEMA_DENSE_LIST, denseList, denseList.size(), SharedSerde.DenseListSerializer.INSTANCE);
+            serializer.writeStringList($0, denseList, $0.listMember());
         }
         if (sparseList != null) {
-            serializer.writeList($SCHEMA_SPARSE_LIST, sparseList, sparseList.size(), SharedSerde.SparseListSerializer.INSTANCE);
+            serializer.writeSparseStringList($1, sparseList, $1.listMember());
         }
         if (denseMap != null) {
-            serializer.writeMap($SCHEMA_DENSE_MAP, denseMap, denseMap.size(), SharedSerde.DenseMapSerializer.INSTANCE);
+            serializer.writeStringMap($2, denseMap, $2.mapKeyMember(), $2.mapValueMember());
         }
         if (sparseMap != null) {
-            serializer.writeMap($SCHEMA_SPARSE_MAP, sparseMap, sparseMap.size(), SharedSerde.SparseMapSerializer.INSTANCE);
+            serializer.writeSparseStringMap($3, sparseMap, $3.mapKeyMember(), $3.mapValueMember());
         }
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
+        SchemaUtils.validateMemberOf($SCHEMA, member);
         return switch (member.memberIndex()) {
-            case 0 -> (T) SchemaUtils.validateSameMember($SCHEMA_DENSE_LIST, member, denseList);
-            case 1 -> (T) SchemaUtils.validateSameMember($SCHEMA_SPARSE_LIST, member, sparseList);
-            case 2 -> (T) SchemaUtils.validateSameMember($SCHEMA_DENSE_MAP, member, denseMap);
-            case 3 -> (T) SchemaUtils.validateSameMember($SCHEMA_SPARSE_MAP, member, sparseMap);
-            default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+            case 0 -> (T) denseList;
+            case 1 -> (T) sparseList;
+            case 2 -> (T) denseMap;
+            case 3 -> (T) sparseMap;
+            default -> throw SchemaUtils.unknownMember(member);
         };
     }
 
@@ -222,40 +221,39 @@ public final class CollectionsStruct implements SerializableStruct {
         @Override
         @SuppressWarnings("unchecked")
         public void setMemberValue(Schema member, Object value) {
+            SchemaUtils.validateMemberOf($SCHEMA, member);
             switch (member.memberIndex()) {
-                case 0 -> denseList((List<String>) SchemaUtils.validateSameMember($SCHEMA_DENSE_LIST, member, value));
-                case 1 -> sparseList((List<String>) SchemaUtils.validateSameMember($SCHEMA_SPARSE_LIST, member, value));
-                case 2 -> denseMap((Map<String, String>) SchemaUtils.validateSameMember($SCHEMA_DENSE_MAP, member, value));
-                case 3 -> sparseMap((Map<String, String>) SchemaUtils.validateSameMember($SCHEMA_SPARSE_MAP, member, value));
-                default -> ShapeBuilder.super.setMemberValue(member, value);
+                case 0 -> denseList((List<String>) value);
+                case 1 -> sparseList((List<String>) value);
+                case 2 -> denseMap((Map<String, String>) value);
+                case 3 -> sparseMap((Map<String, String>) value);
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct($SCHEMA, this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct($SCHEMA, this, Builder::$deserializeMember);
             return this;
         }
 
         @Override
         public Builder deserializeMember(ShapeDeserializer decoder, Schema schema) {
-            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, $InnerDeserializer.INSTANCE);
+            decoder.readStruct(schema.assertMemberTargetIs($SCHEMA), this, Builder::$deserializeMember);
             return this;
         }
 
-        private static final class $InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
-            private static final $InnerDeserializer INSTANCE = new $InnerDeserializer();
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void accept(Builder builder, Schema member, ShapeDeserializer de) {
-                switch (member.memberIndex()) {
-                    case 0 -> builder.denseList(SharedSerde.deserializeDenseList(member, de));
-                    case 1 -> builder.sparseList(SharedSerde.deserializeSparseList(member, de));
-                    case 2 -> builder.denseMap(SharedSerde.deserializeDenseMap(member, de));
-                    case 3 -> builder.sparseMap(SharedSerde.deserializeSparseMap(member, de));
-                    default -> throw new IllegalArgumentException("Unexpected member: " + member.memberName());
-                }
+        private static void $deserializeMember(
+                Builder builder,
+                Schema member,
+                ShapeDeserializer de
+        ) {
+            switch (member.memberIndex()) {
+                case 0 -> builder.denseList(SharedSerde.deserializeDenseList(member, de));
+                case 1 -> builder.sparseList(SharedSerde.deserializeSparseList(member, de));
+                case 2 -> builder.denseMap(SharedSerde.deserializeDenseMap(member, de));
+                case 3 -> builder.sparseMap(SharedSerde.deserializeSparseMap(member, de));
+                default -> throw SchemaUtils.unknownMember(member);
             }
         }
     }

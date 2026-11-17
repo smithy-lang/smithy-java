@@ -14,6 +14,7 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -31,11 +32,13 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
@@ -2107,4 +2110,122 @@ public class JsonDeserializerTest extends ProviderTestBase {
         });
     }
 
+    private static final String MAX_DIGITS = "7".repeat(BigNumbers.MAX_DIGITS);
+    private static final String TOO_MANY_DIGITS = "7".repeat(BigNumbers.MAX_TEXT_DIGITS + 1);
+    private static final String TOO_MANY_SIGNIFICANT_DIGITS = "7".repeat(BigNumbers.MAX_TEXT_DIGITS);
+    private static final String TOO_MANY_FULLWIDTH_DIGITS = "\uFF17".repeat(BigNumbers.MAX_TEXT_DIGITS + 1);
+
+    @PerProvider
+    public void deserializesBigIntegerWithMaxDigits(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var de = codec.createDeserializer(("-" + MAX_DIGITS).getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readBigInteger(PreludeSchemas.BIG_INTEGER), is(new BigInteger("-" + MAX_DIGITS)));
+        }
+    }
+
+    @PerProvider
+    @Timeout(10)
+    public void rejectsBigIntegerOverMaxDigits(JsonSerdeProvider provider) {
+        for (var json : List.of(
+                TOO_MANY_DIGITS,
+                "-" + TOO_MANY_DIGITS,
+                "1".repeat(2_000_000),
+                TOO_MANY_SIGNIFICANT_DIGITS,
+                "-" + TOO_MANY_SIGNIFICANT_DIGITS,
+                MAX_DIGITS + "7")) {
+            try (var codec = codec(provider)) {
+                assertThrows(SerializationException.class,
+                        () -> codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                                .readBigInteger(PreludeSchemas.BIG_INTEGER));
+            }
+        }
+    }
+
+    @PerProvider
+    public void deserializesBigDecimalCountingOnlyDigits(JsonSerdeProvider provider) {
+        for (var json : List.of(
+                "-" + "1".repeat(BigNumbers.MAX_DIGITS - 1) + ".1",
+                "1".repeat(BigNumbers.MAX_DIGITS - 2) + ".1e+1",
+                MAX_DIGITS + "E+9999",
+                "0." + "0".repeat(BigNumbers.MAX_TEXT_DIGITS - BigNumbers.MAX_DIGITS - 1) + MAX_DIGITS,
+                "1E+900000000")) {
+            try (var codec = codec(provider)) {
+                var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
+                assertThat(de.readBigDecimal(PreludeSchemas.BIG_DECIMAL), is(new BigDecimal(json)));
+            }
+        }
+    }
+
+    @PerProvider
+    @Timeout(10)
+    public void rejectsBigDecimalOverMaxDigits(JsonSerdeProvider provider) {
+        for (var json : List.of(
+                "1".repeat(BigNumbers.MAX_TEXT_DIGITS - 1) + ".11",
+                "1".repeat(BigNumbers.MAX_TEXT_DIGITS - 2) + ".1e+12",
+                "1".repeat(2_000_000) + ".5",
+                MAX_DIGITS + ".5",
+                "7".repeat(BigNumbers.MAX_DIGITS + 6) + "E+9999",
+                TOO_MANY_SIGNIFICANT_DIGITS)) {
+            try (var codec = codec(provider)) {
+                assertThrows(SerializationException.class,
+                        () -> codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8))
+                                .readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+            }
+        }
+    }
+
+    @PerProvider
+    @Timeout(10)
+    public void boundsArbitraryPrecisionStrings(JsonSerdeProvider provider) {
+        try (var codec = codecBuilder(provider).useStringForArbitraryPrecision(true).build()) {
+            var ok = codec.createDeserializer(("\"" + MAX_DIGITS + "\"").getBytes(StandardCharsets.UTF_8));
+            assertThat(ok.readBigInteger(PreludeSchemas.BIG_INTEGER), is(new BigInteger(MAX_DIGITS)));
+
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(("\"" + TOO_MANY_DIGITS + "\"").getBytes(StandardCharsets.UTF_8))
+                            .readBigInteger(PreludeSchemas.BIG_INTEGER));
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(
+                            ("\"" + "1".repeat(2_000_000) + ".5\"").getBytes(StandardCharsets.UTF_8))
+                            .readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(
+                            ("\"" + TOO_MANY_SIGNIFICANT_DIGITS + "\"").getBytes(StandardCharsets.UTF_8))
+                            .readBigInteger(PreludeSchemas.BIG_INTEGER));
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(("\"" + MAX_DIGITS + ".5\"").getBytes(StandardCharsets.UTF_8))
+                            .readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+            var zeros = "0".repeat(BigNumbers.MAX_TEXT_DIGITS - BigNumbers.MAX_DIGITS);
+            var padded = codec.createDeserializer(("\"" + zeros + MAX_DIGITS + "\"").getBytes(StandardCharsets.UTF_8));
+            assertThat(padded.readBigInteger(PreludeSchemas.BIG_INTEGER), is(new BigInteger(MAX_DIGITS)));
+            byte[] fullwidth = ("\"" + TOO_MANY_FULLWIDTH_DIGITS + "\"").getBytes(StandardCharsets.UTF_8);
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(fullwidth).readBigInteger(PreludeSchemas.BIG_INTEGER));
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(fullwidth).readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+            byte[] hugeFullwidth = ("\"" + "\uFF17".repeat(300_000) + "\"").getBytes(StandardCharsets.UTF_8);
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(hugeFullwidth).readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+        }
+    }
+
+    @PerProvider
+    @Timeout(10)
+    public void boundsDocumentIntegers(JsonSerdeProvider provider) {
+        try (var codec = codec(provider)) {
+            var ok = codec.createDeserializer(("[" + MAX_DIGITS + "]").getBytes(StandardCharsets.UTF_8));
+            assertThat(ok.readDocument().asList().get(0).asBigInteger(), is(new BigInteger(MAX_DIGITS)));
+
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(("[" + TOO_MANY_DIGITS + "]").getBytes(StandardCharsets.UTF_8))
+                            .readDocument());
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(
+                            ("[" + TOO_MANY_SIGNIFICANT_DIGITS + "]").getBytes(StandardCharsets.UTF_8))
+                            .readDocument());
+            assertThrows(SerializationException.class,
+                    () -> codec.createDeserializer(("[" + "1".repeat(2_000_000) + "]").getBytes(StandardCharsets.UTF_8))
+                            .readDocument());
+        }
+    }
 }

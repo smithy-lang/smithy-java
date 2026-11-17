@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -29,6 +30,7 @@ import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -121,6 +123,36 @@ class SmithyDocumentAdapterTest {
         var result = adapter.fromSmithy(document, schema(BASE_ID));
         assertTrue(
                 Document.equals(Document.ofObject(Map.of("child", Map.of("name", "child", "count", "123"))), result));
+    }
+
+    @Test
+    void boundsArbitraryPrecisionStringsWhenAdaptingToSmithy() {
+        var count = CHILD.member("count");
+        var decimal = Schema.structureBuilder(ShapeId.from("test#Decimal"))
+                .putMember("value", PreludeSchemas.BIG_DECIMAL)
+                .build()
+                .member("value");
+        String maxDigits = "7".repeat(BigNumbers.MAX_DIGITS);
+        assertEquals(new BigInteger(maxDigits), adapter.toSmithy(Document.of(maxDigits), count).asBigInteger());
+        String maxDigitsDecimal = "7".repeat(BigNumbers.MAX_DIGITS - 1) + ".5";
+        assertEquals(new BigDecimal(maxDigitsDecimal),
+                adapter.toSmithy(Document.of(maxDigitsDecimal), decimal).asBigDecimal());
+        String tooManyDigits = "7".repeat(BigNumbers.MAX_TEXT_DIGITS + 1);
+        assertThrows(SerializationException.class, () -> adapter.toSmithy(Document.of(tooManyDigits), count));
+        assertThrows(SerializationException.class,
+                () -> adapter.toSmithy(Document.of(tooManyDigits + ".5"), decimal));
+        assertThrows(SerializationException.class,
+                () -> adapter.toSmithy(Document.of("1".repeat(2_000_000)), count));
+        String tooManySignificantDigits = "7".repeat(BigNumbers.MAX_TEXT_DIGITS);
+        assertThrows(SerializationException.class,
+                () -> adapter.toSmithy(Document.of(tooManySignificantDigits), count));
+        assertThrows(SerializationException.class,
+                () -> adapter.toSmithy(Document.of(maxDigits + ".5"), decimal));
+        String tooManyFullwidthDigits = "\uFF17".repeat(BigNumbers.MAX_TEXT_DIGITS + 1);
+        assertThrows(SerializationException.class,
+                () -> adapter.toSmithy(Document.of(tooManyFullwidthDigits), count));
+        assertThrows(SerializationException.class,
+                () -> adapter.toSmithy(Document.of(tooManyFullwidthDigits), decimal));
     }
 
     private static SerializableStruct struct(Schema schema, Consumer<ShapeSerializer> members) {

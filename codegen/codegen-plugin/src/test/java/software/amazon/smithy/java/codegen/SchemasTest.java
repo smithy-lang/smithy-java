@@ -154,7 +154,7 @@ public class SchemasTest {
 
     private void verifySchemaReference(String structureName) {
         assertThat(getFileString(structureName + ".java"))
-                .containsPattern("public static final Schema \\$SCHEMA = Schemas\\d*\\.[A-Z][A-Z0-9_]+");
+                .containsPattern("public static final Schema \\$SCHEMA = Schemas\\d*\\.\\$\\d+;");
     }
 
     private String getFileString(String fileName) {

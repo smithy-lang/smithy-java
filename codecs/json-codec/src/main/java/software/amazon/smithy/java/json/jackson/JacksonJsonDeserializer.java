@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.serde.BigNumbers;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -160,9 +161,12 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 if (parser.currentToken() != JsonToken.VALUE_STRING) {
                     throw new SerializationException("Expected string, found: " + describeToken());
                 }
-                return new BigInteger(parser.getText());
+                // Jackson limits numeric tokens. String tokens need the same digit limit.
+                return BigNumbers.parseBigInteger(parser.getText());
             }
-            return parser.getBigIntegerValue();
+            return BigNumbers.checkBigIntegerDigits(parser.getBigIntegerValue());
+        } catch (SerializationException e) {
+            throw e;
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -175,9 +179,12 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 if (parser.currentToken() != JsonToken.VALUE_STRING) {
                     throw new SerializationException("Expected string, found: " + describeToken());
                 }
-                return new BigDecimal(parser.getText());
+                // Jackson limits numeric tokens. String tokens need the same digit limit.
+                return BigNumbers.parseBigDecimal(parser.getText());
             }
-            return parser.getDecimalValue();
+            return BigNumbers.checkBigDecimalDigits(parser.getDecimalValue());
+        } catch (SerializationException e) {
+            throw e;
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -214,7 +221,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 case VALUE_TRUE -> JsonDocuments.of(true, settings);
                 case VALUE_FALSE -> JsonDocuments.of(false, settings);
                 case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> JsonDocuments.of(
-                        parser.getNumberValue(),
+                        boundedNumber(parser.getNumberValue()),
                         settings);
                 case START_ARRAY -> {
                     List<Document> values = new ArrayList<>();
@@ -330,5 +337,15 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
             throw new SerializationException("Attempted to read non-null value as null");
         }
         return null;
+    }
+
+    // Jackson's token limit does not enforce the significant-digit limit.
+    private static Number boundedNumber(Number number) {
+        if (number instanceof BigInteger b) {
+            return BigNumbers.checkBigIntegerDigits(b);
+        } else if (number instanceof BigDecimal d) {
+            return BigNumbers.checkBigDecimalDigits(d);
+        }
+        return number;
     }
 }

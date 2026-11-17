@@ -186,7 +186,6 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
     @Test
     void addsToEnumVariants() {
         var fileContents = getFileStringForClass("EnumWithDocs");
-        // Sealed interface pattern - static fields (UPPER_SNAKE_CASE) instantiate inner classes (PascalCase + Type suffix)
         assertThat(
                 fileContents,
                 containsString(
@@ -246,7 +245,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                                  * @return this builder.
                                  */
                                 public Builder required(String required) {
-                                    this.required = Objects.requireNonNull(required, "required cannot be null");
+                                    this.required = SchemaUtils.requireNonNull(required, $0);
                                     $setMembers |= 0x1L;
                                     return this;
                                 }
