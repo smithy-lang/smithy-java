@@ -25,6 +25,8 @@ import software.amazon.smithy.model.node.ObjectNode;
 public class RpcV2JsonProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
+            // The @discriminated union trait is not supported yet
+            skipOperations = "smithy.protocoltests.rpcv2Json#DiscriminatedUnionOperation",
             skipTests = {
                     // clientOptional is not respected for client-generated shapes yet
                     "RpcV2JsonRequestClientSkipsTopLevelDefaultValuesInInput",
@@ -47,6 +49,8 @@ public class RpcV2JsonProtocolTests {
 
     @HttpClientResponseTests
     @ProtocolTestFilter(
+            // The @discriminated union trait is not supported yet
+            skipOperations = "smithy.protocoltests.rpcv2Json#DiscriminatedUnionOperation",
             skipTests = {
                     "RpcV2JsonResponseClientPopulatesDefaultsValuesWhenMissingInResponse",
             })
