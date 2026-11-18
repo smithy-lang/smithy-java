@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
 import java.time.Clock;
+import java.util.Objects;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
@@ -62,8 +63,14 @@ public final class SigV4AuthScheme implements AuthScheme<HttpRequest, AwsCredent
     public Context getSignerProperties(Context context) {
         var region = context.expect(SigV4Settings.REGION);
         var clock = context.get(SigV4Settings.CLOCK);
+        var normalizePath = context.get(SigV4Settings.NORMALIZE_PATH);
+        var doubleUrlEncode = context.get(SigV4Settings.DOUBLE_URL_ENCODE);
         var cached = signerProperties;
-        if (cached != null && cached.region == region && cached.clock == clock) {
+        if (cached != null
+                && cached.region == region
+                && cached.clock == clock
+                && Objects.equals(cached.normalizePath, normalizePath)
+                && Objects.equals(cached.doubleUrlEncode, doubleUrlEncode)) {
             return cached.properties;
         }
         var ctx = Context.create();
@@ -72,14 +79,25 @@ public final class SigV4AuthScheme implements AuthScheme<HttpRequest, AwsCredent
         if (clock != null) {
             ctx.put(SigV4Settings.CLOCK, clock);
         }
+        if (normalizePath != null) {
+            ctx.put(SigV4Settings.NORMALIZE_PATH, normalizePath);
+        }
+        if (doubleUrlEncode != null) {
+            ctx.put(SigV4Settings.DOUBLE_URL_ENCODE, doubleUrlEncode);
+        }
         var properties = Context.unmodifiableView(ctx);
-        signerProperties = new SignerProperties(region, clock, properties);
+        signerProperties = new SignerProperties(region, clock, normalizePath, doubleUrlEncode, properties);
         return properties;
     }
 
     private volatile SignerProperties signerProperties;
 
-    private record SignerProperties(String region, Clock clock, Context properties) {}
+    private record SignerProperties(
+            String region,
+            Clock clock,
+            Boolean normalizePath,
+            Boolean doubleUrlEncode,
+            Context properties) {}
 
     @Override
     public Signer<HttpRequest, AwsCredentialsIdentity> signer() {
