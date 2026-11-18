@@ -168,6 +168,41 @@ class McpRemoteClientTest {
     }
 
     @Test
+    void initializeRecordsTheRemoteServerInfo() {
+        var serverInfo = Document.of(Map.of("name", Document.of("upstream"), "version", Document.of("9.9.9")));
+        var client = new FakeClient(List.of(
+                success(Document.of(Map.of(
+                        "protocolVersion",
+                        Document.of(KnownProtocolVersion.V2025_11_25.identifier()),
+                        "serverInfo",
+                        serverInfo))),
+                success(Document.of(Map.of()))));
+        assertNull(client.serverInfo());
+
+        client.initialize(new McpServerIdentity("proxy", "1.0.0"), KnownProtocolVersion.V2025_11_25);
+
+        assertEquals("upstream", client.serverInfo().getMember("name").asString());
+        assertEquals("9.9.9", client.serverInfo().getMember("version").asString());
+    }
+
+    @Test
+    void serverInfoStaysNullWhenTheRemoteNegotiatesAnUnsupportedVersion() {
+        var client = new FakeClient(List.of(
+                success(Document.of(Map.of(
+                        "protocolVersion",
+                        Document.of("1999-01-01"),
+                        "serverInfo",
+                        Document.of(Map.of("name", Document.of("upstream"), "version", Document.of("9.9.9"))))))));
+
+        assertThrows(
+                McpRemoteException.class,
+                () -> client.initialize(new McpServerIdentity("proxy", "1.0.0"), KnownProtocolVersion.V2025_11_25));
+
+        assertFalse(client.initialized());
+        assertNull(client.serverInfo());
+    }
+
+    @Test
     void modernProtocolMetadataIsRetainedAcrossToolPages() {
         var client = new FakeClient(List.of(
                 toolsResponse(List.of(tool("FirstTool")), "next"),

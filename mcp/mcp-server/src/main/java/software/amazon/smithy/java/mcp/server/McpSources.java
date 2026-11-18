@@ -7,6 +7,7 @@ package software.amazon.smithy.java.mcp.server;
 
 import java.util.Map;
 import java.util.function.Consumer;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 import software.amazon.smithy.java.server.Service;
@@ -34,7 +35,14 @@ interface McpSources extends AutoCloseable {
             Consumer<JsonRpcResponse> responseWriter
     );
 
-    void initializeRemoteClients(McpProtocol protocol);
+    /**
+     * Initializes every remote client for a downstream {@code initialize} and loads its catalog.
+     *
+     * @param protocol the protocol the downstream client negotiated
+     * @param clientInfo the downstream client's {@code clientInfo} to record for remote initialization if none
+     *                   is recorded yet, or null
+     */
+    void initializeRemoteClients(McpProtocol protocol, Document clientInfo);
 
     default void ensureRemoteCatalogLoaded() {
         ensureRemoteCatalogLoaded(BuiltInProtocols.protocol(ProtocolVersion.defaultVersion()));

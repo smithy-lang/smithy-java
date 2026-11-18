@@ -47,6 +47,7 @@ public abstract class McpRemoteClient implements AutoCloseable {
     private final AtomicReference<Consumer<JsonRpcResponse>> responseNotificationConsumer = new AtomicReference<>();
     private final AtomicReference<Consumer<JsonRpcRequest>> requestNotificationConsumer = new AtomicReference<>();
     private final AtomicReference<McpProtocol> negotiatedProtocol = new AtomicReference<>();
+    private final AtomicReference<Document> remoteServerInfo = new AtomicReference<>();
     private final AtomicReference<Initialization> initialization = new AtomicReference<>();
     private final AtomicReference<CompletableFuture<Void>> initializationFlight = new AtomicReference<>();
     private final AtomicLong initializationGeneration = new AtomicLong();
@@ -188,11 +189,13 @@ public abstract class McpRemoteClient implements AutoCloseable {
             }
             try {
                 if (!initialized()) {
-                    var selected = performInitialize(initializeRequest, protocol, protocols);
+                    var negotiation = performInitialize(initializeRequest, protocol, protocols);
                     this.responseNotificationConsumer.set(responseNotificationConsumer);
                     this.requestNotificationConsumer.set(requestNotificationConsumer);
+                    // Record serverInfo before initialization so a caller that sees initialized() can read it.
+                    remoteServerInfo.set(negotiation.serverInfo());
                     initialization.set(new Initialization(initializeRequest, protocol, protocols));
-                    negotiatedProtocol.set(selected);
+                    negotiatedProtocol.set(negotiation.protocol());
                     exchange(JsonRpcRequest.builder()
                             .method(McpMethod.Standard.NOTIFICATIONS_INITIALIZED.wireName())
                             .jsonrpc("2.0")
@@ -210,7 +213,7 @@ public abstract class McpRemoteClient implements AutoCloseable {
         }
     }
 
-    private McpProtocol performInitialize(
+    private Negotiation performInitialize(
             JsonRpcRequest initializeRequest,
             McpProtocol requestedProtocol,
             McpProtocolRegistry protocols
@@ -221,13 +224,15 @@ public abstract class McpRemoteClient implements AutoCloseable {
                         exchangeForwarded(initializeRequest),
                         "initialize response"));
         requireSuccess(result, "initialization");
+        var body = result.getResult();
+        var serverInfo = McpHttpBinding.isObject(body) ? body.getMember("serverInfo") : null;
 
-        var negotiatedVersion = McpHttpBinding.stringMember(result.getResult(), "protocolVersion");
+        var negotiatedVersion = McpHttpBinding.stringMember(body, "protocolVersion");
         if (negotiatedVersion == null) {
-            return requestedProtocol;
+            return new Negotiation(requestedProtocol, serverInfo);
         }
         try {
-            return protocols.require(ProtocolVersion.parse(negotiatedVersion));
+            return new Negotiation(protocols.require(ProtocolVersion.parse(negotiatedVersion)), serverInfo);
         } catch (McpProtocolException e) {
             throw new McpRemoteException(
                     "Remote MCP server negotiated an unsupported protocol version: " + negotiatedVersion,
@@ -307,11 +312,12 @@ public abstract class McpRemoteClient implements AutoCloseable {
             }
             try {
                 if (initializationGeneration.get() == observedGeneration) {
-                    var selected = performInitialize(
+                    var negotiation = performInitialize(
                             currentInitialization.request(),
                             currentInitialization.requestedProtocol(),
                             currentInitialization.protocols());
-                    negotiatedProtocol.set(selected);
+                    negotiatedProtocol.set(negotiation.protocol());
+                    remoteServerInfo.set(negotiation.serverInfo());
                     exchange(JsonRpcRequest.builder()
                             .method(McpMethod.Standard.NOTIFICATIONS_INITIALIZED.wireName())
                             .jsonrpc("2.0")
@@ -331,6 +337,19 @@ public abstract class McpRemoteClient implements AutoCloseable {
 
     final boolean initialized() {
         return initialization.get() != null;
+    }
+
+    /**
+     * Returns the {@code serverInfo} the remote reported in its last successful {@code initialize}, as the
+     * remote sent it and without validation.
+     *
+     * <p>Returns null before this client is initialized, when the remote omitted {@code serverInfo}, and for
+     * remotes reached only through a stateless protocol version, which the engine never initializes.
+     *
+     * @return the remote's {@code serverInfo}, or null
+     */
+    public final Document serverInfo() {
+        return remoteServerInfo.get();
     }
 
     final McpProtocol negotiatedProtocol() {
@@ -522,6 +541,8 @@ public abstract class McpRemoteClient implements AutoCloseable {
             JsonRpcRequest request,
             McpProtocol requestedProtocol,
             McpProtocolRegistry protocols) {}
+
+    private record Negotiation(McpProtocol protocol, Document serverInfo) {}
 
     public abstract String name();
 }

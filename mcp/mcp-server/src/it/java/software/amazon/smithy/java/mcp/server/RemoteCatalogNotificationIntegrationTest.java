@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -322,6 +323,85 @@ class RemoteCatalogNotificationIntegrationTest {
                                 .getMember("text")
                                 .asString());
                 output.assertNoOutput(100);
+            } finally {
+                server.shutdown().join();
+            }
+        } finally {
+            http.stop(0);
+        }
+    }
+
+    @Test
+    void stdioServerForwardsTheClientIdentityToAnHttpRemote() throws Exception {
+        var sentClientInfo = new AtomicReference<Document>();
+        var http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            http.setExecutor(executor);
+            http.createContext("/mcp", exchange -> {
+                try (exchange) {
+                    var request = McpJson.CODEC.deserializeShape(
+                            exchange.getRequestBody().readAllBytes(),
+                            JsonRpcRequest.builder());
+                    if (request.getId() == null) {
+                        exchange.sendResponseHeaders(202, -1);
+                        return;
+                    }
+                    Map<String, ?> result = switch (request.getMethod()) {
+                        case "initialize" -> {
+                            sentClientInfo.set(request.getParams().getMember("clientInfo"));
+                            yield Map.of(
+                                    "protocolVersion",
+                                    "2025-11-25",
+                                    "capabilities",
+                                    Map.of("tools", Map.of()),
+                                    "serverInfo",
+                                    Map.of("name", "identity-server", "version", "9.9.9"));
+                        }
+                        case "tools/list" -> Map.of("tools", List.of(tool("echo")));
+                        case "prompts/list" -> Map.of("prompts", List.of());
+                        default -> throw new IOException("Unexpected method: " + request.getMethod());
+                    };
+                    respond(exchange,
+                            "application/json",
+                            McpJson.CODEC.serializeToString(JsonRpcResponse.builder()
+                                    .jsonrpc("2.0")
+                                    .id(request.getId())
+                                    .result(Document.ofObject(result))
+                                    .build()));
+                }
+            });
+            http.start();
+
+            var input = new TestInputStream();
+            var output = new TestOutputStream();
+            var remote = HttpMcpClient.builder()
+                    .endpoint("http://127.0.0.1:" + http.getAddress().getPort() + "/mcp")
+                    .build();
+            var server = StdioMcpServer.builder()
+                    .name("proxy")
+                    .forwardClientInfo(true)
+                    .addRemoteClient(remote)
+                    .input(input)
+                    .output(output)
+                    .build();
+            server.start();
+            try {
+                send(input,
+                        1,
+                        "initialize",
+                        Map.of(
+                                "protocolVersion",
+                                "2025-11-25",
+                                "capabilities",
+                                Map.of(),
+                                "clientInfo",
+                                Map.of("name", "claude-code", "version", "2.0.0")));
+                assertResponse(read(output), 1);
+
+                assertEquals("claude-code", sentClientInfo.get().getMember("name").asString());
+                assertEquals("2.0.0", sentClientInfo.get().getMember("version").asString());
+                assertEquals("identity-server", remote.serverInfo().getMember("name").asString());
             } finally {
                 server.shutdown().join();
             }
