@@ -88,11 +88,11 @@ public class ClientTest {
             ApplyModelRetryInfoPlugin.class,
             InjectIdempotencyTokenPlugin.class,
             AutoPlugin.class,
-            SimpleAuthDetectionPlugin.class,
             UserAgentPlugin.class,
             ApplyHttpRetryInfoPlugin.class,
             RequestCompressionPlugin.class,
             HttpChecksumPlugin.class,
+            SimpleAuthDetectionPlugin.class,
             FooPlugin.class);
 
     @Test

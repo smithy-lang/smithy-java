@@ -77,6 +77,14 @@ jreleaser {
 
 
 subprojects {
+    // Without an explicit smithy-cli dependency, the Smithy Gradle plugin resolves runtimeClasspath during
+    // configuration to detect the CLI version. That observes the BOM before it has collected its constraints.
+    plugins.withId("software.amazon.smithy.gradle.smithy-base") {
+        dependencies {
+            add("smithyCli", libs.smithy.cli)
+        }
+    }
+
     plugins.withId("java") {
         apply(plugin = "idea")
         afterEvaluate {
