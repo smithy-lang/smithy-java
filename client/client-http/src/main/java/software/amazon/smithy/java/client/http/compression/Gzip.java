@@ -11,7 +11,7 @@ import java.util.zip.GZIPOutputStream;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
-public final class Gzip implements CompressionAlgorithm {
+public final class Gzip implements CompressionAlgorithm, DecompressionAlgorithm {
 
     @Override
     public String algorithmId() {
@@ -35,5 +35,13 @@ public final class Gzip implements CompressionAlgorithm {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public DataStream decompress(DataStream data) {
+        return DataStream.ofInputStream(
+                new GzipDecompressingInputStream(data.asInputStream()),
+                data.contentType(),
+                -1);
     }
 }

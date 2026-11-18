@@ -11,16 +11,23 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.client.http.HttpContext;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.plugins.ResponseDecompressionPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HeaderName;
@@ -54,6 +61,8 @@ public final class HttpMcpClient extends McpRemoteClient {
     private final AtomicReference<Map<String, Map<String, String>>> toolHeaderParameters =
             new AtomicReference<>(Map.of());
     private final AtomicReference<String> sessionId = new AtomicReference<>();
+    private final ClientInterceptor interceptor;
+    private final Context pluginContext;
 
     private HttpMcpClient(Builder builder) {
         this.transport = builder.transport != null ? builder.transport : new JavaHttpClientTransport();
@@ -64,6 +73,27 @@ public final class HttpMcpClient extends McpRemoteClient {
         this.identityResolver = builder.identityResolver;
         this.signerContext = builder.signerContext != null ? builder.signerContext : Context.create();
         this.timeout = builder.timeout != null ? builder.timeout : Duration.ofMinutes(5);
+        var config = ClientConfig.builder().transport(transport);
+        var applied = new LinkedHashMap<Class<?>, ClientPlugin>();
+        for (var plugin : builder.plugins.values()) {
+            applyPlugin(plugin, config, applied);
+        }
+        this.interceptor = ClientInterceptor.chain(config.interceptors());
+        this.pluginContext = config.context();
+    }
+
+    private static void applyPlugin(
+            ClientPlugin plugin,
+            ClientConfig.Builder config,
+            Map<Class<?>, ClientPlugin> applied
+    ) {
+        if (applied.putIfAbsent(plugin.getClass(), plugin) != null) {
+            return;
+        }
+        plugin.configureClient(config);
+        for (var child : plugin.getChildPlugins()) {
+            applyPlugin(child, config, applied);
+        }
     }
 
     private static String sanitizeName(String host) {
@@ -82,6 +112,11 @@ public final class HttpMcpClient extends McpRemoteClient {
         private Context signerContext;
         private ClientTransport<HttpRequest, HttpResponse> transport;
         private Duration timeout;
+        private final Map<Class<?>, ClientPlugin> plugins = new LinkedHashMap<>();
+
+        private Builder() {
+            addPlugin(new ResponseDecompressionPlugin());
+        }
 
         public Builder endpoint(String endpoint) {
             this.endpoint = endpoint;
@@ -120,6 +155,19 @@ public final class HttpMcpClient extends McpRemoteClient {
 
         public Builder timeout(Duration timeout) {
             this.timeout = timeout;
+            return this;
+        }
+
+        /**
+         * Adds a client plugin. Only the interceptor hooks from {@code modifyBeforeRetryLoop} to
+         * {@code readBeforeDeserialization} run, since the client sends JSON-RPC messages rather than modeled
+         * operations. Plugins are deduplicated by class; {@link ResponseDecompressionPlugin} is added by default.
+         *
+         * @param plugin Plugin to add.
+         * @return the builder.
+         */
+        public Builder addPlugin(ClientPlugin plugin) {
+            plugins.putIfAbsent(plugin.getClass(), plugin);
             return this;
         }
 
@@ -207,8 +255,15 @@ public final class HttpMcpClient extends McpRemoteClient {
                     .setBody(DataStream.ofBytes(body, "application/json"))
                     .toUnmodifiable();
 
-            Context context = Context.create();
+            Context context = Context.modifiableCopy(pluginContext);
             context.put(HttpContext.HTTP_REQUEST_TIMEOUT, timeout);
+
+            var requestHook = new RequestHook<>(McpHttpOperation.INSTANCE, context, request, httpRequest);
+            requestHook = requestHook.withRequest(interceptor.modifyBeforeRetryLoop(requestHook));
+            interceptor.readBeforeAttempt(requestHook);
+            requestHook = requestHook.withRequest(interceptor.modifyBeforeSigning(requestHook));
+            interceptor.readBeforeSigning(requestHook);
+            httpRequest = requestHook.request();
 
             if (authScheme != null) {
                 httpRequest = signWithAuthScheme(httpRequest);
@@ -216,7 +271,22 @@ public final class HttpMcpClient extends McpRemoteClient {
                 httpRequest = signer.sign(httpRequest, null, context).signedRequest();
             }
 
-            HttpResponse response = transport.send(context, httpRequest);
+            requestHook = requestHook.withRequest(httpRequest);
+            interceptor.readAfterSigning(requestHook);
+            requestHook = requestHook.withRequest(interceptor.modifyBeforeTransmit(requestHook));
+            interceptor.readBeforeTransmit(requestHook);
+            httpRequest = requestHook.request();
+
+            var responseHook = new ResponseHook<>(
+                    McpHttpOperation.INSTANCE,
+                    context,
+                    request,
+                    httpRequest,
+                    transport.send(context, httpRequest));
+            interceptor.readAfterTransmit(responseHook);
+            responseHook = responseHook.withResponse(interceptor.modifyBeforeDeserialization(responseHook));
+            interceptor.readBeforeDeserialization(responseHook);
+            HttpResponse response = responseHook.response();
             LOG.trace("Received HTTP response with status: {}", response.statusCode());
 
             // Extract and store session ID from response only during initialize
