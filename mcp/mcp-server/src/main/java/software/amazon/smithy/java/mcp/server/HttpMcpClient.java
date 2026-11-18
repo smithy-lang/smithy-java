@@ -6,10 +6,12 @@
 package software.amazon.smithy.java.mcp.server;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,12 @@ public final class HttpMcpClient extends McpRemoteClient {
     private static final InternalLogger LOG = InternalLogger.getLogger(HttpMcpClient.class);
     private static final int UPSTREAM_HTTP_ERROR_CODE = -32000;
     private static final long MAX_DISCARDED_BODY_BYTES = 8 * 1024;
+    private static final int MAX_ERROR_MESSAGE_BODY_BYTES = 200;
+    private static final int MAX_JSON_ERROR_BODY_BYTES = 64 * 1024;
+    private static final int MAX_LOGGED_SSE_CHARS = 200;
+    private static final int MAX_RESPONSE_BODY_BYTES_LIMIT = Integer.MAX_VALUE - 8;
+
+    private static final int DEFAULT_MAX_RESPONSE_BODY_BYTES = 16 * 1024 * 1024;
 
     private final ClientTransport<HttpRequest, HttpResponse> transport;
     private final URI endpoint;
@@ -51,6 +59,7 @@ public final class HttpMcpClient extends McpRemoteClient {
     private final IdentityResolver<?> identityResolver;
     private final Context signerContext;
     private final Duration timeout;
+    private final int maxResponseBodyBytes;
     private final AtomicReference<Map<String, Map<String, String>>> toolHeaderParameters =
             new AtomicReference<>(Map.of());
     private final AtomicReference<String> sessionId = new AtomicReference<>();
@@ -64,6 +73,7 @@ public final class HttpMcpClient extends McpRemoteClient {
         this.identityResolver = builder.identityResolver;
         this.signerContext = builder.signerContext != null ? builder.signerContext : Context.create();
         this.timeout = builder.timeout != null ? builder.timeout : Duration.ofMinutes(5);
+        this.maxResponseBodyBytes = builder.maxResponseBodyBytes;
     }
 
     private static String sanitizeName(String host) {
@@ -82,6 +92,7 @@ public final class HttpMcpClient extends McpRemoteClient {
         private Context signerContext;
         private ClientTransport<HttpRequest, HttpResponse> transport;
         private Duration timeout;
+        private int maxResponseBodyBytes = DEFAULT_MAX_RESPONSE_BODY_BYTES;
 
         public Builder endpoint(String endpoint) {
             this.endpoint = endpoint;
@@ -123,9 +134,28 @@ public final class HttpMcpClient extends McpRemoteClient {
             return this;
         }
 
+        /**
+         * Sets the largest successful response the client reads from the remote server.
+         *
+         * <p>This limits the bytes of a JSON response body, and the characters of each line and each event
+         * of a {@code text/event-stream} response. A response over the limit is closed without being read
+         * further, and the request fails with a JSON-RPC error. Defaults to 16 MiB.
+         *
+         * @param maxResponseBodyBytes the limit, greater than 0 and at most {@code Integer.MAX_VALUE - 8}.
+         * @return the builder.
+         */
+        public Builder maxResponseBodyBytes(int maxResponseBodyBytes) {
+            this.maxResponseBodyBytes = maxResponseBodyBytes;
+            return this;
+        }
+
         public HttpMcpClient build() {
             if (endpoint == null || endpoint.isEmpty()) {
                 throw new IllegalArgumentException("Endpoint must be provided");
+            }
+            if (maxResponseBodyBytes <= 0 || maxResponseBodyBytes > MAX_RESPONSE_BODY_BYTES_LIMIT) {
+                throw new IllegalArgumentException("maxResponseBodyBytes must be greater than 0 and at most "
+                        + MAX_RESPONSE_BODY_BYTES_LIMIT + ": " + maxResponseBodyBytes);
             }
             if (signer != null && authScheme != null) {
                 throw new IllegalArgumentException(
@@ -235,7 +265,7 @@ public final class HttpMcpClient extends McpRemoteClient {
                 var ownsRecovery = sessionId.compareAndSet(currentSessionId, null);
                 if (allowSessionRecovery
                         && !McpHttpBinding.isInitialize(request)) {
-                    ByteBufferUtils.getBytes(response.body().asByteBuffer());
+                    discardBody(response);
                     if (restartSession(currentGeneration)) {
                         return exchange(request, false);
                     }
@@ -260,7 +290,13 @@ public final class HttpMcpClient extends McpRemoteClient {
                 return parseSseResponse(response, request);
             }
 
-            var responseBytes = ByteBufferUtils.getBytes(response.body().asByteBuffer());
+            var responseBody = readAtMost(response, maxResponseBodyBytes);
+            if (responseBody.truncated()) {
+                LOG.warn("Response from {} exceeds {} bytes", endpoint, maxResponseBodyBytes);
+                return upstreamError(request,
+                        "HTTP " + response.statusCode() + ": Response body exceeds " + maxResponseBodyBytes + " bytes");
+            }
+            var responseBytes = responseBody.bytes();
             if (responseBytes.length == 0) {
                 return null;
             }
@@ -283,6 +319,44 @@ public final class HttpMcpClient extends McpRemoteClient {
         } else {
             response.close();
         }
+    }
+
+    private record BoundedBody(byte[] bytes, boolean truncated) {}
+
+    /**
+     * Reads at most {@code max} bytes of the body. If the body is longer, closes the response without reading
+     * the rest and marks the result truncated.
+     */
+    private static BoundedBody readAtMost(HttpResponse response, int max) throws IOException {
+        var body = response.body();
+        if (body == null) {
+            return new BoundedBody(new byte[0], false);
+        }
+        var in = body.asInputStream();
+        byte[] read;
+        try {
+            read = in.readNBytes(max + 1);
+        } catch (IOException | RuntimeException e) {
+            response.close();
+            throw e;
+        }
+        if (read.length > max) {
+            response.close();
+            return new BoundedBody(Arrays.copyOf(read, max), true);
+        }
+        in.close();
+        return new BoundedBody(read, false);
+    }
+
+    private JsonRpcResponse upstreamError(JsonRpcRequest request, String message) {
+        return JsonRpcResponse.builder()
+                .jsonrpc("2.0")
+                .id(request.getId())
+                .error(JsonRpcErrorResponse.builder()
+                        .code(UPSTREAM_HTTP_ERROR_CODE)
+                        .message(message)
+                        .build())
+                .build();
     }
 
     private JsonRpcResponse sessionRecoveryFailure(
@@ -370,8 +444,9 @@ public final class HttpMcpClient extends McpRemoteClient {
         try (var input = response.body().asInputStream();
                 var reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
             var data = new StringBuilder();
+            var lineBuffer = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
+            while ((line = readSseLine(reader, lineBuffer, maxResponseBodyBytes)) != null) {
                 if (line.isEmpty()) {
                     var result = processSseEvent(data, request.getId());
                     if (result != null) {
@@ -379,7 +454,14 @@ public final class HttpMcpClient extends McpRemoteClient {
                     }
                 } else if (line.startsWith("data:")) {
                     var value = line.substring(5);
-                    data.append(value.startsWith(" ") ? value.substring(1) : value).append('\n');
+                    if (value.startsWith(" ")) {
+                        value = value.substring(1);
+                    }
+                    if ((long) data.length() + value.length() + 1 > maxResponseBodyBytes) {
+                        throw new SseLimitExceededException(
+                                "SSE event exceeds " + maxResponseBodyBytes + " characters");
+                    }
+                    data.append(value).append('\n');
                 }
             }
             var result = processSseEvent(data, request.getId());
@@ -405,6 +487,40 @@ public final class HttpMcpClient extends McpRemoteClient {
                         .message("SSE parsing error: No final response found in stream")
                         .build())
                 .build();
+    }
+
+    /**
+     * Reads one SSE line, ended by CR, LF or CRLF, as {@link BufferedReader#readLine()} does, but fails once the
+     * line has more than {@code maxChars} characters.
+     *
+     * @return the line without its ending, or null at the end of the stream.
+     */
+    private static String readSseLine(BufferedReader reader, StringBuilder line, int maxChars) throws IOException {
+        line.setLength(0);
+        int c;
+        while ((c = reader.read()) != -1) {
+            if (c == '\n') {
+                return line.toString();
+            }
+            if (c == '\r') {
+                reader.mark(1);
+                if (reader.read() != '\n') {
+                    reader.reset();
+                }
+                return line.toString();
+            }
+            if (line.length() >= maxChars) {
+                throw new SseLimitExceededException("SSE line exceeds " + maxChars + " characters");
+            }
+            line.append((char) c);
+        }
+        return line.isEmpty() ? null : line.toString();
+    }
+
+    private static final class SseLimitExceededException extends IOException {
+        SseLimitExceededException(String message) {
+            super(message);
+        }
     }
 
     private JsonRpcResponse processSseEvent(StringBuilder data, Document expectedId) {
@@ -433,7 +549,10 @@ public final class HttpMcpClient extends McpRemoteClient {
             }
             return response;
         } catch (RuntimeException e) {
-            LOG.warn("Failed to parse SSE message: {}", jsonData, e);
+            var logged = jsonData.length() > MAX_LOGGED_SSE_CHARS
+                    ? jsonData.substring(0, MAX_LOGGED_SSE_CHARS) + "... (truncated)"
+                    : jsonData;
+            LOG.warn("Failed to parse SSE message: {}", logged, e);
             return null;
         }
     }
@@ -449,15 +568,22 @@ public final class HttpMcpClient extends McpRemoteClient {
         }
     }
 
-    private JsonRpcResponse handleErrorResponse(HttpResponse response, JsonRpcRequest request) {
+    private JsonRpcResponse handleErrorResponse(HttpResponse response, JsonRpcRequest request)
+            throws IOException {
         long contentLength = response.body().contentLength();
         String errorMessage = "HTTP " + response.statusCode();
 
         if (contentLength != 0) {
             String contentType = response.body().contentType();
-            byte[] bodyBytes = ByteBufferUtils.getBytes(response.body().asByteBuffer());
 
             if (contentType != null && contentType.startsWith("application/json")) {
+                var errorBody = readAtMost(response, MAX_JSON_ERROR_BODY_BYTES);
+                if (errorBody.truncated()) {
+                    LOG.warn("Error response from {} exceeds {} bytes", endpoint, MAX_JSON_ERROR_BODY_BYTES);
+                    return upstreamError(request,
+                            errorMessage + ": Error response exceeds " + MAX_JSON_ERROR_BODY_BYTES + " bytes");
+                }
+                byte[] bodyBytes = errorBody.bytes();
                 try {
                     return JsonRpcResponse.builder()
                             .deserialize(McpJson.CODEC.createDeserializer(bodyBytes))
@@ -474,9 +600,9 @@ public final class HttpMcpClient extends McpRemoteClient {
                             .build();
                 }
             } else {
-                int length = Math.min(200, bodyBytes.length);
-                String errorBody = new String(bodyBytes, 0, length, StandardCharsets.UTF_8);
-                errorMessage = errorMessage + ": " + errorBody + (length != bodyBytes.length ? " (truncated)" : "");
+                var errorBody = readAtMost(response, MAX_ERROR_MESSAGE_BODY_BYTES);
+                errorMessage = errorMessage + ": " + new String(errorBody.bytes(), StandardCharsets.UTF_8)
+                        + (errorBody.truncated() ? " (truncated)" : "");
             }
         }
 
