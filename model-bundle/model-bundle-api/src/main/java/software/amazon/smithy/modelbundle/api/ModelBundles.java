@@ -5,9 +5,9 @@
 
 package software.amazon.smithy.modelbundle.api;
 
-import software.amazon.smithy.java.server.ProxyOperationTrait;
-import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.java.server.proxy.ProxyOperationTrait;
+import software.amazon.smithy.java.server.proxy.ProxyService;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.MemberShape;

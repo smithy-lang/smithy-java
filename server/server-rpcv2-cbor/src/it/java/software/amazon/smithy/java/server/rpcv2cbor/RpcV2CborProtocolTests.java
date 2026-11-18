@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server.rpcv2;
+package software.amazon.smithy.java.server.rpcv2cbor;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
