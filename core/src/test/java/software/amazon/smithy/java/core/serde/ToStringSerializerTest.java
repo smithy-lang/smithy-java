@@ -96,6 +96,24 @@ public class ToStringSerializerTest {
     }
 
     @Test
+    public void redactsSensitiveFloats() {
+        var floatSchema = Schema.createFloat(ShapeId.from("smithy.example#Float"), new SensitiveTrait());
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
+                .putMember("foo", floatSchema)
+                .putMember("bar", PreludeSchemas.FLOAT)
+                .build();
+
+        var str = ToStringSerializer.serialize(e -> {
+            e.writeStruct(schema, TestHelper.create(schema, (s, ser) -> {
+                ser.writeFloat(s.member("foo"), 1.5f);
+                ser.writeFloat(s.member("bar"), 2.5f);
+            }));
+        });
+
+        assertThat(str, equalTo("Struct[foo=*REDACTED*, bar=2.5]"));
+    }
+
+    @Test
     public void redactsFullListIfSensitive() {
         var mapSchema = Schema.mapBuilder(ShapeId.from("smithy.example#Map"))
                 .putMember("key", PreludeSchemas.STRING)
