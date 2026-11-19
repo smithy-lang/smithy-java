@@ -1,5 +1,19 @@
 # Change Log
 
+## 1.9.1 (11/18/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Bug Fixes
+
+* Fixed a bug in `ToStringSerializer.writeFloat`, which appended the value
+ directly and rendered @sensitive floats in toString().
+  ([#1459](https://github.com/smithy-lang/smithy-java/pull/1459))
+
 ## 1.9.0 (11/17/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
