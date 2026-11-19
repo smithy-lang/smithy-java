@@ -166,7 +166,7 @@ public final class StructureGenerator<
             writer.putContext(
                     "hashCode",
                     new HashCodeGenerator(writer, shape, directive.symbolProvider(), directive.model()));
-            writer.putContext("toString", new ToStringGenerator(writer));
+            writer.putContext("toString", new ToStringGenerator(writer, shape));
             writer.putContext("close", new CloseGenerator(writer, shape, directive.symbolProvider(), streamingMember));
             writer.putContext(
                     "serializer",

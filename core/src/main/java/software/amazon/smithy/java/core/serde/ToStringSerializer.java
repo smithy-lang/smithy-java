@@ -163,7 +163,7 @@ public final class ToStringSerializer implements ShapeSerializer {
 
     @Override
     public void writeFloat(Schema schema, float value) {
-        builder.append(value);
+        append(schema, value);
     }
 
     @Override
