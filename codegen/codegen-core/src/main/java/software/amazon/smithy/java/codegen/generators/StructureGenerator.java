@@ -30,6 +30,8 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.BuilderSetterSection;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.sections.DefaultInitializerValueSection;
+import software.amazon.smithy.java.codegen.sections.ErrorCorrectionValueSection;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.error.ErrorFault;
@@ -773,7 +775,9 @@ public final class StructureGenerator<
 
             @Override
             public void run() {
+                writer.pushState(new ErrorCorrectionValueSection(memberShape));
                 memberShape.accept(this);
+                writer.popState();
             }
 
             @Override
@@ -1044,7 +1048,9 @@ public final class StructureGenerator<
             public void run() {
                 if (member.hasNonNullDefault()) {
                     this.defaultValue = member.expectTrait(DefaultTrait.class).toNode();
+                    writer.pushState(new DefaultInitializerValueSection(member));
                     member.accept(this);
+                    writer.popState();
                 }
             }
 
