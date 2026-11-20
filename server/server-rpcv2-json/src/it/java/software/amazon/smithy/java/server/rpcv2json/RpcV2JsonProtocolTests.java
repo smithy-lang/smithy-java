@@ -26,6 +26,8 @@ public class RpcV2JsonProtocolTests {
 
     @HttpServerRequestTests
     @ProtocolTestFilter(
+            // The @discriminated union trait is not supported yet
+            skipOperations = "smithy.protocoltests.rpcv2Json#DiscriminatedUnionOperation",
             skipTests = {
                     // TODO fix empty body handling in the deserializer
                     "RpcV2JsonRequestNoInput",
@@ -40,6 +42,8 @@ public class RpcV2JsonProtocolTests {
 
     @HttpServerResponseTests
     @ProtocolTestFilter(
+            // The @discriminated union trait is not supported yet
+            skipOperations = "smithy.protocoltests.rpcv2Json#DiscriminatedUnionOperation",
             skipTests = {
                     "RpcV2JsonResponseNoOutput", // TODO genuine bug, fix
                     // TODO fix the protocol test

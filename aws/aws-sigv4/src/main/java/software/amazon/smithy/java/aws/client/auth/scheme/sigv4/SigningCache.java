@@ -9,11 +9,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.locks.StampedLock;
 
-/**
- * A bounded cache for {@link SigningKey}s that has a FIFO eviction policy when the cache is full.
- */
-final class SigningCache {
-    private final LinkedHashMap<CacheKey, SigningKey> fifoStore;
+final class SigningCache<K, V> {
+    private final LinkedHashMap<K, V> fifoStore;
     private final StampedLock lock = new StampedLock();
 
     SigningCache(int maxSize) {
@@ -22,7 +19,7 @@ final class SigningCache {
         }
         this.fifoStore = new LinkedHashMap<>() {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<CacheKey, SigningKey> eldest) {
+            protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
                 return size() > maxSize;
             }
         };
@@ -31,7 +28,7 @@ final class SigningCache {
     /**
      * Adds an entry to the cache, evicting the earliest entry if necessary.
      */
-    void put(CacheKey key, SigningKey value) {
+    void put(K key, V value) {
         long stamp = lock.writeLock();
         try {
             fifoStore.put(key, value);
@@ -40,10 +37,7 @@ final class SigningCache {
         }
     }
 
-    /**
-     * @return Signing key if it exists in the store, otherwise {@code null}.
-     */
-    SigningKey get(CacheKey key) {
+    V get(K key) {
         long stamp = lock.readLock();
         try {
             return fifoStore.get(key);

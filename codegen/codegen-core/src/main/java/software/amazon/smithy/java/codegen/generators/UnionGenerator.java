@@ -156,7 +156,7 @@ public final class UnionGenerator
                 writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(shape, member));
                 writer.putContext("memberIndex", sortedMembers.indexOf(member));
                 writer.putContext("schemaClass", Schema.class);
-                writer.putContext("toString", new ToStringGenerator(writer));
+                writer.putContext("toString", new ToStringGenerator(writer, member));
                 writer.putContext("valueGetter", writer.consumer((writer) -> {
                     writer.pushState(new GetterSection(member));
                     writer.writeInline("""

@@ -1,5 +1,69 @@
 # Change Log
 
+## 1.9.1 (11/18/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Bug Fixes
+
+* Fixed a bug in `ToStringSerializer.writeFloat`, which appended the value
+ directly and rendered @sensitive floats in toString().
+  ([#1459](https://github.com/smithy-lang/smithy-java/pull/1459))
+
+## 1.9.0 (11/17/2026)
+> [!IMPORTANT]
+> All client modules are considered stable.  Some modules, including
+> server, CLI, and MCP, are still in developer-preview and may contain
+> bugs.  No guarantee is made about their API stability. Unstable
+> modules are marked with a warning in their `README.md` and with the
+> `@SmithyUnstableApi` annotation in their `package-info.java`.
+
+### Features
+
+* Added SigV4a signing for HTTP requests and event streams, with
+  configurable signing region sets and auth scheme discovery for generated
+  clients
+  ([#1424](https://github.com/smithy-lang/smithy-java/pull/1424))
+
+### Bug Fixes
+
+* Fixed schemas for recursive unions being generated as structures, which
+  caused code that dispatches on the schema type, such as validation, to
+  treat them as structures. Validation of these unions now requires exactly
+  one member to be set
+  ([#1431](https://github.com/smithy-lang/smithy-java/pull/1431))
+* Fixed codecs throwing exceptions such as `NullPointerException` or
+  `IllegalArgumentException` instead of `SerializationException` when
+  deserializing invalid input, such as a union with no members or multiple
+  members set
+  ([#1418](https://github.com/smithy-lang/smithy-java/pull/1418))
+* Fixed generated waiters being emitted in a nondeterministic order
+  ([#1428](https://github.com/smithy-lang/smithy-java/pull/1428))
+* Fixed a regression from 1.7.0 where the HTTP payload serializer ignored the
+  schema passed in when serializing a structure payload
+  ([#1426](https://github.com/smithy-lang/smithy-java/pull/1426))
+
+### Improvements
+
+* Added a reference to the `bom` module to every published module so that
+  Gradle aligns the versions of Smithy Java modules that come from clients
+  built with different Smithy Java versions
+  ([#1425](https://github.com/smithy-lang/smithy-java/pull/1425))
+* Limited deserialized big integers and big decimal significands to 1,000
+  digits and rejected conversions that exceed safe bounds, to prevent
+  excessive CPU and memory use on untrusted input. Big decimals now use
+  scientific notation when plain output would exceed 1,000 digits
+  ([#1442](https://github.com/smithy-lang/smithy-java/pull/1442))
+* Reduced the size of generated code by sharing operation, enum, and
+  deserializer logic across shapes. For EC2, the generated JAR shrank from
+  23.35 MB to 15.97 MB with 4,598 fewer classes. Added
+  `ApiService.getOperation(ShapeId)` to look up an operation by shape ID
+  ([#1430](https://github.com/smithy-lang/smithy-java/pull/1430))
+
 ## 1.8.0 (10/20/2026)
 > [!IMPORTANT]
 > All client modules are considered stable.  Some modules, including
