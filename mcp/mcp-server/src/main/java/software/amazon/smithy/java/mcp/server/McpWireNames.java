@@ -10,6 +10,7 @@ final class McpWireNames {
     static final String CLIENT_INFO = "io.modelcontextprotocol/clientInfo";
     static final String CLIENT_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities";
     static final String SERVER_INFO = "io.modelcontextprotocol/serverInfo";
+    static final String SUBSCRIPTION_ID = "io.modelcontextprotocol/subscriptionId";
 
     private McpWireNames() {}
 }
