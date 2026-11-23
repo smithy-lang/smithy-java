@@ -692,6 +692,62 @@ public class SmithyUriTest {
                     () -> SmithyUri.of("https", "fe80::1%25eth0", -1, "/", null));
         }
 
+        static Stream<Arguments> invalidHosts() {
+            return Stream.of(
+                    Arguments.of("a\u010D\u010Ab"),
+                    Arguments.of("\u00E9x.com"),
+                    Arguments.of("a\u0000b"),
+                    Arguments.of("a\u007Fb"),
+                    Arguments.of("a\u000Bb"),
+                    Arguments.of("a@b"),
+                    Arguments.of("a\\b"),
+                    Arguments.of("a{b"));
+        }
+
+        @ParameterizedTest
+        @MethodSource("invalidHosts")
+        void rejectsInvalidHostCharacters(String host) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", host, -1, "/", null));
+            var base = SmithyUri.of("https", "example.com", -1, "/", null);
+            assertThrows(IllegalArgumentException.class, () -> base.withHost(host));
+        }
+
+        @Test
+        void invalidHostMessageShowsEscapedHost() {
+            var e = assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "a\r\nb@c", -1, "/", null));
+            assertThat(e.getMessage(), equalTo("Invalid character in host: '\\u000D' in a\\u000D\\u000Ab@c"));
+
+            var e2 = assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "a@b", -1, "/", null));
+            assertThat(e2.getMessage(), equalTo("Invalid character in host: '@' in a@b"));
+        }
+
+        @Test
+        void uppercaseHostMessageShowsEscapedHost() {
+            var e = assertThrows(IllegalArgumentException.class,
+                    () -> SmithyUri.of("https", "Exč.com", -1, "/", null));
+            assertThat(e.getMessage(), equalTo("Host must be lowercase: Ex\\u010D.com"));
+        }
+
+        static Stream<Arguments> validHosts() {
+            return Stream.of(
+                    Arguments.of("a_b.example.com"),
+                    Arguments.of("::1"),
+                    Arguments.of("192.168.0.1"),
+                    Arguments.of("xn--bcher-kva.example"),
+                    Arguments.of("a-b~c"));
+        }
+
+        @ParameterizedTest
+        @MethodSource("validHosts")
+        void acceptsValidHosts(String host) {
+            assertThat(SmithyUri.of("https", host, -1, "/", null).getHost(), equalTo(host));
+            var base = SmithyUri.of("https", "example.com", -1, "/", null);
+            assertThat(base.withHost(host).getHost(), equalTo(host));
+        }
+
         @Test
         void rejectsBareBracketsInHost() {
             assertThrows(IllegalArgumentException.class,

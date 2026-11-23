@@ -246,6 +246,17 @@ class SmithyUriTemplateTest {
     }
 
     @Test
+    void rejectsHostValuesCarryingControlCharacters() {
+        var template = SmithyUriTemplate.builder()
+                .scheme("https")
+                .addHostPlaceholder()
+                .addHostLiteral(".example.com")
+                .build();
+        assertThrows(IllegalArgumentException.class, () -> template.expand("x\u010D\u010Ay"));
+        assertThrows(IllegalArgumentException.class, () -> template.expand("x\ry"));
+    }
+
+    @Test
     void validatesConstantPartsWhenBuilt() {
         assertThrows(IllegalArgumentException.class,
                 () -> SmithyUriTemplate.builder().scheme("HTTPS"));

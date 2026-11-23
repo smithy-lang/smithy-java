@@ -89,7 +89,28 @@ final class HostLabelSerializer extends SpecificShapeSerializer implements Shape
             if (!schema.hasTrait(TraitKey.HOST_LABEL_TRAIT)) {
                 return;
             }
+            if (value == null) {
+                // Leave the label unset so flush reports it as missing.
+                return;
+            }
+            validateHostLabel(schema.memberName(), value);
             serializer.labelMap.put(schema.memberName(), value);
+        }
+
+        private static void validateHostLabel(String member, String value) {
+            boolean valid = !value.isEmpty();
+            for (int i = 0; valid && i < value.length(); i++) {
+                char c = value.charAt(i);
+                valid = (c >= 'a' && c <= 'z')
+                        || (c >= 'A' && c <= 'Z')
+                        || (c >= '0' && c <= '9')
+                        || c == '-'
+                        || c == '.';
+            }
+            if (!valid) {
+                throw new SerializationException("Invalid value for host label `" + member
+                        + "`: must be a non-empty string of ASCII letters, digits, '-' or '.'");
+            }
         }
 
         @Override
