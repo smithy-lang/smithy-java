@@ -11,7 +11,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
+import java.security.interfaces.ECPrivateKey;
+import java.security.interfaces.ECPublicKey;
+import java.security.spec.ECGenParameterSpec;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -26,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.SignResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsEcdsaCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.core.settings.EndpointAuthSchemeSettings;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -193,6 +198,37 @@ class SigV4aSignerTest {
         }
         assertThat(signed.headers().hasHeader("x-amz-security-token")).isFalse();
         assertThat(canonical).doesNotContain("x-amz-security-token");
+    }
+
+    @Test
+    void signsWithASuppliedEcdsaKeyInsteadOfDerivingOne() throws Exception {
+        var generator = KeyPairGenerator.getInstance("EC");
+        generator.initialize(new ECGenParameterSpec("secp256r1"));
+        var keyPair = generator.generateKeyPair();
+        var identity = AwsEcdsaCredentialsIdentity.create(
+                "ASIAECDSAEXAMPLE",
+                (ECPrivateKey) keyPair.getPrivate(),
+                "ecdsa-session-token");
+        var request = request("GET", "https://example.amazonaws.com/", Map.of(), null);
+
+        SignResult<HttpRequest> result;
+        String stringToSign;
+        String canonical;
+        try (var signer = SigV4aSigner.create()) {
+            result = signer.sign(request, identity, properties());
+            stringToSign = signer.lastStringToSign();
+            canonical = signer.lastCanonicalRequest();
+        }
+
+        var headers = result.signedRequest().headers();
+        assertThat(headers.firstValue("x-amz-security-token")).isEqualTo("ecdsa-session-token");
+        assertThat(canonical).contains("x-amz-security-token:ecdsa-session-token\n");
+        assertThat(headers.firstValue("authorization"))
+                .startsWith("AWS4-ECDSA-P256-SHA256 Credential=ASIAECDSAEXAMPLE/20260601/service/aws4_request, ");
+        assertThat(SigV4aTestSupport.verifies((ECPublicKey) keyPair.getPublic(), stringToSign, result.signature()))
+                .isTrue();
+        assertThat(SigV4aTestSupport.verifies(SigV4aTestSupport.testPublicKey(), stringToSign, result.signature()))
+                .isFalse();
     }
 
     @Test

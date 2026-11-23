@@ -14,6 +14,8 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPrivateKeySpec;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsEcdsaCredentialsIdentity;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -69,6 +71,13 @@ final class SigV4aKeyDerivation {
 
     static ECParameterSpec p256() {
         return P256;
+    }
+
+    static ECPrivateKey signingKey(AwsCredentialsIdentity identity, SigningResources r) {
+        if (identity instanceof AwsEcdsaCredentialsIdentity ecdsa) {
+            return ecdsa.ecdsaPrivateKey();
+        }
+        return derive(identity.accessKeyId(), identity.secretAccessKey(), r);
     }
 
     static ECPrivateKey derive(String accessKeyId, String secretAccessKey, SigningResources r) {
