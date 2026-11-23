@@ -1,1 +1,2 @@
 software.amazon.smithy.java.codegen.client.integrations.settings.DefaultPluginSettingsIntegration
+software.amazon.smithy.java.codegen.integrations.tostring.ToStringSectionIntegration
