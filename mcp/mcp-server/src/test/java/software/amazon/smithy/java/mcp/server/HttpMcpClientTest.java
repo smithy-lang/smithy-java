@@ -441,6 +441,282 @@ class HttpMcpClientTest {
     }
 
     @Test
+    void testLargeTextErrorBodyIsNotBuffered() throws Exception {
+        var handler = new StreamingBodyHandler(500, "text/plain", "", "A");
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+
+        var response = assertTimeoutPreemptively(Duration.ofSeconds(5), () -> proxy.exchange(rpcRequest()));
+
+        var message = response.getError().getMessage();
+        assertEquals(UPSTREAM_HTTP_ERROR_CODE, response.getError().getCode());
+        assertEquals("HTTP 500: " + "A".repeat(200) + " (truncated)", message);
+        handler.assertStoppedEarly();
+    }
+
+    @Test
+    void testLargeJsonErrorBodyIsNotBuffered() throws Exception {
+        var handler = new StreamingBodyHandler(500, "application/json", "{\"jsonrpc\":\"2.0\",\"error\":\"", "A");
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+
+        var response = assertTimeoutPreemptively(Duration.ofSeconds(5), () -> proxy.exchange(rpcRequest()));
+
+        assertEquals(1, response.getId().asInteger());
+        assertEquals(UPSTREAM_HTTP_ERROR_CODE, response.getError().getCode());
+        assertEquals("HTTP 500: Error response exceeds 65536 bytes", response.getError().getMessage());
+        handler.assertStoppedEarly();
+    }
+
+    @Test
+    void testLargeSuccessfulJsonBodyIsNotBuffered() throws Exception {
+        var handler =
+                new StreamingBodyHandler(200,
+                        "application/json",
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"",
+                        "A",
+                        StreamingBodyHandler.LARGE_MAX_STREAMED_BYTES);
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+
+        var response = assertTimeoutPreemptively(Duration.ofSeconds(30), () -> proxy.exchange(rpcRequest()));
+
+        assertEquals(1, response.getId().asInteger());
+        assertEquals(UPSTREAM_HTTP_ERROR_CODE, response.getError().getCode());
+        assertEquals("HTTP 200: Response body exceeds 16777216 bytes", response.getError().getMessage());
+        handler.assertStoppedEarly();
+    }
+
+    @Test
+    void testLongSseLineIsNotBuffered() throws Exception {
+        var handler = new StreamingBodyHandler(200,
+                "text/event-stream",
+                "data: ",
+                "A",
+                StreamingBodyHandler.LARGE_MAX_STREAMED_BYTES);
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+
+        var response = assertTimeoutPreemptively(Duration.ofSeconds(30), () -> proxy.exchange(rpcRequest()));
+
+        assertEquals(-32001, response.getError().getCode());
+        assertEquals("SSE parsing error: SSE line exceeds 16777216 characters", response.getError().getMessage());
+        handler.assertStoppedEarly();
+    }
+
+    @Test
+    void testLargeSseEventIsNotBuffered() throws Exception {
+        var handler = new StreamingBodyHandler(200,
+                "text/event-stream",
+                "",
+                "data: " + "A".repeat(100) + "\n",
+                StreamingBodyHandler.LARGE_MAX_STREAMED_BYTES);
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+
+        var response = assertTimeoutPreemptively(Duration.ofSeconds(30), () -> proxy.exchange(rpcRequest()));
+
+        assertEquals(-32001, response.getError().getCode());
+        assertEquals("SSE parsing error: SSE event exceeds 16777216 characters", response.getError().getMessage());
+        handler.assertStoppedEarly();
+    }
+
+    @Test
+    void expiredSessionWithALargeNotFoundBodyIsStillRecovered() throws Exception {
+        var handler = new RecoveringSessionHandler(true);
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+
+        var protocol = BuiltInProtocols.protocol(KnownProtocolVersion.V2025_11_25);
+        proxy.initialize(
+                ignored -> {},
+                ignored -> {},
+                JsonRpcRequest.builder()
+                        .method(McpMethod.Standard.INITIALIZE.wireName())
+                        .id(Document.of(1))
+                        .jsonrpc("2.0")
+                        .params(Document.of(Map.of(
+                                "protocolVersion",
+                                Document.of(protocol.id().identifier()))))
+                        .build(),
+                protocol);
+
+        var response = assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> proxy.exchange(JsonRpcRequest.builder()
+                        .method(McpMethod.Standard.PING.wireName())
+                        .id(Document.of(2))
+                        .jsonrpc("2.0")
+                        .build()));
+
+        assertEquals("recovered", response.getResult().asString());
+        assertEquals(2, handler.initializeCount.get());
+        handler.notFoundBody.assertStoppedEarly();
+    }
+
+    @Test
+    void testBuilderRejectsInvalidMaxResponseBodyBytes() {
+        for (int invalid : new int[] {0, -1, Integer.MAX_VALUE - 7, Integer.MAX_VALUE}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> HttpMcpClient.builder().endpoint(serverUrl).maxResponseBodyBytes(invalid).build(),
+                    "accepted " + invalid);
+        }
+        assertDoesNotThrow(
+                () -> HttpMcpClient.builder().endpoint(serverUrl).maxResponseBodyBytes(Integer.MAX_VALUE - 8).build());
+    }
+
+    @Test
+    void testMaxResponseBodyBytesLimitsJsonResponses() throws IOException {
+        var smallResult = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"" + "a".repeat(900) + "\"}";
+        var largeResult = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"" + "a".repeat(2048) + "\"}";
+        var chunked = new AtomicBoolean();
+        var body = new AtomicReference<String>();
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            var bytes = body.get().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, chunked.get() ? 0 : bytes.length);
+            try (var output = exchange.getResponseBody()) {
+                output.write(bytes);
+            }
+        });
+        var limited = HttpMcpClient.builder().endpoint(serverUrl).maxResponseBodyBytes(1024).build();
+
+        for (boolean isChunked : new boolean[] {false, true}) {
+            chunked.set(isChunked);
+            body.set(largeResult);
+            var error = limited.exchange(rpcRequest()).getError();
+            assertNotNull(error, "chunked=" + isChunked);
+            assertEquals("HTTP 200: Response body exceeds 1024 bytes", error.getMessage());
+
+            body.set(smallResult);
+            assertEquals("a".repeat(900), limited.exchange(rpcRequest()).getResult().asString());
+        }
+        limited.close();
+    }
+
+    @Test
+    void testMaxResponseBodyBytesLimitsSseLines() throws Exception {
+        var handler = new StreamingBodyHandler(200, "text/event-stream", "data: ", "A");
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+        var limited = HttpMcpClient.builder().endpoint(serverUrl).maxResponseBodyBytes(1024).build();
+
+        var response = assertTimeoutPreemptively(Duration.ofSeconds(5), () -> limited.exchange(rpcRequest()));
+
+        assertEquals("SSE parsing error: SSE line exceeds 1024 characters", response.getError().getMessage());
+        handler.assertStoppedEarly();
+        limited.close();
+    }
+
+    @Test
+    void testMaxResponseBodyBytesLimitsSseEvents() throws Exception {
+        var handler = new StreamingBodyHandler(200, "text/event-stream", "", "data: " + "A".repeat(100) + "\n");
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", handler);
+        var limited = HttpMcpClient.builder().endpoint(serverUrl).maxResponseBodyBytes(1024).build();
+
+        var response = assertTimeoutPreemptively(Duration.ofSeconds(5), () -> limited.exchange(rpcRequest()));
+
+        assertEquals("SSE parsing error: SSE event exceeds 1024 characters", response.getError().getMessage());
+        handler.assertStoppedEarly();
+        limited.close();
+    }
+
+    @Test
+    void testSseWithinMaxResponseBodyBytesStillWorks() throws IOException {
+        var json = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"" + "a".repeat(900) + "\"}";
+        serveSse(": " + "c".repeat(1000) + "\r\nevent: message\r\ndata: " + json + "\r\n\r\n");
+        var limited = HttpMcpClient.builder().endpoint(serverUrl).maxResponseBodyBytes(1024).build();
+
+        assertEquals("a".repeat(900), limited.exchange(rpcRequest()).getResult().asString());
+        limited.close();
+    }
+
+    private void serveSse(String body) {
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, 0);
+            try (var output = exchange.getResponseBody()) {
+                output.write(body.getBytes(StandardCharsets.UTF_8));
+            }
+        });
+    }
+
+    private static JsonRpcRequest rpcRequest() {
+        return JsonRpcRequest.builder()
+                .method("test/method")
+                .id(Document.of(1))
+                .jsonrpc("2.0")
+                .build();
+    }
+
+    private static final int UPSTREAM_HTTP_ERROR_CODE = -32000;
+
+    /**
+     * Answers with a chunked body of a fixed maximum size: a prefix, then a repeated pattern. A client
+     * that bounds its reads closes the connection long before the whole body is written.
+     */
+    private static final class StreamingBodyHandler implements HttpHandler {
+        private static final long DEFAULT_MAX_STREAMED_BYTES = 32L * 1024 * 1024;
+        // Larger than the client's default 16 MiB limit plus what the socket and reader buffers hold.
+        private static final long LARGE_MAX_STREAMED_BYTES = 128L * 1024 * 1024;
+
+        private final int status;
+        private final long maxStreamedBytes;
+        private final String contentType;
+        private final byte[] prefix;
+        private final byte[] chunk;
+        private final AtomicBoolean completed = new AtomicBoolean();
+        private final CountDownLatch done = new CountDownLatch(1);
+
+        StreamingBodyHandler(int status, String contentType, String prefix, String pattern) {
+            this(status, contentType, prefix, pattern, DEFAULT_MAX_STREAMED_BYTES);
+        }
+
+        StreamingBodyHandler(int status, String contentType, String prefix, String pattern, long maxStreamedBytes) {
+            this.status = status;
+            this.maxStreamedBytes = maxStreamedBytes;
+            this.contentType = contentType;
+            this.prefix = prefix.getBytes(StandardCharsets.UTF_8);
+            this.chunk = pattern.repeat(Math.max(1, 64 * 1024 / pattern.length())).getBytes(StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            exchange.getRequestBody().readAllBytes();
+            stream(exchange);
+        }
+
+        void stream(HttpExchange exchange) throws IOException {
+            exchange.getResponseHeaders().set("Content-Type", contentType);
+            exchange.sendResponseHeaders(status, 0);
+            try (var output = exchange.getResponseBody()) {
+                output.write(prefix);
+                long sent = prefix.length;
+                while (sent < maxStreamedBytes) {
+                    output.write(chunk);
+                    sent += chunk.length;
+                }
+                output.flush();
+                completed.set(true);
+            } catch (IOException ignored) {
+                // The client closed the connection.
+            } finally {
+                done.countDown();
+                exchange.close();
+            }
+        }
+
+        void assertStoppedEarly() throws InterruptedException {
+            assertTrue(done.await(10, TimeUnit.SECONDS), "server did not finish writing");
+            assertFalse(completed.get(), "client read the whole " + maxStreamedBytes + " byte body");
+        }
+    }
+
+    @Test
     void testStartAndShutdown() {
         assertDoesNotThrow(() -> {
             proxy.start();
@@ -755,6 +1031,17 @@ class HttpMcpClientTest {
 
     private static final class RecoveringSessionHandler implements HttpHandler {
         private final AtomicInteger initializeCount = new AtomicInteger();
+        private final StreamingBodyHandler notFoundBody;
+
+        RecoveringSessionHandler() {
+            this(false);
+        }
+
+        RecoveringSessionHandler(boolean largeNotFoundBody) {
+            this.notFoundBody = largeNotFoundBody
+                    ? new StreamingBodyHandler(404, "text/plain", "", "A")
+                    : null;
+        }
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -780,6 +1067,10 @@ class HttpMcpClientTest {
             }
 
             var sessionId = exchange.getRequestHeaders().getFirst("Mcp-Session-Id");
+            if ("session-1".equals(sessionId) && notFoundBody != null) {
+                notFoundBody.stream(exchange);
+                return;
+            }
             if ("session-1".equals(sessionId)) {
                 exchange.sendResponseHeaders(404, -1);
                 exchange.close();
