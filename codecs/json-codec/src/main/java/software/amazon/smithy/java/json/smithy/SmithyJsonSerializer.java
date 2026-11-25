@@ -68,6 +68,7 @@ final class SmithyJsonSerializer implements ShapeSerializer {
     private final ShapeSerializer structSerializer = new StructSerializer();
     private final ShapeSerializer listElementSerializer = new ListElementSerializer();
     private final MapSerializer mapSerializer = new SmithyMapSerializer();
+    private final DiscriminatedUnionWriter discriminatorWriter = new DiscriminatedUnionWriter();
     private SerializeDocumentContents serializeDocumentContents;
 
     SmithyJsonSerializer(OutputStream sink, JsonSettings settings) {
@@ -318,19 +319,50 @@ final class SmithyJsonSerializer implements ShapeSerializer {
         }
         needsComma[depth] = false;
 
-        // Resolve field name table once per struct for all member writes.
-        byte[][] savedTable = currentFieldNameTable;
         Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
-        var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
-        if (ext != null) {
-            currentFieldNameTable = useJsonName ? ext.jsonFieldNameTable() : ext.memberFieldNameTable();
+        // Only unions can carry @discriminated, so structures skip the extension lookup.
+        var discriminatedExt = structSchema.type() == ShapeType.UNION
+                ? structSchema.getExtension(DiscriminatedUnionSchemaExtensions.KEY)
+                : null;
+        if (discriminatedExt != null) {
+            // The union writes no field table of its own; its single set member's fields are
+            // inlined directly as siblings of the discriminator, using the variant's own table.
+            // The writer is shared, so save its state for the discriminated union this one is nested in.
+            byte[][] savedTable = currentFieldNameTable;
+            var writer = discriminatorWriter;
+            var savedExtension = writer.extension;
+            boolean savedWritten = writer.written;
+            writer.extension = discriminatedExt;
+            writer.written = false;
+            boolean written;
+            try {
+                struct.serializeMembers(writer);
+            } finally {
+                written = writer.written;
+                writer.extension = savedExtension;
+                writer.written = savedWritten;
+                currentFieldNameTable = savedTable;
+            }
+            if (!written) {
+                // The unknown variant has no member to write, and the flat form cannot represent it.
+                throw new SerializationException(
+                        "Cannot serialize discriminated union " + structSchema.id() + " without a known member set");
+            }
         } else {
-            currentFieldNameTable = null;
+            // Resolve field name table once per struct for all member writes.
+            byte[][] savedTable = currentFieldNameTable;
+            var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
+            if (ext != null) {
+                currentFieldNameTable = useJsonName ? ext.jsonFieldNameTable() : ext.memberFieldNameTable();
+            } else {
+                currentFieldNameTable = null;
+            }
+
+            struct.serializeMembers(structSerializer);
+
+            currentFieldNameTable = savedTable; // restore for nested struct returns
         }
 
-        struct.serializeMembers(structSerializer);
-
-        currentFieldNameTable = savedTable; // restore for nested struct returns
         depth--;
         ensureCapacity(1);
         buf[pos++] = '}';
@@ -2906,5 +2938,47 @@ final class SmithyJsonSerializer implements ShapeSerializer {
 
         });
         endObject();
+    }
+
+    /**
+     * Writes a {@code @discriminated} union's single set member. {@link #writeStruct} is called exactly
+     * once, by the union's own generated {@code serializeMembers}, with the member schema of whichever
+     * variant is set and the variant's value.
+     *
+     * <p>Rather than delegate to the normal struct write (which would open a nested object for the
+     * variant), this writes the discriminator key/value pair directly into the already-open outer object,
+     * then serializes the variant's own members as siblings using the normal {@link #structSerializer}
+     * (switched to the variant's own field name table, not the union's).
+     */
+    private final class DiscriminatedUnionWriter extends SpecificShapeSerializer {
+        DiscriminatedUnionSchemaExtensions.DiscriminatedUnionExtension extension;
+        boolean written;
+
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            if (written) {
+                throw new SerializationException("Discriminated union member " + schema.id()
+                        + " cannot be written: only one member of a union can be set");
+            }
+            written = true;
+            byte[] discriminatorFieldNameBytes = extension.discriminatorFieldNameBytes();
+            byte[] discriminatorValueBytes = extension.discriminatorValueBytesTable()[schema.memberIndex()];
+            ensureCapacity(discriminatorFieldNameBytes.length + discriminatorValueBytes.length);
+            // The discriminator is always the first field written, so no leading comma is needed, but
+            // subsequent sibling fields written by the variant's own members do need one.
+            needsComma[depth] = true;
+            System.arraycopy(discriminatorFieldNameBytes, 0, buf, pos, discriminatorFieldNameBytes.length);
+            pos += discriminatorFieldNameBytes.length;
+            System.arraycopy(discriminatorValueBytes, 0, buf, pos, discriminatorValueBytes.length);
+            pos += discriminatorValueBytes.length;
+
+            Schema variantSchema = schema.isMember() ? schema.memberTarget() : schema;
+            var ext = variantSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
+            currentFieldNameTable = ext != null
+                    ? (useJsonName ? ext.jsonFieldNameTable() : ext.memberFieldNameTable())
+                    : null;
+
+            struct.serializeMembers(structSerializer);
+        }
     }
 }

@@ -50,6 +50,23 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
     private int generatedFieldEnd;
     private String generatedFieldName;
 
+    // Set by readDiscriminatedUnion immediately before invoking the resolved variant's StructMemberConsumer.
+    // When set, the next readStruct call reads the variant's fields inside the still-open outer object
+    // rather than expecting its own opening '{'. See the discriminated-union handling in readStruct.
+    private boolean flatStructContinuation;
+
+    // Index of the opening quote of a discriminator field name that the variant being read must skip, or 0
+    // for none (index 0 can never hold a field name, since an object's '{' precedes it). Non-zero when the
+    // discriminator was not the first field: the variant then reads the object from its first field and
+    // meets the discriminator again, which it skips without reporting it as an unknown member. Saved and
+    // restored around each variant read, so nested discriminated unions do not clobber it.
+    private int discriminatorSkipPos;
+
+    // Bytes that discriminator-not-first scans may still skip before decoding falls back to materializing
+    // a document. Each scan is followed by a re-read of the same bytes, so without a bound, nested unions
+    // whose discriminator is not first would process the innermost bytes once per enclosing union.
+    private int rescanBudget;
+
     // Mutable result fields, avoids allocating arrays on every parse call.
     // Safe because the deserializer is single-threaded (one instance per operation).
     long parsedLong;
@@ -102,6 +119,8 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         this.depth = 0;
         // Position at the first non-whitespace token
         this.pos = JsonReadUtils.skipWhitespace(buf, pos, end);
+        int length = end - pos;
+        this.rescanBudget = length > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : length * 2;
     }
 
     @Override
@@ -618,39 +637,74 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         final int localEnd = this.end;
         int p = JsonReadUtils.skipWhitespace(localBuf, this.pos, localEnd);
 
-        if (p >= localEnd) {
-            this.pos = p;
-            return;
-        }
-        if (localBuf[p] != '{') {
-            this.pos = p;
-            throw new SerializationException(
-                    "Expected '{', found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
-        }
-        p++;
-        depth++;
-        if (depth > MAX_DEPTH) {
-            this.pos = p;
-            throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
-        }
-
-        p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
-
-        if (p < localEnd && localBuf[p] == '}') {
-            this.pos = p + 1;
-            depth--;
-            return;
-        }
-
+        // Discriminated-union continuation: the fast path has already consumed the outer '{' and
+        // the discriminator field, and is now feeding the resolved variant its own fields as
+        // siblings inside that still-open object. Skip the opening-brace handling and depth bump
+        // (both already accounted for by the enclosing discriminated readStruct) and drop straight
+        // into the field loop, which will consume the shared closing '}' and balance the depth.
+        boolean continuation = flatStructContinuation;
         Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
-        var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
-        SmithyMemberLookup lookup = null;
-        if (ext != null) {
-            lookup = useJsonName ? ext.jsonNameLookup() : ext.memberNameLookup();
-        }
+        SmithyMemberLookup lookup;
         int expectedNext = 0;
-
         boolean first = true;
+        // Opening quote of a field this loop must skip: the discriminator of the union whose variant is being read,
+        // met again after a rewind. 0 (never a field position) for every other struct.
+        int skipPos = 0;
+
+        if (continuation) {
+            flatStructContinuation = false;
+            skipPos = discriminatorSkipPos;
+            var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
+            lookup = ext != null ? (useJsonName ? ext.jsonNameLookup() : ext.memberNameLookup()) : null;
+            // When the discriminator came first, pos is just after its value and the next token is ',' or
+            // '}', so re-use the loop's post-first handling. Otherwise pos is just after the outer '{' and
+            // the variant reads every field, skipping the discriminator when it meets it.
+            first = skipPos != 0;
+        } else {
+            if (p >= localEnd) {
+                this.pos = p;
+                return;
+            }
+            if (localBuf[p] != '{') {
+                this.pos = p;
+                throw new SerializationException(
+                        "Expected '{', found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
+            }
+            int objectStart = p;
+            p++;
+            depth++;
+            if (depth > MAX_DEPTH) {
+                this.pos = p;
+                throw new SerializationException("Maximum nesting depth exceeded: " + MAX_DEPTH);
+            }
+
+            p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
+
+            if (p < localEnd && localBuf[p] == '}') {
+                this.pos = p + 1;
+                depth--;
+                // An empty object identifies no variant of a discriminated union, which is an error like any other
+                // missing discriminator.
+                var emptyDiscriminatedExt = discriminatedUnionExtension(structSchema);
+                if (emptyDiscriminatedExt != null) {
+                    throw new SerializationException("Discriminated union is missing a string discriminator field '"
+                            + new String(emptyDiscriminatedExt.discriminatorRawNameBytes(), StandardCharsets.UTF_8)
+                            + "'");
+                }
+                return;
+            }
+
+            var discriminatedExt = discriminatedUnionExtension(structSchema);
+            if (discriminatedExt != null) {
+                this.pos = p;
+                readDiscriminatedUnion(schema, discriminatedExt, objectStart, state, structMemberConsumer);
+                return;
+            }
+
+            var ext = structSchema.getExtension(SmithyJsonSchemaExtensions.KEY);
+            lookup = ext != null ? (useJsonName ? ext.jsonNameLookup() : ext.memberNameLookup()) : null;
+        }
+
         while (true) {
             if (!first) {
                 p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
@@ -680,6 +734,19 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                         "Expected field name, found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
             }
             p++; // skip opening quote
+
+            if (p - 1 == skipPos) {
+                // Skip the discriminator before the member lookup, so that a member whose serialized name collides
+                // with it never receives it. Its name, colon and string value were validated when it was found.
+                while (localBuf[p] != '"') {
+                    p += localBuf[p] == '\\' ? 2 : 1;
+                }
+                p = JsonReadUtils.skipWhitespace(localBuf, p + 1, localEnd);
+                this.pos = p + 1; // past the colon
+                skipValue();
+                p = this.pos;
+                continue;
+            }
 
             // Fused speculative path: check expected field name directly at current
             // position without scanning for the closing quote byte-by-byte. If the
@@ -796,6 +863,234 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
                 p = this.pos;
             }
         }
+    }
+
+    /**
+     * Reads a {@code @discriminated} union. On entry {@code this.pos} points at the first field
+     * name inside the already-consumed outer '{'; {@code depth} has been incremented for that
+     * brace and {@code objectStart} is the index of the '{' itself.
+     *
+     * <p>Fast path: when the first field is the discriminator, its value resolves the active
+     * variant directly, and the remaining fields are fed to that variant as siblings in a single
+     * pass (via {@link #flatStructContinuation}).
+     *
+     * <p>Otherwise the fields in front of the discriminator are skipped until it is found, and the
+     * variant then reads the object from its first field, skipping the discriminator when it meets it
+     * again (via {@link #discriminatorSkipPos}). Skipping allocates nothing and costs less than
+     * materializing the fields as a document. Because every skipped byte is read again, the bytes
+     * skipped per deserializer are bounded by {@link #rescanBudget}; past it, the object is
+     * materialized as a document instead, which reads each byte once.
+     */
+    private <T> void readDiscriminatedUnion(
+            Schema unionSchema,
+            DiscriminatedUnionSchemaExtensions.DiscriminatedUnionExtension ext,
+            int objectStart,
+            T state,
+            StructMemberConsumer<T> structMemberConsumer
+    ) {
+        final byte[] localBuf = this.buf;
+        final int localEnd = this.end;
+        int p = this.pos;
+        byte[] discriminatorName = ext.discriminatorRawNameBytes();
+        boolean fieldsBefore = false;
+        int discriminatorPos;
+
+        // Walk the fields until the discriminator. On the fast path it is the first one.
+        while (true) {
+            if (p >= localEnd || localBuf[p] != '"') {
+                this.pos = p;
+                throw new SerializationException(
+                        "Expected field name, found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
+            }
+            int nameQuote = p;
+            p++; // opening quote
+            int nameStart = p;
+            boolean escapedName = false;
+            while (p < localEnd && localBuf[p] != '"') {
+                if (localBuf[p] == '\\') {
+                    escapedName = true;
+                    p++;
+                }
+                p++;
+            }
+            if (p >= localEnd) {
+                this.pos = p;
+                throw new SerializationException("Unterminated field name");
+            }
+            int nameEnd = p;
+            p++; // closing quote
+
+            boolean isDiscriminator;
+            if (escapedName) {
+                JsonReadUtils.parseString(localBuf, nameStart - 1, localEnd, this);
+                isDiscriminator = Arrays.equals(this.parsedString.getBytes(StandardCharsets.UTF_8), discriminatorName);
+            } else {
+                isDiscriminator = (nameEnd - nameStart) == discriminatorName.length
+                        && Arrays.equals(localBuf, nameStart, nameEnd, discriminatorName, 0, discriminatorName.length);
+            }
+
+            p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
+            if (p >= localEnd || localBuf[p] != ':') {
+                this.pos = p;
+                throw new SerializationException(
+                        "Expected ':', found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
+            }
+            p++;
+            p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
+
+            if (isDiscriminator) {
+                discriminatorPos = nameQuote;
+                break;
+            }
+
+            if (!fieldsBefore) {
+                if (rescanBudget <= 0) {
+                    // Undo the depth bump taken for the outer '{' and rewind to it so readDocument
+                    // re-parses cleanly.
+                    depth--;
+                    this.pos = objectStart;
+                    readDiscriminatedUnionViaDocument(unionSchema, state, structMemberConsumer);
+                    return;
+                }
+                fieldsBefore = true;
+            }
+
+            // Skip the value; the variant reads it again after the rewind.
+            this.pos = p;
+            skipValue();
+            p = this.pos;
+            p = JsonReadUtils.skipWhitespace(localBuf, p, localEnd);
+
+            if (p >= localEnd) {
+                this.pos = p;
+                throw new SerializationException("Unterminated object");
+            }
+            if (localBuf[p] == '}') {
+                this.pos = p;
+                throw new SerializationException("Discriminated union is missing a string discriminator field '"
+                        + new String(discriminatorName, StandardCharsets.UTF_8) + "'");
+            }
+            if (localBuf[p] != ',') {
+                this.pos = p;
+                throw new SerializationException(
+                        "Expected ',', found: " + JsonReadUtils.describePos(localBuf, p, localEnd));
+            }
+            p = JsonReadUtils.skipWhitespace(localBuf, p + 1, localEnd);
+        }
+
+        // The discriminator value must be a JSON string.
+        if (p >= localEnd || localBuf[p] != '"') {
+            this.pos = p;
+            throw new SerializationException(
+                    "Expected a string discriminator value, found: "
+                            + JsonReadUtils.describePos(localBuf, p, localEnd));
+        }
+        p++; // opening quote of the value
+        int valueStart = p;
+        boolean escapedValue = false;
+        while (p < localEnd && localBuf[p] != '"') {
+            if (localBuf[p] == '\\') {
+                escapedValue = true;
+                p++;
+            }
+            p++;
+        }
+        if (p >= localEnd) {
+            this.pos = p;
+            throw new SerializationException("Unterminated discriminator value");
+        }
+        int valueEnd = p;
+        p++; // closing quote of the value
+
+        Schema variant;
+        if (escapedValue) {
+            // Decode the escaped value, then resolve against the lookup via its UTF-8 bytes.
+            JsonReadUtils.parseString(localBuf, valueStart - 1, localEnd, this);
+            byte[] valueBytes = this.parsedString.getBytes(StandardCharsets.UTF_8);
+            variant = ext.valueLookup().lookup(valueBytes, 0, valueBytes.length, -1);
+        } else {
+            variant = ext.valueLookup().lookup(localBuf, valueStart, valueEnd, -1);
+        }
+
+        if (variant == null) {
+            // Unknown discriminator value: skip the object so parsing can continue, then record the
+            // unknown variant by its discriminator value, as for a standard union.
+            String discriminatorValue = escapedValue
+                    ? this.parsedString
+                    : decodeUtf8Cached(localBuf, valueStart, valueEnd - valueStart);
+            depth--;
+            this.pos = objectStart;
+            skipValue();
+            handleUnknownVariant(discriminatorValue, state, structMemberConsumer);
+            return;
+        }
+
+        // Hand the resolved variant its own fields. Its readStruct runs as a continuation inside this
+        // still-open object and consumes the shared closing '}', balancing the depth bump taken for the
+        // outer '{'.
+        int savedSkipPos = discriminatorSkipPos;
+        if (fieldsBefore) {
+            rescanBudget -= discriminatorPos - objectStart;
+            this.pos = objectStart + 1;
+            discriminatorSkipPos = discriminatorPos;
+        } else {
+            this.pos = p;
+            discriminatorSkipPos = 0;
+        }
+        flatStructContinuation = true;
+        boolean notReadAsStructure;
+        try {
+            structMemberConsumer.accept(state, variant, this);
+        } finally {
+            // Restore the state even when the variant throws, so a caller that keeps using this deserializer
+            // after an error does not see a stale continuation or skip position.
+            discriminatorSkipPos = savedSkipPos;
+            notReadAsStructure = flatStructContinuation;
+            flatStructContinuation = false;
+        }
+        if (notReadAsStructure) {
+            throw new SerializationException("Discriminated union variant " + variant.memberName()
+                    + " was not read as a structure");
+        }
+    }
+
+    // Only unions can carry @discriminated, so structures skip the extension lookup. type() resolves a member
+    // schema to its target's type.
+    private static DiscriminatedUnionSchemaExtensions.DiscriminatedUnionExtension discriminatedUnionExtension(
+            Schema structSchema
+    ) {
+        return structSchema.type() == ShapeType.UNION
+                ? structSchema.getExtension(DiscriminatedUnionSchemaExtensions.KEY)
+                : null;
+    }
+
+    /**
+     * Fallback for a discriminated union whose discriminator is not the first field, once the rescan
+     * budget is spent. Materializes the whole object as a document and reads the union from it. On entry
+     * {@code this.pos} points at the object's opening '{' and the depth bump for it has been undone.
+     */
+    private <T> void readDiscriminatedUnionViaDocument(
+            Schema unionSchema,
+            T state,
+            StructMemberConsumer<T> structMemberConsumer
+    ) {
+        readDocument().createDeserializer().readStruct(unionSchema, state, structMemberConsumer);
+    }
+
+    // Visible for testing.
+    int rescanBudget() {
+        return rescanBudget;
+    }
+
+    private <T> void handleUnknownVariant(
+            String discriminatorValue,
+            T state,
+            StructMemberConsumer<T> structMemberConsumer
+    ) {
+        if (settings.forbidUnknownUnionMembers()) {
+            throw new SerializationException("Unknown discriminator value " + discriminatorValue + " encountered");
+        }
+        structMemberConsumer.unknownMember(state, discriminatorValue);
     }
 
     @Override

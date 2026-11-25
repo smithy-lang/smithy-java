@@ -15,6 +15,7 @@ import software.amazon.smithy.java.core.schema.SchemaExtensionProvider;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.DiscriminatedTrait;
 import tools.jackson.core.SerializableString;
 import tools.jackson.core.io.SerializedString;
 
@@ -30,12 +31,30 @@ public final class JsonSchemaExtensions implements SchemaExtensionProvider<JsonS
 
     /**
      * Pre-computed JSON data stored on a Schema.
+     *
+     * @param discriminated non-null only for union schemas carrying {@code @discriminated}.
      */
     public record JsonSchemaExtension(
             SerializableString jsonFieldName,
             SerializableString memberFieldName,
             MemberLookup jsonMemberLookup,
-            TimestampFormatter timestampFormatter) {}
+            TimestampFormatter timestampFormatter,
+            DiscriminatedData discriminated) {}
+
+    /**
+     * Pre-computed {@code @discriminated} union data for the Jackson backend.
+     *
+     * @param discriminatorFieldName the discriminator field name read on the wire, e.g. {@code type}.
+     * @param serializedFieldName the discriminator field name, pre-encoded for writing.
+     * @param serializedValues indexed by memberIndex: the discriminator value (member name) of each member,
+     *                         pre-encoded for writing.
+     * @param valueLookup resolves the active member from a discriminator value (member name).
+     */
+    public record DiscriminatedData(
+            String discriminatorFieldName,
+            SerializableString serializedFieldName,
+            SerializableString[] serializedValues,
+            MemberLookup valueLookup) {}
 
     @Override
     public SchemaExtensionKey<JsonSchemaExtension> key() {
@@ -67,20 +86,42 @@ public final class JsonSchemaExtensions implements SchemaExtensionProvider<JsonS
             formatter = TimestampFormatter.match(tsTrait.getFormat());
         }
 
-        return new JsonSchemaExtension(jsonFieldName, memberFieldName, null, formatter);
+        return new JsonSchemaExtension(jsonFieldName, memberFieldName, null, formatter, null);
     }
 
     private static JsonSchemaExtension forRoot(Schema schema) {
         var tsTrait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
         if (tsTrait != null) {
             var formatter = TimestampFormatter.match(tsTrait.getFormat());
-            return new JsonSchemaExtension(null, null, null, formatter);
+            return new JsonSchemaExtension(null, null, null, formatter, null);
         }
         return null;
     }
 
     private static JsonSchemaExtension forStruct(Schema schema) {
-        return new JsonSchemaExtension(null, null, buildMemberLookup(schema.members()), null);
+        DiscriminatedData discriminated = null;
+        if (schema.type() == ShapeType.UNION) {
+            var trait = schema.getTrait(TraitKey.get(DiscriminatedTrait.class));
+            if (trait != null) {
+                discriminated = buildDiscriminatedData(schema, trait.getValue());
+            }
+        }
+        return new JsonSchemaExtension(null, null, buildMemberLookup(schema.members()), null, discriminated);
+    }
+
+    private static DiscriminatedData buildDiscriminatedData(Schema schema, String discriminatorFieldName) {
+        List<Schema> members = schema.members();
+        SerializableString[] serializedValues = new SerializableString[members.size()];
+        for (Schema m : members) {
+            // The discriminator value is the member name (see the discriminated-unions design).
+            serializedValues[m.memberIndex()] = new SerializedString(m.memberName());
+        }
+        // The union schema already looks up its members by name, which is the discriminator value.
+        return new DiscriminatedData(
+                discriminatorFieldName,
+                new SerializedString(discriminatorFieldName),
+                serializedValues,
+                schema);
     }
 
     private static MemberLookup buildMemberLookup(List<Schema> members) {

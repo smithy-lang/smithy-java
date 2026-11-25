@@ -339,4 +339,14 @@ final class JsonWriteUtils {
         scratch[pos++] = ':';
         return Arrays.copyOf(scratch, pos);
     }
+
+    /// Computes the UTF-8 byte representation of a bare quoted JSON string value, with no trailing colon. Example: for
+    /// value "circle", returns bytes for `"circle"`.
+    ///
+    /// Used for pre-encoded discriminator values (the quoted member name written as a JSON value, not a field key).
+    static byte[] encodeQuotedValueToken(String value) {
+        byte[] scratch = new byte[maxQuotedStringBytes(value)];
+        int pos = writeQuotedString(scratch, 0, value);
+        return Arrays.copyOf(scratch, pos);
+    }
 }

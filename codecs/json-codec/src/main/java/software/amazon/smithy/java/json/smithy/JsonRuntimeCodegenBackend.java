@@ -47,6 +47,7 @@ import software.amazon.smithy.java.json.JsonFieldMapper;
 import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.DiscriminatedTrait;
 
 final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJsonCodec>, Opcodes {
     private static final String CODEC = Type.getInternalName(GeneratedJsonCodec.class);
@@ -115,6 +116,7 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
                 }
             }
             rejectModeledException(structure);
+            rejectDiscriminatedUnion(structure);
             requireAccessible(structure.shapeClass(), structure.schema());
             if (structure.builderClass() != null) {
                 requireAccessible(structure.builderClass(), structure.schema());
@@ -160,6 +162,15 @@ final class JsonRuntimeCodegenBackend implements RuntimeCodecBackend<GeneratedJs
         if (shapeClass != null && ModeledException.class.isAssignableFrom(shapeClass)) {
             throw new UnsupportedSchemaException(
                     "JSON runtime codegen does not support modeled exceptions: " + structure.schema().id());
+        }
+    }
+
+    // Generated union readers and writers use the standard tagged encoding, so decline discriminated unions and let
+    // the native serde, which implements the flat encoding, handle any shape that contains one.
+    private static void rejectDiscriminatedUnion(RuntimeCodecPlan.StructPlan structure) {
+        if (structure.schema().hasTrait(TraitKey.get(DiscriminatedTrait.class))) {
+            throw new UnsupportedSchemaException(
+                    "JSON runtime codegen does not support @discriminated unions: " + structure.schema().id());
         }
     }
 
