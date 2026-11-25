@@ -23,6 +23,10 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * Provides the AWS Signature Version 4a (SigV4a) auth scheme for HTTP requests.
  *
  * <p>SigV4a signs requests with an ECDSA P-256 key derived from the caller's {@link AwsCredentialsIdentity}.
+ * When the identity is an {@link software.amazon.smithy.java.aws.auth.api.identity.AwsEcdsaCredentialsIdentity},
+ * the signer uses its
+ * {@link software.amazon.smithy.java.aws.auth.api.identity.AwsEcdsaCredentialsIdentity#ecdsaPrivateKey() private key}
+ * instead of deriving one.
  * Each signature is valid in every region named by the {@code X-Amz-Region-Set} header.
  * Add an instance to your client builder or apply the auth scheme to your Smithy service:
  * <pre>{@code

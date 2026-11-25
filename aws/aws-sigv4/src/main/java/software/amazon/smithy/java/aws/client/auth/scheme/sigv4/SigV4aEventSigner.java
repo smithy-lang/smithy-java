@@ -21,7 +21,7 @@ final class SigV4aEventSigner extends AwsEventSigner {
 
     @Override
     byte[] sign(byte[] stringToSign, String region, String service, SigningResources resources) {
-        var key = SigV4aKeyDerivation.derive(identity.accessKeyId(), identity.secretAccessKey(), resources);
+        var key = SigV4aKeyDerivation.signingKey(identity, resources);
         return resources.ecdsaSign(key, stringToSign, 0, stringToSign.length);
     }
 }

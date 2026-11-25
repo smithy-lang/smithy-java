@@ -53,7 +53,7 @@ final class SigV4aSigner implements Signer<HttpRequest, AwsCredentialsIdentity> 
         HttpSigning.canonicalize(mod, properties, r, payloadHash, identity.sessionToken(), isS3);
 
         int stringToSignLength = HttpSigning.stringToSign(r, ALGORITHM, null, service);
-        ECPrivateKey signingKey = SigV4aKeyDerivation.derive(identity.accessKeyId(), identity.secretAccessKey(), r);
+        ECPrivateKey signingKey = SigV4aKeyDerivation.signingKey(identity, r);
         byte[] der = r.ecdsaSign(signingKey, r.stringToSignBytes, 0, stringToSignLength);
         if (der.length * 2 > r.signatureHex.length) {
             throw new IllegalStateException("Unexpected ECDSA signature length " + der.length);

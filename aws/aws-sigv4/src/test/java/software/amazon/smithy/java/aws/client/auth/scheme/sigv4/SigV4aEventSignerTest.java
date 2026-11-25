@@ -9,7 +9,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
+import java.security.interfaces.ECPrivateKey;
+import java.security.interfaces.ECPublicKey;
+import java.security.spec.ECGenParameterSpec;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -22,6 +26,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsEcdsaCredentialsIdentity;
 import software.amazon.smithy.java.aws.client.core.settings.EndpointAuthSchemeSettings;
 import software.amazon.smithy.java.aws.events.AwsEventFrame;
 import software.amazon.smithy.java.context.Context;
@@ -98,6 +103,27 @@ class SigV4aEventSignerTest {
         var schemeScope = stringToSign(INSTANTS.get(0), "service", "abc123", signed.getPayload());
         assertThat(P256TestMath.verify(publicKey, utf8(endpointScope), signature)).isTrue();
         assertThat(P256TestMath.verify(publicKey, utf8(schemeScope), signature)).isFalse();
+    }
+
+    @Test
+    void signsFramesWithASuppliedEcdsaKey() throws Exception {
+        var generator = KeyPairGenerator.getInstance("EC");
+        generator.initialize(new ECGenParameterSpec("secp256r1"));
+        var keyPair = generator.generateKeyPair();
+        var identity =
+                AwsEcdsaCredentialsIdentity.create("ASIAECDSAEXAMPLE", (ECPrivateKey) keyPair.getPrivate(), null);
+        var context = Context.create()
+                .put(SigV4Settings.REGION, "us-west-2")
+                .put(SigV4Settings.SIGNING_NAME, "demo")
+                .put(SigV4Settings.CLOCK, tickingClock());
+        var signer = new SigV4aEventSigner(identity, context, "abc123");
+
+        var signed = signer.transformFrame(new AwsEventFrame(new Message(new HashMap<>(), "A".getBytes()))).unwrap();
+        byte[] signature = signed.getHeaders().get(":chunk-signature").getByteArray();
+        var stringToSign = stringToSign(INSTANTS.get(0), "demo", "abc123", signed.getPayload());
+
+        assertThat(P256TestMath.verify((ECPublicKey) keyPair.getPublic(), utf8(stringToSign), signature)).isTrue();
+        assertThat(P256TestMath.verify(SigV4aTestSupport.testPublicKey(), utf8(stringToSign), signature)).isFalse();
     }
 
     @Test
