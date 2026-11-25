@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Random;
@@ -139,6 +140,45 @@ class SigningResourcesTest {
         r.addHeaderCanonical("b-second", "b");
         r.sortHeadersByName();
         assertThat(names(r)).containsExactly("b-second", host, "z-last");
+    }
+
+    @Test
+    void queryPairsSortByKeyThenValueForEverySizeAndOrder() {
+        var random = new Random(13);
+        var r = new SigningResources();
+        for (int n : new int[] {0, 1, 32, 33, 1_000}) {
+            for (int mode = 0; mode < 3; mode++) {
+                List<String[]> pairs = new ArrayList<>();
+                for (int i = 0; i < n; i++) {
+                    pairs.add(new String[] {"k" + random.nextInt(Math.max(1, n / 4)), "v" + random.nextInt(1000)});
+                }
+                List<String[]> expected = new ArrayList<>(pairs);
+                expected.sort((a, b) -> {
+                    int cmp = a[0].compareTo(b[0]);
+                    return cmp != 0 ? cmp : a[1].compareTo(b[1]);
+                });
+                List<String[]> input = new ArrayList<>(expected);
+                if (mode == 0) {
+                    Collections.reverse(input);
+                } else if (mode == 2) {
+                    input = pairs;
+                }
+                r.reset();
+                for (String[] p : input) {
+                    r.addQueryPair(p[0], p[1]);
+                }
+                r.sortQueryPairs();
+                List<String> got = new ArrayList<>();
+                for (int i = 0; i < r.queryPairCount; i++) {
+                    got.add(r.queryPairs[i * 2] + "=" + r.queryPairs[i * 2 + 1]);
+                }
+                List<String> want = new ArrayList<>();
+                for (String[] p : expected) {
+                    want.add(p[0] + "=" + p[1]);
+                }
+                assertThat(got).as("n %d mode %d", n, mode).isEqualTo(want);
+            }
+        }
     }
 
     private static List<String> names(SigningResources r) {
