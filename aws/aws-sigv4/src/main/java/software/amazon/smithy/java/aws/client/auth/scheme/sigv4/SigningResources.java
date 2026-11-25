@@ -45,6 +45,7 @@ final class SigningResources {
     static final int MAX_SIGNATURE_HEX_LENGTH = 144;
     private static final int BUFFER_SIZE = 512;
     private static final int INITIAL_HEADER_CAPACITY = 16;
+    private static final int INSERTION_SORT_THRESHOLD = 32;
     private static final long ONES = 0x0101010101010101L;
     private static final long HIGH_BITS = 0x8080808080808080L;
     private static final VarHandle LONGS = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
@@ -615,10 +616,15 @@ final class SigningResources {
     }
 
     /**
-     * In-place insertion sort of the query pairs by encoded key, breaking ties by encoded value.
+     * Sort the query pairs in place by encoded key, breaking ties by encoded value.
      */
     void sortQueryPairs() {
-        for (int i = 1; i < queryPairCount; i++) {
+        int n = queryPairCount;
+        if (n > INSERTION_SORT_THRESHOLD) {
+            sortQueryPairsLarge(n);
+            return;
+        }
+        for (int i = 1; i < n; i++) {
             int srcSlot = i * 2;
             String key = queryPairs[srcSlot];
             String value = queryPairs[srcSlot + 1];
@@ -632,6 +638,21 @@ final class SigningResources {
 
             queryPairs[(j + 1) * 2] = key;
             queryPairs[(j + 1) * 2 + 1] = value;
+        }
+    }
+
+    private void sortQueryPairsLarge(int n) {
+        String[] qp = queryPairs;
+        Integer[] idx = new Integer[n];
+        for (int i = 0; i < n; i++) {
+            idx[i] = i;
+        }
+        Arrays.sort(idx, (a, b) -> compareKeyValue(qp[a * 2], qp[a * 2 + 1], qp[b * 2], qp[b * 2 + 1]));
+        String[] src = Arrays.copyOf(qp, n * 2);
+        for (int k = 0; k < n; k++) {
+            int from = idx[k] * 2;
+            qp[k * 2] = src[from];
+            qp[k * 2 + 1] = src[from + 1];
         }
     }
 
