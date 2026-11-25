@@ -572,13 +572,10 @@ final class SigningResources {
     private void sortAndMemoize(int n) {
         String[] h = headers;
         int[] order = memoOrder.length == n ? memoOrder : new int[n];
-        for (int i = 0; i < n; i++) {
-            int j = i - 1;
-            while (j >= 0 && h[order[j] * 2].compareTo(h[i * 2]) > 0) {
-                order[j + 1] = order[j];
-                j--;
-            }
-            order[j + 1] = i;
+        if (n > INSERTION_SORT_THRESHOLD) {
+            sortHeaderOrderLarge(h, order, n);
+        } else {
+            sortHeaderOrderSmall(h, order, n);
         }
         String[] names = memoNames.length == n ? memoNames : new String[n];
         for (int i = 0; i < n; i++) {
@@ -587,6 +584,31 @@ final class SigningResources {
         memoNames = names;
         memoOrder = order;
         applyOrder(order, n);
+    }
+
+    private static void sortHeaderOrderSmall(String[] h, int[] order, int n) {
+        for (int i = 0; i < n; i++) {
+            int j = i - 1;
+            while (j >= 0 && h[order[j] * 2].compareTo(h[i * 2]) > 0) {
+                order[j + 1] = order[j];
+                j--;
+            }
+            order[j + 1] = i;
+        }
+    }
+
+    /**
+     * Arrays.sort on objects is stable, so repeated names keep their insertion order.
+     */
+    private static void sortHeaderOrderLarge(String[] h, int[] order, int n) {
+        Integer[] idx = new Integer[n];
+        for (int i = 0; i < n; i++) {
+            idx[i] = i;
+        }
+        Arrays.sort(idx, (a, b) -> h[a * 2].compareTo(h[b * 2]));
+        for (int k = 0; k < n; k++) {
+            order[k] = idx[k];
+        }
     }
 
     private void applyOrder(int[] order, int n) {
