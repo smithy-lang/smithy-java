@@ -117,9 +117,14 @@ final class McpToolExecutor {
             return toolFailure(call, e);
         }
 
-        var outputDocument = adapter.fromSmithy(
-                Document.of(output),
-                operation.getApiOperation().outputSchema());
+        final Document outputDocument;
+        try {
+            outputDocument = adapter.fromSmithy(
+                    Document.of(output),
+                    operation.getApiOperation().outputSchema());
+        } catch (SmithyDocumentAdapter.UnavailableResultException e) {
+            return toolFailure(call, e);
+        }
         var result = CallToolResult.builder()
                 .content(List.of(TextContent.builder()
                         .text(McpJson.CODEC.serializeToString(outputDocument))

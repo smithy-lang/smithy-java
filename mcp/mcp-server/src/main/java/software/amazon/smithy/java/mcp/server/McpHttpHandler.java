@@ -7,9 +7,11 @@ package software.amazon.smithy.java.mcp.server;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.mcp.model.JsonRpcErrorResponse;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
@@ -21,7 +23,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  */
 @SmithyUnstableApi
 public final class McpHttpHandler {
-    private static final int HEADER_MISMATCH_ERROR_CODE = -32020;
+    static final int HEADER_MISMATCH_ERROR_CODE = -32020;
     private final McpEngine engine;
     private final boolean loopbackOnly;
     private final AtomicBoolean bound = new AtomicBoolean();
@@ -64,6 +66,11 @@ public final class McpHttpHandler {
         var headerVersion = McpHttpBinding.firstHeader(headers, "mcp-protocol-version");
         var protocolVersion = resolveProtocolVersion(request, bodyVersion, headerVersion);
         var modernClaim = isModernClaim(bodyVersion, headerVersion);
+        if (modernClaim) {
+            // Parameter headers are only compared for a modern claim. The arguments are replaced before any
+            // check runs, and nothing read so far depends on them, so every check and the engine see one request.
+            request = withWireArguments(request);
+        }
 
         if (loopbackOnly) {
             var hostError = validateLoopbackHeaders(request, headers);
@@ -158,6 +165,32 @@ public final class McpHttpHandler {
         return null;
     }
 
+    /**
+     * Arguments that are backed by a schema are keyed by the member names of that schema, which need not be the
+     * schema of the tool. For a tool with parameter headers they are replaced by the same values keyed by wire
+     * name, so that the document that is compared with the headers is the document the tool is invoked with.
+     * Nothing else in the request changes, and arguments that are schemaless already are left as they are.
+     */
+    private JsonRpcRequest withWireArguments(JsonRpcRequest request) {
+        if (!McpHttpBinding.isToolCall(request)) {
+            return request;
+        }
+        var params = request.getParams();
+        var toolName = McpHttpBinding.stringMember(params, "name");
+        if (toolName == null || engine.headerParameters(toolName).isEmpty()) {
+            return request;
+        }
+        var arguments = params.getMember("arguments");
+        var wireArguments = SmithyDocumentAdapter.wireKeyed(arguments);
+        if (wireArguments == arguments) {
+            return request;
+        }
+        // Read by member name like the params themselves, whether or not they are backed by a schema.
+        var members = new HashMap<>(params.asStringMap());
+        members.put("arguments", wireArguments);
+        return request.toBuilder().params(Document.of(members)).build();
+    }
+
     private JsonRpcResponse validateMcpParameterHeaders(
             JsonRpcRequest request,
             Map<String, List<String>> headers
@@ -172,8 +205,14 @@ public final class McpHttpHandler {
             return null;
         }
 
+        var headerParameters = engine.headerParameters(toolName);
+        if (headerParameters.isEmpty()) {
+            return null;
+        }
+
+        // Header parameters are keyed by wire name, which is the only name such an argument is accepted under.
         var arguments = params.getMember("arguments");
-        for (var entry : engine.headerParameters(toolName).entrySet()) {
+        for (var entry : headerParameters.entrySet()) {
             var parameterName = entry.getKey();
             var headerName = "Mcp-Param-" + entry.getValue();
             var bodyValue = McpHttpBinding.isObject(arguments)

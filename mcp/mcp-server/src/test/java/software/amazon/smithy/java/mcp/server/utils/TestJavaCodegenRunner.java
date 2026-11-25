@@ -46,6 +46,12 @@ public final class TestJavaCodegenRunner {
                 fileManifest,
                 "software.amazon.smithy.java.mcp.conformance#ConformanceService",
                 "software.amazon.smithy.java.mcp.conformance");
+        execute(
+                plugin,
+                model,
+                fileManifest,
+                "smithy.example.jsonname#TagService",
+                "software.amazon.smithy.java.example.jsonname");
     }
 
     private static void execute(

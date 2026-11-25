@@ -13,8 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.networknt.schema.InputFormat;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SpecificationVersion;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -22,11 +28,15 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.context.Context;
@@ -3179,5 +3189,1096 @@ public class StdioMcpServerTest {
         assertNotNull(response.getError());
         assertEquals(-32603, response.getError().getCode());
         assertEquals("Internal error", response.getError().getMessage());
+    }
+
+    @Test
+    void proxyServiceJsonNamedMembersUseWireNamesInSchemas() {
+        var proxyModel = Model.assembler()
+                .addUnparsedModel("proxy-jsonname.smithy",
+                        """
+                                $version: "2"
+
+                                namespace smithy.test.proxyjsonname
+
+                                @aws.protocols#awsJson1_0
+                                service ProxyTestService {
+                                    operations: [ProcessItem]
+                                }
+
+                                operation ProcessItem {
+                                    input := {
+                                        @jsonName("item_id")
+                                        itemId: String
+                                    }
+                                    output := {
+                                        @required
+                                        @jsonName("result_code")
+                                        resultCode: Integer
+                                    }
+                                }
+                                """)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        server = StdioMcpServer.builder()
+                .name("smithy-mcp-server")
+                .input(input)
+                .output(output)
+                .addService("proxy-test",
+                        ProxyService.builder()
+                                .service(ShapeId.from("smithy.test.proxyjsonname#ProxyTestService"))
+                                .proxyEndpoint("http://localhost")
+                                .model(proxyModel)
+                                .build())
+                .build();
+
+        server.start();
+        initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+
+        write("tools/list", Document.of(Map.of()));
+        var response = read();
+        var tools = response.getResult().asStringMap().get("tools").asList();
+
+        var tool = tools.stream()
+                .filter(t -> t.asStringMap().get("name").asString().equals("ProcessItem"))
+                .findFirst()
+                .orElseThrow()
+                .asStringMap();
+
+        // Input schema should use wire name
+        var inputSchema = tool.get("inputSchema").asStringMap();
+        var inputProperties = inputSchema.get("properties").asStringMap();
+        assertTrue(inputProperties.containsKey("item_id"),
+                "inputSchema should advertise the @jsonName 'item_id'");
+        assertFalse(inputProperties.containsKey("itemId"),
+                "inputSchema should not advertise the member name 'itemId'");
+
+        // Output schema should use wire name in properties and required
+        var outputSchema = tool.get("outputSchema").asStringMap();
+        var outputProperties = outputSchema.get("properties").asStringMap();
+        assertTrue(outputProperties.containsKey("result_code"),
+                "outputSchema should advertise the @jsonName 'result_code'");
+        assertFalse(outputProperties.containsKey("resultCode"),
+                "outputSchema should not advertise the member name 'resultCode'");
+
+        var required = outputSchema.get("required").asList();
+        assertEquals(1, required.size());
+        assertEquals("result_code",
+                required.get(0).asString(),
+                "outputSchema.required should use the @jsonName 'result_code'");
+    }
+
+    @Test
+    void proxyServiceJsonNameToolsCallRoundTrip() throws Exception {
+        var proxyModel = Model.assembler()
+                .addUnparsedModel("proxy-call-jsonname.smithy",
+                        """
+                                $version: "2"
+
+                                namespace smithy.test.proxycalljsonname
+
+                                @aws.protocols#awsJson1_0
+                                service ProxyCallService {
+                                    operations: [TransformData]
+                                }
+
+                                operation TransformData {
+                                    input := {
+                                        @jsonName("input_text")
+                                        inputText: String
+                                    }
+                                    output := {
+                                        @required
+                                        @jsonName("output_text")
+                                        outputText: String
+                                    }
+                                }
+                                """)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        var capturedRequests = new CopyOnWriteArrayList<String>();
+        var mockServer = startAwsJsonBackend("{\"outputText\":\"transformed\"}", capturedRequests);
+
+        try {
+            server = StdioMcpServer.builder()
+                    .name("smithy-mcp-server")
+                    .input(input)
+                    .output(output)
+                    .addService("proxy-call",
+                            ProxyService.builder()
+                                    .service(ShapeId.from("smithy.test.proxycalljsonname#ProxyCallService"))
+                                    .proxyEndpoint(backendUrl(mockServer))
+                                    .model(proxyModel)
+                                    .build())
+                    .build();
+
+            server.start();
+            initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+
+            // Call with wire name
+            capturedRequests.clear();
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("TransformData"),
+                            "arguments",
+                            Document.of(Map.of("input_text", Document.of("test"))))));
+            var wireNameResponse = read();
+            assertNull(wireNameResponse.getError());
+            assertEquals(1, capturedRequests.size());
+            assertTrue(capturedRequests.get(0).contains("\"inputText\":\"test\""),
+                    "Backend request should use protocol's naming (member name for awsJson1_0)");
+
+            var wireNameResult = wireNameResponse.getResult().asStringMap();
+            var wireNameContent = wireNameResult.get("structuredContent").asStringMap();
+            assertTrue(wireNameContent.containsKey("output_text"),
+                    "structuredContent should use wire name 'output_text'");
+            assertEquals("transformed", wireNameContent.get("output_text").asString());
+
+            // Call with member-name alias
+            capturedRequests.clear();
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("TransformData"),
+                            "arguments",
+                            Document.of(Map.of("inputText", Document.of("alias-test"))))));
+            var aliasResponse = read();
+            assertNull(aliasResponse.getError());
+            assertEquals(1, capturedRequests.size());
+            assertTrue(capturedRequests.get(0).contains("\"inputText\":\"alias-test\""),
+                    "Backend request should accept member-name alias");
+
+            var aliasResult = aliasResponse.getResult().asStringMap();
+            var aliasContent = aliasResult.get("structuredContent").asStringMap();
+            assertTrue(aliasContent.containsKey("output_text"),
+                    "structuredContent from alias call should also use wire name");
+
+            // Validate structuredContent against outputSchema
+            write("tools/list", Document.of(Map.of()));
+            var toolsList = read();
+            var tools = toolsList.getResult().getMember("tools").asList();
+            var transformTool = tools.stream()
+                    .filter(t -> t.getMember("name").asString().equals("TransformData"))
+                    .findFirst()
+                    .orElseThrow();
+            var outputSchema = transformTool.getMember("outputSchema");
+
+            var errors = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
+                    .getSchema(CODEC.serializeToString(outputSchema))
+                    .validate(CODEC.serializeToString(Document.of(wireNameContent)), InputFormat.JSON);
+            assertTrue(errors.isEmpty(),
+                    "structuredContent should validate against advertised outputSchema");
+
+        } finally {
+            mockServer.stop(0);
+        }
+    }
+
+    @Test
+    void proxyServiceRejectsUnionArgumentsWithMoreThanOneVariant() throws Exception {
+        var proxyModel = Model.assembler()
+                .addUnparsedModel("proxy-union-jsonname.smithy",
+                        """
+                                $version: "2"
+
+                                namespace smithy.test.proxyunionjsonname
+
+                                @aws.protocols#awsJson1_0
+                                service ProxyUnionService {
+                                    operations: [FindTag]
+                                }
+
+                                operation FindTag {
+                                    input := {
+                                        selector: TagSelector
+                                    }
+                                    output := {
+                                        found: Boolean
+                                    }
+                                }
+
+                                union TagSelector {
+                                    @jsonName("by_name")
+                                    byName: String
+
+                                    byId: String
+                                }
+                                """)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        var capturedRequests = new CopyOnWriteArrayList<String>();
+        var mockServer = startAwsJsonBackend("{\"found\":true}", capturedRequests);
+        try {
+            server = StdioMcpServer.builder()
+                    .name("smithy-mcp-server")
+                    .input(input)
+                    .output(output)
+                    .addService("proxy-union",
+                            ProxyService.builder()
+                                    .service(ShapeId.from("smithy.test.proxyunionjsonname#ProxyUnionService"))
+                                    .proxyEndpoint(backendUrl(mockServer))
+                                    .model(proxyModel)
+                                    .build())
+                    .build();
+
+            server.start();
+            initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+
+            // The member-name alias of one variant together with another variant.
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("FindTag"),
+                            "arguments",
+                            Document.of(Map.of("selector",
+                                    Document.of(Map.of(
+                                            "byName",
+                                            Document.of("a"),
+                                            "byId",
+                                            Document.of("1"))))))));
+            var mixed = read();
+            assertNotNull(mixed.getError());
+            assertEquals(-32602, mixed.getError().getCode());
+            assertTrue(capturedRequests.isEmpty(), "The backend must not be called");
+
+            // Both spellings of the same variant are one variant: the wire name wins.
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("FindTag"),
+                            "arguments",
+                            Document.of(Map.of("selector",
+                                    Document.of(Map.of(
+                                            "by_name",
+                                            Document.of("wire"),
+                                            "byName",
+                                            Document.of("alias"))))))));
+            var sameVariant = read();
+            assertNull(sameVariant.getError());
+            assertEquals(1, capturedRequests.size());
+            assertTrue(capturedRequests.get(0).contains("\"byName\":\"wire\""), capturedRequests.get(0));
+        } finally {
+            mockServer.stop(0);
+        }
+    }
+
+    @Test
+    void proxyServiceKeepsRenamedMembersOfOneOfDocumentContent() throws Exception {
+        var proxyModel = Model.assembler()
+                .addUnparsedModel("proxy-oneof-jsonname.smithy",
+                        """
+                                $version: "2"
+
+                                namespace smithy.test.proxyoneofjsonname
+
+                                use smithy.mcp#oneOf
+
+                                @aws.protocols#awsJson1_0
+                                service ProxyOneOfService {
+                                    operations: [DescribeItem]
+                                }
+
+                                operation DescribeItem {
+                                    input := {}
+                                    output := {
+                                        item: ItemDocument
+                                    }
+                                }
+
+                                @oneOf(
+                                    discriminator: "__type"
+                                    members: [
+                                        {name: "tag", target: TagItem}
+                                    ]
+                                )
+                                document ItemDocument
+
+                                structure TagItem {
+                                    @required
+                                    @jsonName("item_id")
+                                    itemId: String
+
+                                    label: String
+                                }
+                                """)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        // Document content is opaque to the backend protocol and arrives keyed as the backend wrote it,
+        // including a property that the model does not know.
+        var backendResponse = "{\"item\":{\"__type\":\"smithy.test.proxyoneofjsonname#TagItem\","
+                + "\"item_id\":\"i-1\",\"label\":\"first\",\"added\":true}}";
+        var mockServer = startAwsJsonBackend(backendResponse, new CopyOnWriteArrayList<>());
+        try {
+            server = StdioMcpServer.builder()
+                    .name("smithy-mcp-server")
+                    .input(input)
+                    .output(output)
+                    .addService("proxy-oneof",
+                            ProxyService.builder()
+                                    .service(ShapeId.from("smithy.test.proxyoneofjsonname#ProxyOneOfService"))
+                                    .proxyEndpoint(backendUrl(mockServer))
+                                    .model(proxyModel)
+                                    .build())
+                    .build();
+
+            server.start();
+            initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("DescribeItem"),
+                            "arguments",
+                            Document.of(Map.of()))));
+            var response = read();
+            assertNull(response.getError());
+            var structuredContent = response.getResult().getMember("structuredContent");
+            assertTrue(Document.equals(
+                    Document.ofObject(Map.of("item",
+                            Map.of("tag", Map.of("item_id", "i-1", "label", "first", "added", true)))),
+                    structuredContent), CODEC.serializeToString(structuredContent));
+
+            write("tools/list", Document.of(Map.of()));
+            var outputSchema = read().getResult()
+                    .getMember("tools")
+                    .asList()
+                    .stream()
+                    .filter(t -> t.getMember("name").asString().equals("DescribeItem"))
+                    .findFirst()
+                    .orElseThrow()
+                    .getMember("outputSchema");
+            var errors = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
+                    .getSchema(CODEC.serializeToString(outputSchema))
+                    .validate(CODEC.serializeToString(structuredContent), InputFormat.JSON);
+            assertTrue(errors.isEmpty(), "structuredContent should validate against outputSchema: " + errors);
+        } finally {
+            mockServer.stop(0);
+        }
+    }
+
+    @Test
+    void proxyServiceLeavesOutMembersWithOverlappingNames() throws Exception {
+        var proxyModel = Model.assembler()
+                .addUnparsedModel("proxy-oneof-overlap.smithy",
+                        """
+                                $version: "2"
+
+                                namespace smithy.test.proxyoneofoverlap
+
+                                use smithy.mcp#oneOf
+
+                                @aws.protocols#awsJson1_0
+                                service ProxyOverlapService {
+                                    operations: [UpdateItem]
+                                }
+
+                                operation UpdateItem {
+                                    input := {
+                                        item: ItemDocument
+
+                                        selector: Lookup
+
+                                        @jsonName("beta")
+                                        alpha: String
+
+                                        @jsonName("alpha")
+                                        beta: String
+
+                                        plain: String
+
+                                        blocked: Blocked
+                                    }
+                                    output := {
+                                        item: ItemDocument
+
+                                        selector: Lookup
+
+                                        nested: NestedPair
+
+                                        @jsonName("beta")
+                                        alpha: String
+
+                                        @jsonName("alpha")
+                                        beta: String
+
+                                        plain: String
+                                    }
+                                }
+
+                                /// The second member is named in JSON like the first one in the model.
+                                union Lookup {
+                                    @jsonName("lookup")
+                                    archive: String
+
+                                    @jsonName("archive")
+                                    fetch: String
+
+                                    @jsonName("by_id")
+                                    byId: String
+
+                                    byName: String
+                                }
+
+                                structure NestedPair {
+                                    @jsonName("b")
+                                    a: String
+
+                                    @jsonName("a")
+                                    c: String
+
+                                    keep: String
+                                }
+
+                                @oneOf(
+                                    discriminator: "__type"
+                                    members: [
+                                        {name: "pair", target: PairItem}
+                                    ]
+                                )
+                                document ItemDocument
+
+                                /// Each of the first two members is named in JSON like the other one in the model.
+                                structure PairItem {
+                                    @jsonName("second")
+                                    first: String
+
+                                    @jsonName("first")
+                                    second: String
+
+                                    @required
+                                    @jsonName("item_label")
+                                    label: String
+
+                                    size: Integer
+
+                                    nested: NestedPair
+
+                                    @jsonName("nested_alt")
+                                    nestedAlt: NestedPair
+
+                                    choice: Lookup
+
+                                    inner: ItemDocument
+
+                                    blocked: Blocked
+                                }
+
+                                /// Each member is named in JSON like the other one in the model.
+                                union Blocked {
+                                    @jsonName("fetch")
+                                    archive: String
+
+                                    @jsonName("archive")
+                                    fetch: String
+                                }
+                                """)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        // The backend answers with the ambiguous keys as well.
+        var backendResponse = "{\"item\":{\"__type\":\"smithy.test.proxyoneofoverlap#PairItem\","
+                + "\"first\":\"red\",\"second\":\"blue\",\"item_label\":\"kept\",\"size\":3,"
+                // Keyed by wire name, with a value for each of the two ambiguous keys.
+                + "\"nested\":{\"b\":\"red\",\"a\":\"blue\",\"keep\":\"inner\"}},"
+                + "\"nested\":{\"a\":\"red\",\"c\":\"blue\",\"keep\":\"outer\"},"
+                + "\"selector\":{\"byId\":\"found\"},"
+                + "\"alpha\":\"red\",\"beta\":\"blue\",\"plain\":\"p\"}";
+        var capturedRequests = new CopyOnWriteArrayList<String>();
+        var mockServer = startAwsJsonBackend(backendResponse, capturedRequests);
+        try {
+            server = StdioMcpServer.builder()
+                    .name("smithy-mcp-server")
+                    .input(input)
+                    .output(output)
+                    .addService("proxy-overlap",
+                            ProxyService.builder()
+                                    .service(ShapeId.from("smithy.test.proxyoneofoverlap#ProxyOverlapService"))
+                                    .proxyEndpoint(backendUrl(mockServer))
+                                    .model(proxyModel)
+                                    .build())
+                    .build();
+
+            server.start();
+            initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+
+            write("tools/list", Document.of(Map.of()));
+            var tool = read().getResult()
+                    .getMember("tools")
+                    .asList()
+                    .stream()
+                    .filter(t -> t.getMember("name").asString().equals("UpdateItem"))
+                    .findFirst()
+                    .orElseThrow();
+            for (var schema : List.of(tool.getMember("inputSchema"), tool.getMember("outputSchema"))) {
+                var content = schema.getMember("properties")
+                        .getMember("item")
+                        .getMember("oneOf")
+                        .asList()
+                        .getFirst()
+                        .getMember("properties")
+                        .getMember("pair");
+                assertEquals(Set.of("item_label", "size", "nested", "nested_alt", "choice", "inner", "blocked"),
+                        content.getMember("properties").asStringMap().keySet());
+                assertEquals(Set.of("keep"),
+                        content.getMember("properties")
+                                .getMember("nested")
+                                .getMember("properties")
+                                .asStringMap()
+                                .keySet());
+                assertFalse(schema.getMember("properties").asStringMap().containsKey("alpha"));
+                assertFalse(schema.getMember("properties").asStringMap().containsKey("beta"));
+            }
+            assertEquals(2,
+                    tool.getMember("inputSchema")
+                            .getMember("properties")
+                            .getMember("selector")
+                            .getMember("oneOf")
+                            .asList()
+                            .size());
+
+            // A key that names a member that is left out is refused: at the top level, for a union (a key that
+            // named one member before members were named by their JSON name, and would name the other one now),
+            // next to a member that is available, and at any depth of wrapped or flattened document content.
+            var pair = "smithy.test.proxyoneofoverlap#PairItem";
+            for (var arguments : List.of(
+                    Map.of("alpha", "x", "plain", "p"),
+                    Map.of("selector", Map.of("archive", "id")),
+                    Map.of("selector", Map.of("by_id", "i", "lookup", "x")),
+                    Map.of("item", Map.of("pair", Map.of("first", "x", "item_label", "l"))),
+                    Map.of("item", Map.of("pair", Map.of("item_label", "l", "nested", Map.of("b", "x")))),
+                    Map.of("item", Map.of("__type", pair, "label", "l", "second", "y")),
+                    Map.of("item", Map.of("__type", pair, "label", "l", "nested", Map.of("c", "y", "keep", "k"))),
+                    // Flattened content is forwarded as it is: every name of a member is checked.
+                    Map.of("item",
+                            Map.of(
+                                    "__type",
+                                    pair,
+                                    "label",
+                                    "l",
+                                    "nested_alt",
+                                    Map.of("keep", "k"),
+                                    "nestedAlt",
+                                    Map.of("a", "x"))))) {
+                write("tools/call",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("UpdateItem"),
+                                "arguments",
+                                Document.ofObject(arguments))));
+                var refused = read();
+                assertNotNull(refused.getError(), arguments.toString());
+                assertEquals(-32602, refused.getError().getCode());
+                assertTrue(refused.getError().getMessage().endsWith("is not available over MCP"),
+                        refused.getError().getMessage());
+            }
+            // Content that is flattened already is forwarded as it is, and is still refused where the wrapped
+            // form would be: a union with two members, and a wrapper whose discriminator names another variant.
+            for (var refusal : List.of(
+                    Map.entry(
+                            Map.of("item",
+                                    Map.of("__type", pair, "label", "l", "choice", Map.of("byId", "i", "byName", "n"))),
+                            "accepts exactly one member"),
+                    Map.entry(
+                            Map.of("item",
+                                    Map.of("pair",
+                                            Map.of("item_label", "l", "choice", Map.of("by_id", "i", "byName", "n")))),
+                            "accepts exactly one member"),
+                    Map.entry(
+                            Map.of("item",
+                                    Map.of(
+                                            "__type",
+                                            pair,
+                                            "label",
+                                            "l",
+                                            "inner",
+                                            Map.of("pair",
+                                                    Map.of(
+                                                            "__type",
+                                                            "smithy.test.proxyoneofoverlap#Other",
+                                                            "size",
+                                                            1)))),
+                            "is the discriminator of"))) {
+                var arguments = refusal.getKey();
+                write("tools/call",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("UpdateItem"),
+                                "arguments",
+                                Document.ofObject(arguments))));
+                var refused = read();
+                assertNotNull(refused.getError(), arguments.toString());
+                assertEquals(-32602, refused.getError().getCode());
+                assertTrue(refused.getError().getMessage().contains(refusal.getValue()),
+                        refused.getError().getMessage());
+            }
+            assertTrue(capturedRequests.isEmpty(), "The backend must not be called");
+
+            // A union that has no member left takes no value, not even an empty one. Without it the call goes
+            // through, see below.
+            for (var arguments : List.of(
+                    Map.of("item", Map.of("pair", Map.of("item_label", "l", "blocked", Map.of()))),
+                    Map.of("item", Map.of("__type", pair, "label", "l", "blocked", Map.of())))) {
+                write("tools/call",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("UpdateItem"),
+                                "arguments",
+                                Document.ofObject(arguments))));
+                var refused = read();
+                assertNotNull(refused.getError(), arguments.toString());
+                assertEquals(-32602, refused.getError().getCode());
+                assertTrue(refused.getError().getMessage().endsWith("has no member that is available over MCP"),
+                        refused.getError().getMessage());
+            }
+            assertTrue(capturedRequests.isEmpty(), "The backend must not be called");
+
+            // Nor null: a key for it is a value.
+            var blockedNull = new HashMap<String, Document>();
+            blockedNull.put("blocked", null);
+            blockedNull.put("plain", Document.of("p"));
+            var flattenedNull = new HashMap<String, Document>();
+            flattenedNull.put("__type", Document.of(pair));
+            flattenedNull.put("label", Document.of("l"));
+            flattenedNull.put("blocked", null);
+            for (var arguments : List.of(
+                    Document.of(blockedNull),
+                    Document.of(Map.of("item", Document.of(flattenedNull))))) {
+                write("tools/call",
+                        Document.of(Map.of("name", Document.of("UpdateItem"), "arguments", arguments)));
+                var refused = read();
+                assertNotNull(refused.getError());
+                assertEquals(-32602, refused.getError().getCode());
+                assertTrue(refused.getError().getMessage().endsWith("has no member that is available over MCP"),
+                        refused.getError().getMessage());
+            }
+            assertTrue(capturedRequests.isEmpty(), "The backend must not be called");
+
+            // Whatever the key holds.
+            var holdingNull = new HashMap<String, Document>();
+            holdingNull.put("beta", null);
+            holdingNull.put("plain", Document.of("p"));
+            write("tools/call",
+                    Document.of(Map.of("name", Document.of("UpdateItem"), "arguments", Document.of(holdingNull))));
+            var refusedNull = read();
+            assertNotNull(refusedNull.getError());
+            assertEquals(-32602, refusedNull.getError().getCode());
+            assertTrue(refusedNull.getError().getMessage().contains("`beta` names a member of UpdateItemInput"),
+                    refusedNull.getError().getMessage());
+            assertTrue(capturedRequests.isEmpty(), "The backend must not be called");
+
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("UpdateItem"),
+                            "arguments",
+                            Document.ofObject(Map.of(
+                                    "item",
+                                    Map.of("pair",
+                                            Map.of(
+                                                    "item_label",
+                                                    "sent",
+                                                    "size",
+                                                    2,
+                                                    "nested",
+                                                    Map.of("keep", "inner"))),
+                                    "selector",
+                                    Map.of("by_id", "i"),
+                                    "plain",
+                                    "p")))));
+            var response = read();
+            assertNull(response.getError());
+
+            // The backend receives the other members under their member names, and none of the ambiguous keys.
+            assertEquals(1, capturedRequests.size());
+            var forwarded = CODEC.createDeserializer(capturedRequests.get(0).getBytes(StandardCharsets.UTF_8))
+                    .readDocument();
+            assertTrue(Document.equals(
+                    Document.ofObject(Map.of(
+                            "item",
+                            Map.of(
+                                    "__type",
+                                    "smithy.test.proxyoneofoverlap#PairItem",
+                                    "label",
+                                    "sent",
+                                    "size",
+                                    2,
+                                    "nested",
+                                    Map.of("keep", "inner")),
+                            "selector",
+                            Map.of("byId", "i"),
+                            "plain",
+                            "p")),
+                    forwarded), capturedRequests.get(0));
+
+            var structuredContent = response.getResult().getMember("structuredContent");
+            assertTrue(Document.equals(
+                    Document.ofObject(Map.of(
+                            "item",
+                            Map.of("pair", Map.of("item_label", "kept", "size", 3, "nested", Map.of("keep", "inner"))),
+                            "selector",
+                            Map.of("by_id", "found"),
+                            "nested",
+                            Map.of("keep", "outer"),
+                            "plain",
+                            "p")),
+                    structuredContent), CODEC.serializeToString(structuredContent));
+            var errors = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
+                    .getSchema(CODEC.serializeToString(tool.getMember("outputSchema")))
+                    .validate(CODEC.serializeToString(structuredContent), InputFormat.JSON);
+            assertTrue(errors.isEmpty(), "structuredContent should validate against outputSchema: " + errors);
+        } finally {
+            mockServer.stop(0);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"selector\":{\"archive\":\"id\"}}",
+            // Inside document content, where the member can be there and hold null.
+            "{\"detail\":{\"__type\":\"smithy.test.proxyunionoverlap#Holder\",\"choice\":{\"archive\":null}}}",
+            // Next to a member that is available and that the union declares first.
+            "{\"detail\":{\"__type\":\"smithy.test.proxyunionoverlap#Holder\","
+                    + "\"other\":{\"byId\":\"i\",\"archive\":null}}}",
+            // A union that has no member left cannot be a result, not even an empty one.
+            "{\"blocked\":{}}"
+    })
+    void proxyServiceReportsAResultThatSelectsAUnionMemberThatIsLeftOut(String backendResponse) throws Exception {
+        var proxyModel = Model.assembler()
+                .addUnparsedModel("proxy-union-overlap.smithy",
+                        """
+                                $version: "2"
+
+                                namespace smithy.test.proxyunionoverlap
+
+                                use smithy.mcp#oneOf
+
+                                @aws.protocols#awsJson1_0
+                                service ProxyUnionService {
+                                    operations: [FindItem]
+                                }
+
+                                operation FindItem {
+                                    input := {}
+                                    output := {
+                                        selector: Lookup
+
+                                        detail: Detail
+
+                                        blocked: Blocked
+                                    }
+                                }
+
+                                /// Each member is named in JSON like the other one in the model.
+                                union Blocked {
+                                    @jsonName("fetch")
+                                    archive: String
+
+                                    @jsonName("archive")
+                                    fetch: String
+                                }
+
+                                @oneOf(
+                                    discriminator: "__type"
+                                    members: [
+                                        {name: "holder", target: Holder}
+                                    ]
+                                )
+                                document Detail
+
+                                structure Holder {
+                                    choice: Lookup
+
+                                    other: Reversed
+                                }
+
+                                union Reversed {
+                                    @jsonName("by_id")
+                                    byId: String
+
+                                    @jsonName("lookup")
+                                    archive: String
+
+                                    @jsonName("archive")
+                                    fetch: String
+                                }
+
+                                /// The second member is named in JSON like the first one in the model.
+                                union Lookup {
+                                    @jsonName("lookup")
+                                    archive: String
+
+                                    @jsonName("archive")
+                                    fetch: String
+
+                                    @jsonName("by_id")
+                                    byId: String
+                                }
+                                """)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        // The backend selects a member that tools cannot express: the call fails, visibly.
+        var mockServer = startAwsJsonBackend(backendResponse, new CopyOnWriteArrayList<>());
+        try {
+            server = StdioMcpServer.builder()
+                    .name("smithy-mcp-server")
+                    .input(input)
+                    .output(output)
+                    .addService("proxy-union",
+                            ProxyService.builder()
+                                    .service(ShapeId.from("smithy.test.proxyunionoverlap#ProxyUnionService"))
+                                    .proxyEndpoint(backendUrl(mockServer))
+                                    .model(proxyModel)
+                                    .build())
+                    .build();
+
+            server.start();
+            initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+
+            write("tools/call",
+                    Document.of(Map.of("name", Document.of("FindItem"), "arguments", Document.of(Map.of()))));
+            var response = read();
+            assertNull(response.getError());
+            assertTrue(response.getResult().getMember("isError").asBoolean());
+            assertNull(response.getResult().getMember("structuredContent"));
+            var union = backendResponse.contains("\"other\"") ? "Reversed" : "Lookup";
+            assertEquals(
+                    backendResponse.contains("\"blocked\"")
+                            ? "Union Blocked has no member that is available over MCP"
+                            : "Member `" + union + "$archive` is not available over MCP",
+                    response.getResult().getMember("content").asList().getFirst().getMember("text").asString());
+        } finally {
+            mockServer.stop(0);
+        }
+    }
+
+    @Test
+    void proxyServiceTellsVariantsWithOneNameApartByWhatTheyRequire() throws Exception {
+        var proxyModel = Model.assembler()
+                .addUnparsedModel("proxy-oneof-same-name.smithy",
+                        """
+                                $version: "2"
+
+                                namespace smithy.test.proxyoneofsamename
+
+                                use smithy.mcp#oneOf
+
+                                @aws.protocols#awsJson1_0
+                                service ProxySameNameService {
+                                    operations: [PutEntry]
+                                }
+
+                                operation PutEntry {
+                                    input := {
+                                        entry: Entry
+
+                                        marked: MarkedEntry
+
+                                        coded: CodedEntry
+
+                                        loaded: LoadedEntry
+                                    }
+                                    output := {}
+                                }
+
+                                @oneOf(
+                                    discriminator: "__type"
+                                    members: [
+                                        {name: "entry", target: ByX}
+                                        {name: "entry", target: ByMarkedY}
+                                    ]
+                                )
+                                document MarkedEntry
+
+                                @oneOf(
+                                    discriminator: "__type"
+                                    members: [
+                                        {name: "entry", target: ByCode}
+                                        {name: "entry", target: ById}
+                                    ]
+                                )
+                                document CodedEntry
+
+                                @oneOf(
+                                    discriminator: "__type"
+                                    members: [
+                                        {name: "entry", target: ById}
+                                        {name: "entry", target: ByPayload}
+                                    ]
+                                )
+                                document LoadedEntry
+
+                                structure ByPayload {
+                                    @required
+                                    payload: Document
+                                }
+
+                                structure ByCode {
+                                    @required
+                                    @jsonName("apiCode")
+                                    code: String
+                                }
+
+                                structure ById {
+                                    @required
+                                    id: String
+                                }
+
+                                /// The second member cannot be sent: it is named in JSON like the discriminator.
+                                structure ByMarkedY {
+                                    @required
+                                    y: String
+
+                                    @required
+                                    @jsonName("__type")
+                                    marker: String
+                                }
+
+                                @oneOf(
+                                    discriminator: "__type"
+                                    members: [
+                                        {name: "entry", target: ByX}
+                                        {name: "entry", target: ByY}
+                                    ]
+                                )
+                                document Entry
+
+                                structure ByX {
+                                    @required
+                                    x: String
+                                }
+
+                                structure ByY {
+                                    @required
+                                    y: String
+                                }
+                                """)
+                .discoverModels()
+                .assemble()
+                .unwrap();
+
+        var capturedRequests = new CopyOnWriteArrayList<String>();
+        var mockServer = startAwsJsonBackend("{}", capturedRequests);
+        try {
+            server = StdioMcpServer.builder()
+                    .name("smithy-mcp-server")
+                    .input(input)
+                    .output(output)
+                    .addService("proxy-same-name",
+                            ProxyService.builder()
+                                    .service(ShapeId.from("smithy.test.proxyoneofsamename#ProxySameNameService"))
+                                    .proxyEndpoint(backendUrl(mockServer))
+                                    .model(proxyModel)
+                                    .build())
+                    .build();
+
+            server.start();
+            initializeWithProtocolVersion(KnownProtocolVersion.V2025_06_18);
+
+            // One key names both variants; the content fits one of the two alternatives the tool advertises.
+            for (var member : List.of("x", "y")) {
+                write("tools/call",
+                        Document.of(Map.of(
+                                "name",
+                                Document.of("PutEntry"),
+                                "arguments",
+                                Document.ofObject(Map.of("entry", Map.of("entry", Map.of(member, "yes")))))));
+                assertNull(read().getError());
+            }
+            assertEquals(2, capturedRequests.size());
+            assertTrue(capturedRequests.get(0).contains("smithy.test.proxyoneofsamename#ByX"), capturedRequests.get(0));
+            assertTrue(capturedRequests.get(1).contains("smithy.test.proxyoneofsamename#ByY"), capturedRequests.get(1));
+
+            // What a definition requires is what it advertises: a member that is left out is not part of it.
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("PutEntry"),
+                            "arguments",
+                            Document.ofObject(Map.of("marked", Map.of("entry", Map.of("y", "yes")))))));
+            assertNull(read().getError());
+            assertEquals(3, capturedRequests.size());
+            assertTrue(capturedRequests.get(2).contains("smithy.test.proxyoneofsamename#ByMarkedY"),
+                    capturedRequests.get(2));
+            capturedRequests.remove(2);
+
+            // A JSON name that is there shadows the member name, as when the member is bound: the first
+            // definition's required member holds null, so the content is the second one's.
+            var content = new HashMap<String, Document>();
+            content.put("apiCode", null);
+            content.put("code", Document.of("x"));
+            content.put("id", Document.of("y"));
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("PutEntry"),
+                            "arguments",
+                            Document.of(Map.of("coded", Document.of(Map.of("entry", Document.of(content))))))));
+            assertNull(read().getError());
+            assertEquals(3, capturedRequests.size());
+            assertTrue(capturedRequests.get(2).contains("smithy.test.proxyoneofsamename#ById"),
+                    capturedRequests.get(2));
+            capturedRequests.remove(2);
+
+            // A document member that holds null has a value, so the content is the second definition's, and
+            // the member is still there when it is forwarded.
+            var payload = new HashMap<String, Document>();
+            payload.put("payload", null);
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("PutEntry"),
+                            "arguments",
+                            Document.of(Map.of("loaded", Document.of(Map.of("entry", Document.of(payload))))))));
+            assertNull(read().getError());
+            assertEquals(3, capturedRequests.size());
+            assertTrue(capturedRequests.get(2).contains("smithy.test.proxyoneofsamename#ByPayload"),
+                    capturedRequests.get(2));
+            assertTrue(capturedRequests.get(2).contains("\"payload\":null"), capturedRequests.get(2));
+            capturedRequests.remove(2);
+
+            // Content that fits both is the first one's, as it always was.
+            write("tools/call",
+                    Document.of(Map.of(
+                            "name",
+                            Document.of("PutEntry"),
+                            "arguments",
+                            Document.ofObject(Map.of("entry", Map.of("entry", Map.of("x", "yes", "y", "yes")))))));
+            assertNull(read().getError());
+            assertEquals(3, capturedRequests.size());
+            assertTrue(capturedRequests.get(2).contains("smithy.test.proxyoneofsamename#ByX"), capturedRequests.get(2));
+        } finally {
+            mockServer.stop(0);
+        }
+    }
+
+    private static HttpServer startAwsJsonBackend(String responseBody, List<String> capturedRequests)
+            throws IOException {
+        var backend = HttpServer.create(new InetSocketAddress(0), 0);
+        backend.createContext("/backend", exchange -> {
+            capturedRequests.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            var bytes = responseBody.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/x-amz-json-1.0");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        backend.start();
+        return backend;
+    }
+
+    private static String backendUrl(HttpServer backend) {
+        return "http://localhost:" + backend.getAddress().getPort() + "/backend";
     }
 }

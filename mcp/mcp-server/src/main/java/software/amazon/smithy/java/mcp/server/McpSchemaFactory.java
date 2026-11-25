@@ -11,12 +11,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.ai.McpHeaderTrait;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaIndex;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.OneOfTrait;
 import software.amazon.smithy.java.mcp.model.JsonArraySchema;
 import software.amazon.smithy.java.mcp.model.JsonDocumentSchema;
@@ -35,6 +38,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * Converts Smithy operation schemas into canonical MCP tool descriptors.
  */
 final class McpSchemaFactory {
+    private static final InternalLogger LOG = InternalLogger.getLogger(McpSchemaFactory.class);
     private static final TraitKey<OneOfTrait> ONE_OF_TRAIT = TraitKey.get(OneOfTrait.class);
     private static final TraitKey<McpHeaderTrait> MCP_HEADER_TRAIT = TraitKey.get(McpHeaderTrait.class);
     private static final List<String> DOCUMENT_TYPES = List.of(
@@ -46,6 +50,7 @@ final class McpSchemaFactory {
             "null");
 
     private final SchemaIndex schemaIndex;
+    private final Set<String> warned = ConcurrentHashMap.newKeySet();
 
     McpSchemaFactory(SchemaIndex schemaIndex) {
         this.schemaIndex = schemaIndex;
@@ -84,10 +89,14 @@ final class McpSchemaFactory {
 
     private Map<String, String> localHeaderParameters(Operation operation) {
         var result = new HashMap<String, String>();
-        for (var member : operation.getApiOperation().inputSchema().members()) {
+        var inputSchema = operation.getApiOperation().inputSchema();
+        var omitted = SmithyDocumentAdapter.overlappingMembers(inputSchema);
+        for (var member : inputSchema.members()) {
             var trait = member.getTrait(MCP_HEADER_TRAIT);
-            if (trait != null && trait.getValue().matches("[A-Za-z0-9][A-Za-z0-9_-]*")) {
-                result.put(member.memberName(), trait.getValue());
+            if (trait != null
+                    && !omitted.contains(member.memberName())
+                    && trait.getValue().matches("[A-Za-z0-9][A-Za-z0-9_-]*")) {
+                result.put(McpJson.wireName(member), trait.getValue());
             }
         }
         return Map.copyOf(result);
@@ -126,11 +135,16 @@ final class McpSchemaFactory {
 
         var properties = new HashMap<String, Document>();
         var required = new ArrayList<String>();
+        var omitted = overlappingMembers(target);
         for (var child : target.members()) {
-            if (child.hasTrait(TraitKey.REQUIRED_TRAIT)) {
-                required.add(child.memberName());
+            if (omitted.contains(child.memberName())) {
+                continue;
             }
-            properties.put(child.memberName(), Document.of(createSchema(child, visited, cache)));
+            var wireName = McpJson.wireName(child);
+            if (child.hasTrait(TraitKey.REQUIRED_TRAIT)) {
+                required.add(wireName);
+            }
+            properties.put(wireName, Document.of(createSchema(child, visited, cache)));
         }
         visited.remove(targetId);
 
@@ -258,15 +272,79 @@ final class McpSchemaFactory {
 
         var variants = new ArrayList<Document>();
         for (var definition : oneOf.getMembers()) {
+            var variant = schemaIndex.getSchema(definition.getTarget());
             variants.add(createUnionVariant(
                     definition.getName(),
-                    createSchema(schemaIndex.getSchema(definition.getTarget()), visited, cache)));
+                    withoutOmittedMembers(
+                            targetId,
+                            oneOf.getDiscriminator(),
+                            variant,
+                            createSchema(variant, visited, cache))));
         }
         visited.remove(targetId);
 
         var result = JsonOneOfSchema.builder().oneOf(variants).build();
         cache.put(targetId, result);
         return withDescription(result, memberDescription(documentMember));
+    }
+
+    /**
+     * The members of a structure or union that are not exposed, see
+     * {@link SmithyDocumentAdapter#overlappingMembers}. They are left out with one warning per shape rather than
+     * failing the entire tool listing.
+     */
+    private Set<String> overlappingMembers(Schema container) {
+        var omitted = SmithyDocumentAdapter.overlappingMembers(container);
+        if (!omitted.isEmpty() && warned.add(container.id().toString())) {
+            LOG.warn(
+                    "Members {} of {} are not part of any tool schema: one is named in JSON like another one is"
+                            + " named in the model, or two share one JSON name, so a key with that name cannot be"
+                            + " attributed",
+                    new TreeSet<>(omitted),
+                    container.id());
+        }
+        return omitted;
+    }
+
+    /**
+     * Leaves the members that are named like the discriminator out of a variant, see
+     * {@link SmithyDocumentAdapter#omittedMembers}, with a warning. Members with overlapping names are left out
+     * of the structure itself.
+     */
+    private SerializableShape withoutOmittedMembers(
+            ShapeId document,
+            String discriminator,
+            Schema variant,
+            SerializableShape variantSchema
+    ) {
+        var named = new TreeSet<>(SmithyDocumentAdapter.omittedMembers(variant, discriminator));
+        named.removeAll(SmithyDocumentAdapter.overlappingMembers(variant));
+        if (named.isEmpty() || !(variantSchema instanceof JsonObjectSchema object)) {
+            return variantSchema;
+        }
+        if (warned.add(document + " " + variant.id())) {
+            LOG.warn(
+                    "Members {} of {} are not part of the tool schema: within the @oneOf document {} they cannot"
+                            + " be told apart from its discriminator {}",
+                    named,
+                    variant.id(),
+                    document,
+                    discriminator);
+        }
+        if (object.getProperties() == null) {
+            return variantSchema;
+        }
+        var wireNames = new HashSet<String>();
+        for (var name : named) {
+            wireNames.add(McpJson.wireName(variant.member(name)));
+        }
+        var properties = new HashMap<>(object.getProperties());
+        properties.keySet().removeAll(wireNames);
+        var builder = object.toBuilder().properties(properties);
+        if (object.getRequired() != null) {
+            builder.required(object.getRequired().stream().filter(name -> !wireNames.contains(name)).toList());
+        }
+        return builder.build();
     }
 
     private SerializableShape createUnionSchema(
@@ -285,12 +363,21 @@ final class McpSchemaFactory {
         }
 
         var variants = new ArrayList<Document>();
+        var omitted = overlappingMembers(target);
         for (var child : target.members()) {
+            if (omitted.contains(child.memberName())) {
+                continue;
+            }
             variants.add(createUnionVariant(
-                    child.memberName(),
+                    McpJson.wireName(child),
                     createSchema(child, visited, cache)));
         }
         visited.remove(targetId);
+        if (variants.isEmpty()) {
+            // No member is left to choose from. A list of alternatives must not be empty, so the one
+            // alternative is the schema that accepts nothing: the union has no value, and can only be absent.
+            variants.add(Document.of(false));
+        }
 
         var result = JsonOneOfSchema.builder().oneOf(variants).build();
         cache.put(targetId, result);

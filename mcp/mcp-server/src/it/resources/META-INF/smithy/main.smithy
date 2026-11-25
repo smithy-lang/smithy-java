@@ -92,6 +92,25 @@ map ShapeWithDefaultMap {
     value: ShapeWithDefault
 }
 
+/// @oneOf document with a variant whose members are renamed on the wire
+@oneOf(discriminator: "__type", members: [
+    {name: "swapped", target: Swapped},
+    {name: "square", target: Square}
+])
+document SwappedShapeWithOneOf
+
+/// Each member is named on the wire like the other member is named in the model
+structure Swapped {
+    @jsonName("second")
+    first: String
+
+    @jsonName("first")
+    second: String
+
+    @jsonName("third_value")
+    third: String
+}
+
 /// List of nested @oneOf documents
 list NestedShapeWithOneOfList {
     member: NestedShapeWithOneOf
@@ -186,6 +205,12 @@ structure Echo {
     // Nested @oneOf documents (for testing recursive adaptation)
     nestedShapeWithOneOf: NestedShapeWithOneOf
     nestedShapeWithOneOfList: NestedShapeWithOneOfList
+
+    // @oneOf document whose variant has @jsonName members
+    swappedShape: SwappedShapeWithOneOf
+
+    // Helper to make Swapped reachable for schema generation
+    swapped: Swapped
 
     shapeWithDefault: ShapeWithDefault
     shapeWithDefaultList: ShapeWithDefaultList

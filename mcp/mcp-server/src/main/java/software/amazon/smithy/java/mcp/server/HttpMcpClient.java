@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.auth.api.Signer;
@@ -411,8 +412,12 @@ public final class HttpMcpClient extends McpRemoteClient {
 
         var mappings = toolHeaderParameters.get().get(toolName);
         var params = request.getParams();
-        var arguments = params == null ? null : params.getMember("arguments");
-        if (mappings == null || arguments == null) {
+        if (mappings == null || !McpHttpBinding.isObject(params)) {
+            return;
+        }
+        // The body is written with wire names, so the headers mirror the arguments as they are keyed there.
+        var arguments = SmithyDocumentAdapter.wireKeyed(params.getMember("arguments"));
+        if (arguments == null) {
             return;
         }
 
@@ -420,7 +425,8 @@ public final class HttpMcpClient extends McpRemoteClient {
             var value = stringMember(arguments, entry.getKey());
             if (value != null) {
                 requestBuilder.addHeader(
-                        HeaderName.of("Mcp-Param-" + entry.getValue()),
+                        // Header names are case-insensitive and HeaderName only takes the lowercase form.
+                        HeaderName.of("mcp-param-" + entry.getValue().toLowerCase(Locale.ROOT)),
                         McpHttpBinding.encodeParameter(value));
             }
         }
