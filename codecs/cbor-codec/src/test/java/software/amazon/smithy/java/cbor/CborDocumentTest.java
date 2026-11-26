@@ -87,7 +87,7 @@ public class CborDocumentTest {
         var de = toCbor("1.1");
 
         var document = de.readDocument();
-        assertThat(document.type(), is(ShapeType.DOUBLE));
+        assertThat(document.type(), is(ShapeType.BIG_DECIMAL));
         assertThat(document.asFloat(), is(1.1f));
         assertThat(document.asDouble(), is(1.1));
     }

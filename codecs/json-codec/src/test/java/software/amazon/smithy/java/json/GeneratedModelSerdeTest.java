@@ -30,6 +30,7 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.DocumentEqualsFlags;
 import software.amazon.smithy.java.json.bench.model.AllListsStruct;
 import software.amazon.smithy.java.json.bench.model.BenchUnion;
 import software.amazon.smithy.java.json.bench.model.BlobStruct;
@@ -670,7 +671,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
                         .build()) {
             ByteBuffer serialized = serCodec.serialize(original);
             Document result = deCodec.createDeserializer(serialized).readDocument();
-            assertThat(Document.equals(result, original)).isTrue();
+            assertThat(Document.equals(result, original, DocumentEqualsFlags.NUMBER_PROMOTION)).isTrue();
         }
     }
 
@@ -708,7 +709,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
                 .freeformData(freeform)
                 .build();
         var result = roundtrip(ser, de, original, ComplexStruct.builder());
-        assertThat(Document.equals(result.getFreeformData(), freeform)).isTrue();
+        assertThat(Document.equals(result.getFreeformData(), freeform, DocumentEqualsFlags.NUMBER_PROMOTION)).isTrue();
     }
 
     static Stream<Arguments> nonStructDocumentInStructRoundtrip() {

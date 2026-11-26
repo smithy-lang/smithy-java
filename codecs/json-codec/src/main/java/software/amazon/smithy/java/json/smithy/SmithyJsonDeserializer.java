@@ -994,7 +994,7 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
 
     /**
      * Parses a number in document context with strict RFC 8259 validation.
-     * Determines the appropriate Number type (Integer, Long, BigInteger, or Double).
+     * Determines the appropriate Number type (Integer, Long, BigInteger, Double or BigDecimal).
      */
     private Document parseDocumentNumber() {
         // Use parseDouble to strictly validate the number grammar
@@ -1013,6 +1013,15 @@ final class SmithyJsonDeserializer implements ShapeDeserializer {
         Number number;
         if (isFloat) {
             number = parsedDouble;
+            // Fractional numbers should become BigDecimal to avoid losing precision as Double.
+            int len = newPos - pos;
+            try {
+                number = BigNumbers.parseBigDecimal(buf, pos, len);
+            } catch (NumberFormatException e) {
+                throw new SerializationException(
+                        "Invalid Number: " + new String(buf, pos, len, StandardCharsets.US_ASCII),
+                        e);
+            }
             pos = newPos;
         } else {
             int len = newPos - pos;
