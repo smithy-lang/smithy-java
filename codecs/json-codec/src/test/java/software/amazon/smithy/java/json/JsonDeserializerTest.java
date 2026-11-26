@@ -1347,7 +1347,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
     }
 
     @PerProvider
-    public void documentParsesExponentAsDouble(JsonSerdeProvider provider) {
+    public void documentParsesExponentAsBigInteger(JsonSerdeProvider provider) {
         try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1e5".getBytes(StandardCharsets.UTF_8));
             var doc = de.readDocument();

@@ -683,6 +683,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
                 Document.of(42),
                 Document.of(Long.MAX_VALUE),
                 Document.of(3.14),
+                Document.of(new BigDecimal("1.5")),
                 Document.of(List.of()),
                 Document.of(List.of(Document.of(1), Document.of("two"), Document.of(true))),
                 Document.of(Map.of()),
@@ -719,6 +720,7 @@ public class GeneratedModelSerdeTest extends ProviderTestBase {
                 Document.of(42),
                 Document.of(Long.MAX_VALUE),
                 Document.of(3.14),
+                Document.of(new BigDecimal("1.5")),
                 Document.of(List.of(Document.of(1), Document.of("two"))),
                 Document.of(Map.of("key", Document.of("value"))),
                 Document.of(Map.of(
