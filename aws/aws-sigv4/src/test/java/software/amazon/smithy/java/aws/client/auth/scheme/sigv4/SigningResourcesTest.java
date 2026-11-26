@@ -143,6 +143,41 @@ class SigningResourcesTest {
     }
 
     @Test
+    void headersSortByNameStablyForEverySizeAndOrder() {
+        var random = new Random(17);
+        var r = new SigningResources();
+        for (int n : new int[] {0, 1, 32, 33, 1_000}) {
+            for (int mode = 0; mode < 3; mode++) {
+                List<String[]> headers = new ArrayList<>();
+                for (int i = 0; i < n; i++) {
+                    headers.add(new String[] {"h" + random.nextInt(Math.max(1, n / 4)), "v" + i});
+                }
+                if (mode == 0) {
+                    headers.sort((a, b) -> b[0].compareTo(a[0]));
+                } else if (mode == 1) {
+                    headers.sort((a, b) -> a[0].compareTo(b[0]));
+                }
+                List<String[]> expected = new ArrayList<>(headers);
+                expected.sort((a, b) -> a[0].compareTo(b[0]));
+                r.reset();
+                for (String[] h : headers) {
+                    r.addHeaderCanonical(h[0], h[1]);
+                }
+                r.sortHeadersByName();
+                List<String> got = new ArrayList<>();
+                for (int i = 0; i < r.headerCount; i++) {
+                    got.add(r.headers[i * 2] + ":" + r.headers[i * 2 + 1]);
+                }
+                List<String> want = new ArrayList<>();
+                for (String[] h : expected) {
+                    want.add(h[0] + ":" + h[1]);
+                }
+                assertThat(got).as("n %d mode %d", n, mode).isEqualTo(want);
+            }
+        }
+    }
+
+    @Test
     void queryPairsSortByKeyThenValueForEverySizeAndOrder() {
         var random = new Random(13);
         var r = new SigningResources();
