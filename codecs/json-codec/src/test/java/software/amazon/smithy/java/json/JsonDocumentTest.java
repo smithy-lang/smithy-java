@@ -73,7 +73,7 @@ public class JsonDocumentTest extends ProviderTestBase {
         var de = codec.createDeserializer("1.1".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
-        assertThat(document.type(), is(ShapeType.DOUBLE));
+        assertThat(document.type(), is(ShapeType.BIG_DECIMAL));
         assertThat(document.asFloat(), is(1.1f));
         assertThat(document.asDouble(), is(1.1));
     }

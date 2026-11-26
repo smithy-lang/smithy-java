@@ -221,7 +221,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 case VALUE_TRUE -> JsonDocuments.of(true, settings);
                 case VALUE_FALSE -> JsonDocuments.of(false, settings);
                 case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> JsonDocuments.of(
-                        boundedNumber(parser.getNumberValue()),
+                        boundedNumber(parser.getNumberValueExact()),
                         settings);
                 case START_ARRAY -> {
                     List<Document> values = new ArrayList<>();

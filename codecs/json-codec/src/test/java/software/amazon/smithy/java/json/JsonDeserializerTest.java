@@ -1351,7 +1351,7 @@ public class JsonDeserializerTest extends ProviderTestBase {
         try (var codec = codec(provider)) {
             var de = codec.createDeserializer("1e5".getBytes(StandardCharsets.UTF_8));
             var doc = de.readDocument();
-            assertThat(doc.type(), is(ShapeType.DOUBLE));
+            assertThat(doc.type(), is(ShapeType.BIG_DECIMAL));
             assertThat(doc.asDouble(), is(1e5));
         }
     }
