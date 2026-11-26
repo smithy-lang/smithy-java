@@ -37,6 +37,10 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.json.JsonCodec;
@@ -46,6 +50,7 @@ import software.amazon.smithy.java.mcp.model.ListToolsResult;
 import software.amazon.smithy.java.mcp.model.ToolInfo;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.JsonNameTrait;
 
 class HttpMcpClientTest {
     private static final JsonCodec JSON_CODEC = JsonCodec.builder().build();
@@ -1444,6 +1449,78 @@ class HttpMcpClientTest {
         assertEquals(
                 Map.of(),
                 metadata.getMember(McpWireNames.CLIENT_CAPABILITIES).asStringMap());
+    }
+
+    @Test
+    void typedArgumentsAreMirroredIntoParameterHeadersByWireName() throws IOException {
+        var parameterHeader = new AtomicReference<String>();
+        var callBody = new AtomicReference<JsonRpcRequest>();
+        mockServer.removeContext("/mcp");
+        mockServer.createContext("/mcp", exchange -> {
+            try {
+                var request = JsonRpcRequest.builder()
+                        .deserialize(JSON_CODEC.createDeserializer(exchange.getRequestBody().readAllBytes()))
+                        .build();
+                var id = JSON_CODEC.serializeToString(request.getId());
+                String result;
+                if (request.getMethod().equals("tools/list")) {
+                    result = "{\"tools\":[{\"name\":\"ListTags\",\"inputSchema\":{\"type\":\"object\","
+                            + "\"properties\":{\"tag_region\":"
+                            + "{\"type\":\"string\",\"x-mcp-header\":\"Tag-Region\"}}}}]}";
+                } else {
+                    parameterHeader.set(exchange.getRequestHeaders().getFirst("Mcp-Param-Tag-Region"));
+                    callBody.set(request);
+                    result = "{\"content\":[{\"type\":\"text\",\"text\":\"listed\"}]}";
+                }
+                writeJson(exchange, 200, "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + result + "}");
+            } finally {
+                exchange.close();
+            }
+        });
+        var protocol = BuiltInProtocols.protocol(KnownProtocolVersion.V2026_07_28);
+        proxy.usingProtocol(protocol, proxy::listTools);
+
+        // The caller passes a shape; its member is named differently in the model than on the wire.
+        var input = Schema.structureBuilder(ShapeId.from("smithy.example#ListTagsInput"))
+                .putMember("tagRegion", PreludeSchemas.STRING, new JsonNameTrait("tag_region"))
+                .build();
+        var arguments = Document.of(new SerializableStruct() {
+            @Override
+            public Schema schema() {
+                return input;
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                serializer.writeString(input.member("tagRegion"), "region-a");
+            }
+
+            @Override
+            public <T> T getMemberValue(Schema member) {
+                throw new UnsupportedOperationException();
+            }
+        });
+        var response = proxy.usingProtocol(protocol,
+                () -> proxy.exchangeForwarded(statelessRequest(2,
+                        "tools/call",
+                        Map.of("name", Document.of("ListTags"), "arguments", arguments))));
+
+        assertNull(response.getError());
+        assertEquals("region-a",
+                callBody.get().getParams().getMember("arguments").getMember("tag_region").asString());
+        assertEquals("region-a", parameterHeader.get());
+
+        // Arguments that are already keyed by wire name are mirrored the same way.
+        var untyped = proxy.usingProtocol(protocol,
+                () -> proxy.exchangeForwarded(statelessRequest(3,
+                        "tools/call",
+                        Map.of(
+                                "name",
+                                Document.of("ListTags"),
+                                "arguments",
+                                Document.of(Map.of("tag_region", Document.of("region-b")))))));
+        assertNull(untyped.getError());
+        assertEquals("region-b", parameterHeader.get());
     }
 
     @Test

@@ -1143,6 +1143,128 @@ class StdioMcpServerIntegrationTest {
     // ========== @oneOf Document in Collections Tests ==========
 
     @Test
+    void testOneOfDocumentWithJsonNamesRoundTrips() {
+        initializeLatestProtocol();
+        var shape = Document.of(Map.of("swapped",
+                Document.of(Map.of(
+                        "third_value",
+                        Document.of("green"),
+                        "note",
+                        Document.of("kept")))));
+
+        var echo = echoSingleField("swappedShape", shape);
+
+        // The handler echoes the document it received, so the result is the request.
+        assertTrue(Document.equals(shape, echo.getMember("swappedShape")),
+                CODEC.serializeToString(echo.getMember("swappedShape")));
+
+        // The handler sees member names, the discriminator, and the property the model does not know.
+        var lastInput = echoOperation.getLastInput().getEcho().getSwappedShape();
+        assertEquals(Set.of("__type", "third", "note"), lastInput.asStringMap().keySet());
+        assertEquals("smithy.java.mcp.test#Swapped", lastInput.getMember("__type").asString());
+        assertEquals("green", lastInput.getMember("third").asString());
+        assertEquals("kept", lastInput.getMember("note").asString());
+    }
+
+    @Test
+    void testOneOfDocumentKeepsExplicitNull() {
+        initializeLatestProtocol();
+        var echo = "{\"swappedShape\":{\"swapped\":{\"third_value\":null,\"note\":\"kept\"}}}";
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("McpEcho"),
+                        "arguments",
+                        createEchoInput(CODEC.createDeserializer(echo.getBytes(StandardCharsets.UTF_8))
+                                .readDocument()
+                                .asStringMap()))));
+        var response = CODEC.deserializeShape(readRawResponse(), JsonRpcResponse.builder());
+        assertNull(response.getError());
+
+        // The handler can tell a member that was sent as null from one that was not sent.
+        var lastInput = echoOperation.getLastInput().getEcho().getSwappedShape().asStringMap();
+        assertEquals(Set.of("__type", "third", "note"), lastInput.keySet());
+        assertNull(lastInput.get("third"));
+
+        // And so can the client.
+        var swapped = response.getResult()
+                .getMember("structuredContent")
+                .getMember("echo")
+                .getMember("swappedShape")
+                .getMember("swapped")
+                .asStringMap();
+        assertEquals(Set.of("third_value", "note"), swapped.keySet());
+        assertNull(swapped.get("third_value"));
+    }
+
+    @Test
+    void testOneOfVariantMembersWithOverlappingNamesAreRefused() {
+        initializeLatestProtocol();
+        // "first" and "second" each name one member in the model and the other one in JSON.
+        var shape = Document.of(Map.of("swapped",
+                Document.of(Map.of(
+                        "second",
+                        Document.of("red"),
+                        "third_value",
+                        Document.of("green")))));
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("McpEcho"),
+                        "arguments",
+                        createEchoInput(Map.of("swappedShape", shape)))));
+        var response = CODEC.deserializeShape(readRawResponse(), JsonRpcResponse.builder());
+
+        assertNotNull(response.getError());
+        assertEquals(-32602, response.getError().getCode());
+        assertEquals("Invalid arguments for tool McpEcho: `second` names a member of Swapped that is not available"
+                + " over MCP", response.getError().getMessage());
+        assertNull(echoOperation.getLastInput(), "The handler must not be invoked");
+    }
+
+    static Stream<Arguments> ambiguousVariants() {
+        var oneOf = "Document SwappedShapeWithOneOf accepts exactly one member, but found `swapped` and `square`";
+        var union = "Union TestUnion accepts exactly one member, but found `stringOption` and `integerOption`";
+        return Stream.of(
+                Arguments.of("{\"swappedShape\":{\"swapped\":{\"third_value\":\"blue\"},\"square\":{\"side\":2}}}",
+                        oneOf),
+                // A variant that is present counts, whatever it holds.
+                Arguments.of("{\"swappedShape\":{\"swapped\":{\"third_value\":\"blue\"},\"square\":null}}", oneOf),
+                Arguments.of("{\"swappedShape\":{\"swapped\":null,\"square\":{\"side\":2}}}", oneOf),
+                Arguments.of("{\"unionValue\":{\"stringOption\":\"a\",\"integerOption\":null}}", union),
+                Arguments.of("{\"unionValue\":{\"stringOption\":null,\"integerOption\":1}}", union),
+                // The variant has a timestamp, so its content is projected onto the modeled members.
+                Arguments.of(
+                        "{\"nestedShapeWithOneOf\":{\"circleWithNested\":"
+                                + "{\"radius\":1,\"__type\":\"smithy.java.mcp.test#Square\"}}}",
+                        "`__type` is the discriminator of NestedShapeWithOneOf and can only be"
+                                + " `smithy.java.mcp.test#CircleWithNested` here"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("ambiguousVariants")
+    void testAmbiguousVariantsAreRejectedBeforeTheHandlerRuns(String echo, String message) {
+        initializeLatestProtocol();
+
+        write("tools/call",
+                Document.of(Map.of(
+                        "name",
+                        Document.of("McpEcho"),
+                        "arguments",
+                        createEchoInput(CODEC.createDeserializer(echo.getBytes(StandardCharsets.UTF_8))
+                                .readDocument()
+                                .asStringMap()))));
+        var response = CODEC.deserializeShape(readRawResponse(), JsonRpcResponse.builder());
+
+        assertNotNull(response.getError(), echo);
+        assertEquals(-32602, response.getError().getCode());
+        assertEquals("Invalid arguments for tool McpEcho: " + message, response.getError().getMessage());
+        assertNull(echoOperation.getLastInput(), "The handler must not be invoked");
+    }
+
+    @Test
     void testOneOfDocumentInList() {
         initializeLatestProtocol();
         // Input is in MCP wrapper format: {"circle": {"radius": 5}}
