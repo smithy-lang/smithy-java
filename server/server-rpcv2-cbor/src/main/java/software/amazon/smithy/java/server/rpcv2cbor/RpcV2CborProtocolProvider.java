@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server.rpcv2;
+package software.amazon.smithy.java.server.rpcv2cbor;
 
 import java.util.List;
 import software.amazon.smithy.java.server.Service;

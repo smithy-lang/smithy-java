@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.server.ProxyOperationTrait;
+import software.amazon.smithy.java.server.proxy.ProxyOperationTrait;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.modelbundle.api.model.AdditionalInput;
