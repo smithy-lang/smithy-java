@@ -718,10 +718,18 @@ public final class JsonDocuments {
     private static final class JsonDocumentDeserializer extends DocumentDeserializer {
 
         private final JsonSettings settings;
+        // Field of the document that readStruct ignores: the discriminator, when this deserializer reads the variant
+        // of a discriminated union from the union's flat document. Null otherwise.
+        private final String hiddenField;
 
         JsonDocumentDeserializer(JsonSettings settings, Document value) {
+            this(settings, value, null);
+        }
+
+        private JsonDocumentDeserializer(JsonSettings settings, Document value, String hiddenField) {
             super(value);
             this.settings = settings;
+            this.hiddenField = hiddenField;
         }
 
         @Override
@@ -731,12 +739,64 @@ public final class JsonDocuments {
 
         @Override
         public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
+            // Only unions can carry @discriminated, so structures skip the extension lookup.
+            if (schema.type() == ShapeType.UNION) {
+                Schema structSchema = schema.isMember() ? schema.memberTarget() : schema;
+                var ext = structSchema.getExtension(JsonSchemaExtensions.KEY);
+                var discriminated = ext != null ? ext.discriminated() : null;
+                if (discriminated != null) {
+                    readDiscriminatedUnion(discriminated, state, structMemberConsumer);
+                    return;
+                }
+            }
+
             for (var member : schema.members()) {
-                var nextValue = readDocument().getMember(settings.fieldMapper().memberToField(member));
+                String field = settings.fieldMapper().memberToField(member);
+                if (hiddenField != null && hiddenField.equals(field)) {
+                    continue;
+                }
+                var nextValue = readDocument().getMember(field);
                 if (nextValue != null) {
                     structMemberConsumer.accept(state, member, deserializer(nextValue));
                 }
             }
+        }
+
+        /**
+         * Reads a {@code @discriminated} union from its flat document form. The discriminator field identifies
+         * the active member, and that member's structure then reads its own fields from the same document, with the
+         * discriminator hidden so that a member whose serialized name collides with it does not receive it.
+         */
+        private <T> void readDiscriminatedUnion(
+                JsonSchemaExtensions.DiscriminatedData discriminated,
+                T state,
+                StructMemberConsumer<T> structMemberConsumer
+        ) {
+            Document document = readDocument();
+            String fieldName = discriminated.discriminatorFieldName();
+            Document discriminator = document.getMember(fieldName);
+
+            if (discriminator == null) {
+                // Without a discriminator, including in an empty object, no variant can be determined.
+                throw new SerializationException(
+                        "Discriminated union is missing a string discriminator field '" + fieldName + "'");
+            }
+            if (discriminator.type() != ShapeType.STRING) {
+                throw new SerializationException(
+                        "Discriminated union discriminator field '" + fieldName + "' must be a string");
+            }
+
+            String value = discriminator.asString();
+            Schema variant = discriminated.valueLookup().member(value);
+            if (variant == null) {
+                if (settings.forbidUnknownUnionMembers()) {
+                    throw new SerializationException("Unknown discriminator value " + value + " encountered");
+                }
+                structMemberConsumer.unknownMember(state, value);
+                return;
+            }
+
+            structMemberConsumer.accept(state, variant, new JsonDocumentDeserializer(settings, document, fieldName));
         }
 
         @Override

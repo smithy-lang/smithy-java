@@ -1,2 +1,3 @@
 software.amazon.smithy.java.json.JsonSchemaExtensions
 software.amazon.smithy.java.json.smithy.SmithyJsonSchemaExtensions
+software.amazon.smithy.java.json.smithy.DiscriminatedUnionSchemaExtensions

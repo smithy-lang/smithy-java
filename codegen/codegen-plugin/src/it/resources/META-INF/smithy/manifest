@@ -48,6 +48,7 @@ structures/union-members.smithy
 traits/traits.smithy
 unions/union-tests.smithy
 unions/unions-all-types.smithy
+unions/discriminated-unions.smithy
 common.smithy
 authScheme.smithy
 main.smithy

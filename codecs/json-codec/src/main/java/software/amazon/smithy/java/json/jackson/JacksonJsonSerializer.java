@@ -37,6 +37,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     private SerializeDocumentContents serializeDocumentContents;
     private final ShapeSerializer structSerializer = new JsonStructSerializer();
     private final MapSerializer mapSerializer = new JsonMapSerializer();
+    private final DiscriminatedUnionWriter discriminatorWriter = new DiscriminatedUnionWriter();
 
     JacksonJsonSerializer(
             JsonGenerator generator,
@@ -219,12 +220,51 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         try {
+            var discriminated = discriminatedData(schema);
             generator.writeStartObject();
-            struct.serializeMembers(structSerializer);
+            if (discriminated != null) {
+                // Inline the single set member's fields as siblings of the discriminator, rather than
+                // nesting them in their own object (the standard union encoding). The writer is shared, so
+                // save its state for the discriminated union this one is nested in.
+                var writer = discriminatorWriter;
+                var savedData = writer.data;
+                boolean savedWritten = writer.written;
+                writer.data = discriminated;
+                writer.written = false;
+                boolean written;
+                try {
+                    struct.serializeMembers(writer);
+                } finally {
+                    written = writer.written;
+                    writer.data = savedData;
+                    writer.written = savedWritten;
+                }
+                if (!written) {
+                    // The unknown variant has no member to write, and the flat form cannot represent it.
+                    throw new SerializationException("Cannot serialize discriminated union "
+                            + (schema.isMember() ? schema.memberTarget() : schema).id()
+                            + " without a known member set");
+                }
+            } else {
+                struct.serializeMembers(structSerializer);
+            }
             generator.writeEndObject();
+        } catch (SerializationException e) {
+            throw e;
         } catch (Exception e) {
             throw new SerializationException(e);
         }
+    }
+
+    // Only unions can carry @discriminated, so structures skip the extension lookup. type() resolves a member
+    // schema to its target's type.
+    static JsonSchemaExtensions.DiscriminatedData discriminatedData(Schema schema) {
+        if (schema.type() != ShapeType.UNION) {
+            return null;
+        }
+        var target = schema.isMember() ? schema.memberTarget() : schema;
+        var ext = target.getExtension(JsonSchemaExtensions.KEY);
+        return ext != null ? ext.discriminated() : null;
     }
 
     private void writeFieldName(Schema schema) throws Exception {
@@ -2149,5 +2189,37 @@ final class JacksonJsonSerializer implements ShapeSerializer {
 
         });
         endObject();
+    }
+
+    /**
+     * Writes a {@code @discriminated} union's single set member. {@code writeStruct} is called exactly
+     * once, by the union's own generated {@code serializeMembers}, with the member schema of whichever
+     * variant is set and the variant's value.
+     *
+     * <p>Rather than open a nested object for the variant, this writes the discriminator field/value
+     * pair directly into the already-open outer object, then serializes the variant's own members as
+     * siblings via the normal {@link JsonStructSerializer}.
+     */
+    private final class DiscriminatedUnionWriter extends SpecificShapeSerializer {
+        private JsonSchemaExtensions.DiscriminatedData data;
+        private boolean written;
+
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            if (written) {
+                throw new SerializationException("Discriminated union member " + schema.id()
+                        + " cannot be written: only one member of a union can be set");
+            }
+            written = true;
+            try {
+                generator.writeName(data.serializedFieldName());
+                generator.writeString(data.serializedValues()[schema.memberIndex()]);
+                struct.serializeMembers(structSerializer);
+            } catch (SerializationException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
     }
 }
