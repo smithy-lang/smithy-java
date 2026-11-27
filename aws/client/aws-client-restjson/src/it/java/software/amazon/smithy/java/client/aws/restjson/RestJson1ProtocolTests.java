@@ -50,9 +50,6 @@ import software.amazon.smithy.model.node.Node;
                 "DuplexMultipleHeaderInput",
                 "MultipleHeaderOutput",
                 "DuplexMultipleHeaderOutput",
-                // Decoder returns modeled error events instead of throwing
-                "ClientErrorOutput",
-                "DuplexClientErrorOutput",
                 // Client doesn't validate missing @required initial response members
                 "MissingRequiredInitialResponseOutput",
                 "DuplexMissingRequiredInitialResponseOutput",
