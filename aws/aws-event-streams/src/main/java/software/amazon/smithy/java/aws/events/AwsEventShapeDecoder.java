@@ -13,7 +13,9 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -65,14 +67,22 @@ final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends Serial
         return switch (messageType) {
             case "error" -> throw decodeError(message);
             case "event" -> decodePayload(getEventType(message), message);
-            case "exception" -> decodeModeledException(message);
+            case "exception" -> throw decodeModeledException(message);
             default -> throw new IllegalStateException("Unknown message type: " + messageType);
         };
     }
 
-    private E decodeModeledException(Message message) {
+    private RuntimeException decodeModeledException(Message message) {
         var exceptionType = expectHeader(message, ":exception-type").getString();
-        return decodePayload(exceptionType, message);
+        var memberSchema = eventSchema.member(exceptionType);
+        if (memberSchema == null) {
+            return new EventStreamingProtocolException("Unsupported exception type: " + exceptionType);
+        }
+        var error = decodeMember(memberSchema, message);
+        if (error instanceof ModeledException modeledException) {
+            return modeledException;
+        }
+        return new EventStreamModeledException(memberSchema.memberTarget(), error);
     }
 
     private E decodePayload(String eventType, Message message) {
@@ -80,14 +90,17 @@ final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends Serial
         if (memberSchema == null) {
             throw new EventStreamingProtocolException("Unsupported event type: " + eventType);
         }
+        var builder = eventBuilder.get();
+        builder.setMemberValue(memberSchema, decodeMember(memberSchema, message));
+        return builder.build();
+    }
+
+    private SerializableShape decodeMember(Schema memberSchema, Message message) {
         var headers = message.getHeaders();
         var deserializer = new EventStreamDeserializer(codec, new HeadersDeserializer(headers), message.getPayload());
-        var memberTarget = memberSchema.memberTarget();
-        var shapeBuilder = memberTarget.shapeBuilder();
+        var shapeBuilder = memberSchema.memberTarget().shapeBuilder();
         shapeBuilder.deserialize(deserializer);
-        var builder = eventBuilder.get();
-        builder.setMemberValue(memberSchema, shapeBuilder.build());
-        return builder.build();
+        return shapeBuilder.build();
     }
 
     private EventStreamingProtocolException decodeError(Message message) {

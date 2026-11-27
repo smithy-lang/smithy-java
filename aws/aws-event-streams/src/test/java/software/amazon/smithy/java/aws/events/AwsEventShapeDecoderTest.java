@@ -8,6 +8,7 @@ package software.amazon.smithy.java.aws.events;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import software.amazon.eventstream.Message;
 import software.amazon.smithy.java.aws.events.model.BlobEvent;
 import software.amazon.smithy.java.aws.events.model.BodyAndHeaderEvent;
-import software.amazon.smithy.java.aws.events.model.EventStreamWithError;
 import software.amazon.smithy.java.aws.events.model.HeadersOnlyEvent;
 import software.amazon.smithy.java.aws.events.model.MyError;
 import software.amazon.smithy.java.aws.events.model.StringEvent;
@@ -188,17 +188,11 @@ class AwsEventShapeDecoderTest {
         var frame = new AwsEventFrame(message);
 
         // Act
-        var struct = createDecoder(TestOperationWithException.instance()).decode(frame);
+        var decoder = createDecoder(TestOperationWithException.instance());
+        var except = assertThrows(MyError.class, () -> decoder.decode(frame));
 
         // Assert
-        assertInstanceOf(EventStreamWithError.class, struct);
-        var actual = (EventStreamWithError) struct;
-        assertInstanceOf(EventStreamWithError.ModeledErrorMemberMember.class, actual);
-        var expected = EventStreamWithError.builder()
-                .modeledErrorMember(MyError.builder().message("Client exception").build())
-                .build();
-        assertEquals(((EventStreamWithError.ModeledErrorMemberMember) expected).getValue().getMessage(),
-                ((EventStreamWithError.ModeledErrorMemberMember) actual).getValue().getMessage());
+        assertEquals("Client exception", except.getMessage());
     }
 
     @Test
