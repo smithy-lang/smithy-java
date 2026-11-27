@@ -33,6 +33,7 @@ tasks {
     }
 
     processResources {
+        inputs.property("smithyJavaVersion", version.toString())
         // Update the Version.java class to reflect current version of project
         filter<ReplaceTokens>("tokens" to mapOf("SmithyJavaVersion" to version))
     }
