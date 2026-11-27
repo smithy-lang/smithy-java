@@ -9,13 +9,17 @@ import java.time.Instant;
 import java.util.List;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
@@ -67,6 +71,110 @@ public class EndpointResolverTest {
         MatcherAssert.assertThat(
                 endpoint.uri().toString(),
                 Matchers.equalTo("https://bar-baz.foo.example.com"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"safe-tenant", "a.b"})
+    public void resolvesValidHostLabel(String label) {
+        EndpointResolver resolver = EndpointResolver.staticEndpoint("https://svc.example.com");
+        Endpoint endpoint = resolver.resolveEndpoint(
+                EndpointResolverParams.builder()
+                        .operation(new TestOperationSingleLabel())
+                        .inputValue(new SingleLabelInput(label))
+                        .build());
+
+        MatcherAssert.assertThat(endpoint.uri().getHost(), Matchers.equalTo(label + ".svc.example.com"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"169.254.169.254\u010D\u010Ax-smuggled:evil", "", "a:1@evil", "a_b", "a b", "\u00E9"})
+    public void rejectsInvalidHostLabel(String label) {
+        EndpointResolver resolver = EndpointResolver.staticEndpoint("https://svc.example.com");
+        var params = EndpointResolverParams.builder()
+                .operation(new TestOperationSingleLabel())
+                .inputValue(new SingleLabelInput(label))
+                .build();
+
+        var e = Assertions.assertThrows(SerializationException.class, () -> resolver.resolveEndpoint(params));
+        MatcherAssert.assertThat(e.getMessage(), Matchers.containsString("`tenant`"));
+    }
+
+    private record SingleLabelInput(String tenant) implements SerializableStruct {
+        static final ShapeId ID = ShapeId.from("smithy.example#SingleLabelInput");
+        static final Schema SCHEMA = Schema.structureBuilder(ID)
+                .putMember("tenant", PreludeSchemas.STRING, new HostLabelTrait())
+                .build();
+        static final Schema SCHEMA_TENANT = SCHEMA.member("tenant");
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            serializer.writeString(SCHEMA_TENANT, tenant);
+        }
+
+        @Override
+        public <T> T getMemberValue(Schema member) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static final class TestOperationSingleLabel implements
+            ApiOperation<SerializableStruct, SerializableStruct> {
+        private static final Schema SCHEMA = Schema.createOperation(
+                ShapeId.from("smithy.example#GetTenant"),
+                EndpointTrait.builder()
+                        .hostPrefix("{tenant}.")
+                        .sourceLocation(SourceLocation.NONE)
+                        .build());
+
+        @Override
+        public ShapeBuilder<SerializableStruct> inputBuilder() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ShapeBuilder<SerializableStruct> outputBuilder() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
+        public Schema inputSchema() {
+            return SingleLabelInput.SCHEMA;
+        }
+
+        @Override
+        public Schema outputSchema() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TypeRegistry errorRegistry() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ShapeId> effectiveAuthSchemes() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Schema> errorSchemas() {
+            return List.of();
+        }
+
+        @Override
+        public ApiService service() {
+            return null;
+        }
     }
 
     private record EndpointInput(String name, String labelA, String labelB) implements SerializableStruct {

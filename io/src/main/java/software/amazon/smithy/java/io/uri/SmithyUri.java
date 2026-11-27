@@ -20,8 +20,9 @@ import java.util.Objects;
  * scheme and host are normalized to lowercase automatically. When constructed from components,
  * uppercase scheme or host is rejected.
  *
- * <p>Host validation is intentionally lightweight. It rejects obviously invalid characters but does not
- * enforce IPv4/IPv6 syntax, reg-name grammar, or other RFC 3986 host production rules.
+ * <p>Host validation is intentionally lightweight. Host characters are restricted to RFC 3986 reg-name
+ * characters plus ':'; non-ASCII and control characters are rejected. It does not enforce IPv4/IPv6
+ * syntax, reg-name grammar, or other RFC 3986 host production rules.
  *
  * <p>Derived values ({@link #toString()}, {@link #hashCode()}, {@link #toURI()}) are computed lazily
  * and always derived from the normalized internal fields.
@@ -32,8 +33,8 @@ public final class SmithyUri {
     // Bit `c` of *_LOW (for c in 0..63) or bit `c - 64` of *_HIGH (for c in 64..127) is set iff `c` is in the class.
     private static final long SCHEME_CONT_LOW;
     private static final long SCHEME_CONT_HIGH;
-    private static final long INVALID_HOST_LOW;
-    private static final long INVALID_HOST_HIGH;
+    private static final long VALID_HOST_LOW;
+    private static final long VALID_HOST_HIGH;
     private static final long VALID_USERINFO_LOW;
     private static final long VALID_USERINFO_HIGH;
     private static final long VALID_PATH_LOW;
@@ -46,7 +47,7 @@ public final class SmithyUri {
     static {
         // Working accumulators built up via setBit, then frozen into the static fields below.
         long schLow = 0, schHigh = 0;
-        long badHostLow = 0, badHostHigh = 0;
+        long hostLow = 0, hostHigh = 0;
         long uiLow = 0, uiHigh = 0;
         long pathLow = 0, pathHigh = 0;
         long queryLow = 0, queryHigh = 0;
@@ -57,17 +58,21 @@ public final class SmithyUri {
         schLow |= 1L << '-';
         schLow |= 1L << '.';
 
-        // Invalid host characters.
-        badHostLow |= 1L << '/';
-        badHostLow |= 1L << '?';
-        badHostLow |= 1L << '#';
-        badHostLow |= 1L << '%';
-        badHostHigh |= 1L << ('[' - 64);
-        badHostHigh |= 1L << (']' - 64);
-        badHostLow |= 1L << ' ';
-        badHostLow |= 1L << '\t';
-        badHostLow |= 1L << '\n';
-        badHostLow |= 1L << '\r';
+        // Valid host characters: RFC 3986 reg-name (lowercase unreserved and sub-delims, no pct-encoding),
+        // plus ":" for IPv6 literals, which are stored without brackets.
+        for (char c = 'a'; c <= 'z'; c++) {
+            hostHigh |= 1L << (c - 64);
+        }
+        for (char c = '0'; c <= '9'; c++) {
+            hostLow |= 1L << c;
+        }
+        for (char c : "-._~!$&'()*+,;=:".toCharArray()) {
+            if (c < 64) {
+                hostLow |= 1L << c;
+            } else {
+                hostHigh |= 1L << (c - 64);
+            }
+        }
 
         // RFC 3986 shared base: unreserved / pct-encoded / sub-delims
         // unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
@@ -132,8 +137,8 @@ public final class SmithyUri {
 
         SCHEME_CONT_LOW = schLow;
         SCHEME_CONT_HIGH = schHigh;
-        INVALID_HOST_LOW = badHostLow;
-        INVALID_HOST_HIGH = badHostHigh;
+        VALID_HOST_LOW = hostLow;
+        VALID_HOST_HIGH = hostHigh;
         VALID_USERINFO_LOW = uiLow;
         VALID_USERINFO_HIGH = uiHigh;
         VALID_PATH_LOW = pathLow;
@@ -728,11 +733,36 @@ public final class SmithyUri {
 
     static void validateHostCharacter(char c, String host) {
         if (c >= 'A' && c <= 'Z') {
-            throw new IllegalArgumentException("Host must be lowercase: " + host);
+            throw new IllegalArgumentException("Host must be lowercase: " + escapeForMessage(host));
         }
-        if (c < 128 && maskContains(INVALID_HOST_LOW, INVALID_HOST_HIGH, c)) {
-            throw new IllegalArgumentException("Invalid character in host: '" + c + "' in " + host);
+        if (c >= 128 || !maskContains(VALID_HOST_LOW, VALID_HOST_HIGH, c)) {
+            throw new IllegalArgumentException("Invalid character in host: '" + escapeForMessage(String.valueOf(c))
+                    + "' in " + escapeForMessage(host));
         }
+    }
+
+    /**
+     * Escape backslash and every character outside printable ASCII as a Java-style unicode escape,
+     * so control and non-ASCII characters never reach exception messages or logs raw.
+     */
+    private static String escapeForMessage(String value) {
+        StringBuilder sb = null;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean printable = c >= 0x20 && c < 0x7F && c != '\\';
+            if (sb == null) {
+                if (printable) {
+                    continue;
+                }
+                sb = new StringBuilder(value.length() + 16).append(value, 0, i);
+            }
+            if (printable) {
+                sb.append(c);
+            } else {
+                sb.append(String.format("\\u%04X", (int) c));
+            }
+        }
+        return sb == null ? value : sb.toString();
     }
 
     static void validatePort(int port) {
