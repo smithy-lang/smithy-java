@@ -6,13 +6,16 @@
 package software.amazon.smithy.java.aws.events;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -64,14 +67,22 @@ final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends Serial
         return switch (messageType) {
             case "error" -> throw decodeError(message);
             case "event" -> decodePayload(getEventType(message), message);
-            case "exception" -> decodeModeledException(message);
+            case "exception" -> throw decodeModeledException(message);
             default -> throw new IllegalStateException("Unknown message type: " + messageType);
         };
     }
 
-    private E decodeModeledException(Message message) {
+    private RuntimeException decodeModeledException(Message message) {
         var exceptionType = expectHeader(message, ":exception-type").getString();
-        return decodePayload(exceptionType, message);
+        var memberSchema = eventSchema.member(exceptionType);
+        if (memberSchema == null) {
+            return new EventStreamingProtocolException("Unsupported exception type: " + exceptionType);
+        }
+        var error = decodeMember(memberSchema, message);
+        if (error instanceof ModeledException modeledException) {
+            return modeledException;
+        }
+        return new EventStreamModeledException(memberSchema.memberTarget(), error);
     }
 
     private E decodePayload(String eventType, Message message) {
@@ -79,15 +90,17 @@ final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends Serial
         if (memberSchema == null) {
             throw new EventStreamingProtocolException("Unsupported event type: " + eventType);
         }
-        var codecDeserializer = codec.createDeserializer(message.getPayload());
-        var headers = message.getHeaders();
-        var deserializer = new EventStreamDeserializer(codecDeserializer, new HeadersDeserializer(headers));
-        var memberTarget = memberSchema.memberTarget();
-        var shapeBuilder = memberTarget.shapeBuilder();
-        shapeBuilder.deserialize(deserializer);
         var builder = eventBuilder.get();
-        builder.setMemberValue(memberSchema, shapeBuilder.build());
+        builder.setMemberValue(memberSchema, decodeMember(memberSchema, message));
         return builder.build();
+    }
+
+    private SerializableShape decodeMember(Schema memberSchema, Message message) {
+        var headers = message.getHeaders();
+        var deserializer = new EventStreamDeserializer(codec, new HeadersDeserializer(headers), message.getPayload());
+        var shapeBuilder = memberSchema.memberTarget().shapeBuilder();
+        shapeBuilder.deserialize(deserializer);
+        return shapeBuilder.build();
     }
 
     private EventStreamingProtocolException decodeError(Message message) {
@@ -105,9 +118,8 @@ final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends Serial
         var responseDeserializer = new InitialResponseDeserializer(publisherMember, eventStream);
         builder.deserialize(responseDeserializer);
         // Deserialize the rest of the members if any
-        var codecDeserializer = codec.createDeserializer(message.getPayload());
         var headers = message.getHeaders();
-        var deserializer = new EventStreamDeserializer(codecDeserializer, new HeadersDeserializer(headers));
+        var deserializer = new EventStreamDeserializer(codec, new HeadersDeserializer(headers), message.getPayload());
         builder.deserialize(deserializer);
         return builder.build();
     }
@@ -158,12 +170,14 @@ final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends Serial
     }
 
     static class EventStreamDeserializer extends SpecificShapeDeserializer {
-        private final ShapeDeserializer codecDeserializer;
+        private final Codec codec;
         private final HeadersDeserializer headersDeserializer;
+        private final byte[] payload;
 
-        EventStreamDeserializer(ShapeDeserializer codecDeserializer, HeadersDeserializer headersDeserializer) {
-            this.codecDeserializer = codecDeserializer;
+        EventStreamDeserializer(Codec codec, HeadersDeserializer headersDeserializer, byte[] payload) {
+            this.codec = codec;
             this.headersDeserializer = headersDeserializer;
+            this.payload = payload;
         }
 
         @Override
@@ -176,10 +190,39 @@ final class AwsEventShapeDecoder<E extends SerializableStruct, IR extends Serial
             }
             var eventPayloadMember = ext.eventPayloadMember();
             if (eventPayloadMember != null) {
-                consumer.accept(builder, eventPayloadMember, codecDeserializer);
+                // Blob and string event payloads are the raw bytes / UTF-8 text of the payload, not
+                // codec-encoded values. This mirrors AwsEventShapeEncoder.EventPayloadSerializer.
+                var payloadDeserializer = switch (eventPayloadMember.type()) {
+                    case BLOB, STRING -> new RawPayloadDeserializer(payload);
+                    // Created only when needed: some codecs (e.g. Jackson) parse eagerly and would reject
+                    // a raw payload.
+                    default -> codec.createDeserializer(payload);
+                };
+                consumer.accept(builder, eventPayloadMember, payloadDeserializer);
             } else {
-                codecDeserializer.readStruct(schema, builder, consumer);
+                codec.createDeserializer(payload).readStruct(schema, builder, consumer);
             }
+        }
+    }
+
+    /**
+     * Reads an {@code @eventPayload} blob or string member directly from the raw event payload.
+     */
+    static final class RawPayloadDeserializer extends SpecificShapeDeserializer {
+        private final byte[] payload;
+
+        RawPayloadDeserializer(byte[] payload) {
+            this.payload = payload;
+        }
+
+        @Override
+        public ByteBuffer readBlob(Schema schema) {
+            return ByteBuffer.wrap(payload);
+        }
+
+        @Override
+        public String readString(Schema schema) {
+            return new String(payload, StandardCharsets.UTF_8);
         }
     }
 

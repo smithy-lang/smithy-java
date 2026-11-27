@@ -32,9 +32,6 @@ import software.amazon.smithy.model.node.Node;
                 // Need to add exception type to header
                 "ClientErrorInput",
                 "DuplexClientErrorInput",
-                // Currently we are using JSON codec for plain text payload, need to correct it.
-                "StringPayloadOutput",
-                "DuplexStringPayloadOutput",
                 // eventstream:1.0.1 made ByteValue.encodeValue() and
                 // ShortValue.encodeValue() no-ops, producing malformed frames.
                 "ByteHeaderInput",
@@ -45,8 +42,6 @@ import software.amazon.smithy.model.node.Node;
                 // headers use base64, payloads use raw strings.
                 "BlobPayloadInput",
                 "DuplexBlobPayloadInput",
-                "BlobPayloadOutput",
-                "DuplexBlobPayloadOutput",
                 "BlobHeaderInput",
                 "DuplexBlobHeaderInput",
                 "BlobHeaderOutput",
@@ -55,9 +50,6 @@ import software.amazon.smithy.model.node.Node;
                 "DuplexMultipleHeaderInput",
                 "MultipleHeaderOutput",
                 "DuplexMultipleHeaderOutput",
-                // Decoder returns modeled error events instead of throwing
-                "ClientErrorOutput",
-                "DuplexClientErrorOutput",
                 // Client doesn't validate missing @required initial response members
                 "MissingRequiredInitialResponseOutput",
                 "DuplexMissingRequiredInitialResponseOutput",

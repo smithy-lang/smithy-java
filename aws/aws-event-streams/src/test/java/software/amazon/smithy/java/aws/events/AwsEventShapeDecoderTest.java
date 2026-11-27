@@ -8,13 +8,15 @@ package software.amazon.smithy.java.aws.events;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import software.amazon.eventstream.Message;
+import software.amazon.smithy.java.aws.events.model.BlobEvent;
 import software.amazon.smithy.java.aws.events.model.BodyAndHeaderEvent;
-import software.amazon.smithy.java.aws.events.model.EventStreamWithError;
 import software.amazon.smithy.java.aws.events.model.HeadersOnlyEvent;
 import software.amazon.smithy.java.aws.events.model.MyError;
 import software.amazon.smithy.java.aws.events.model.StringEvent;
@@ -132,10 +134,10 @@ class AwsEventShapeDecoderTest {
     public void testDecodeStringMember() {
         // Arrange
         var headers = HeadersBuilder.forEvent()
-                .contentType("text/json")
+                .contentType("text/plain")
                 .eventType("stringMember")
                 .build();
-        var message = new Message(headers, "\"hello world!\"".getBytes(StandardCharsets.UTF_8));
+        var message = new Message(headers, "hello world!".getBytes(StandardCharsets.UTF_8));
         var frame = new AwsEventFrame(message);
 
         // Act
@@ -152,6 +154,30 @@ class AwsEventShapeDecoderTest {
     }
 
     @Test
+    public void testDecodeBlobMember() {
+        // Arrange
+        var headers = HeadersBuilder.forEvent()
+                .contentType("application/octet-stream")
+                .eventType("blobMember")
+                .build();
+        var bytes = new byte[] {0, 1, 2, (byte) 0xff};
+        var message = new Message(headers, bytes);
+        var frame = new AwsEventFrame(message);
+
+        // Act
+        var struct = createDecoder(TestOperation.instance()).decode(frame);
+
+        // Assert
+        assertInstanceOf(TestEventStream.class, struct);
+        var actual = (TestEventStream) struct;
+        assertInstanceOf(TestEventStream.BlobMemberMember.class, actual);
+        var expected = TestEventStream.builder()
+                .blobMember(BlobEvent.builder().payload(ByteBuffer.wrap(bytes)).build())
+                .build();
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void testDecodeExceptionMember() {
         // Arrange
         var headers = HeadersBuilder.forException()
@@ -162,17 +188,11 @@ class AwsEventShapeDecoderTest {
         var frame = new AwsEventFrame(message);
 
         // Act
-        var struct = createDecoder(TestOperationWithException.instance()).decode(frame);
+        var decoder = createDecoder(TestOperationWithException.instance());
+        var except = assertThrows(MyError.class, () -> decoder.decode(frame));
 
         // Assert
-        assertInstanceOf(EventStreamWithError.class, struct);
-        var actual = (EventStreamWithError) struct;
-        assertInstanceOf(EventStreamWithError.ModeledErrorMemberMember.class, actual);
-        var expected = EventStreamWithError.builder()
-                .modeledErrorMember(MyError.builder().message("Client exception").build())
-                .build();
-        assertEquals(((EventStreamWithError.ModeledErrorMemberMember) expected).getValue().getMessage(),
-                ((EventStreamWithError.ModeledErrorMemberMember) actual).getValue().getMessage());
+        assertEquals("Client exception", except.getMessage());
     }
 
     @Test
