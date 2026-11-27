@@ -21,7 +21,7 @@ tasks.register<Copy>("addGitHooks") {
     into(File(rootProject.rootDir, ".git/hooks"))
 }
 
-val smithyJavaVersion = project.file("VERSION").readText().replace(System.lineSeparator(), "")
+val smithyJavaVersion = project.file("VERSION").readText().trim()
 allprojects {
     group = "software.amazon.smithy.java"
     version = smithyJavaVersion

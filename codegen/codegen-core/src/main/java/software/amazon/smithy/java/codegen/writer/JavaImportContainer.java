@@ -40,7 +40,8 @@ final class JavaImportContainer implements ImportContainer {
         StringBuilder builder = new StringBuilder();
         for (String importName : getSortedAndFilteredImports()) {
             builder.append("import ").append(importName).append(";");
-            builder.append(System.lineSeparator());
+            // Match the writer's "\n" newlines; lineSeparator() yields mixed line endings on Windows.
+            builder.append('\n');
         }
         return builder.toString();
     }

@@ -28,11 +28,8 @@ class CredentialProcessHandlerTest {
 
     @Test
     void successfulProcessReturnsCredentials(@TempDir Path tmp) throws IOException {
-        Path script = writeScript(tmp,
-                """
-                        #!/bin/sh
-                        echo '{"Version": 1, "AccessKeyId": "AKIA_PROC", "SecretAccessKey": "SECRET_PROC", "SessionToken": "TOK", "AccountId": "123456789012"}'
-                        """);
+        Path script = writeJsonScript(tmp,
+                "{\"Version\": 1, \"AccessKeyId\": \"AKIA_PROC\", \"SecretAccessKey\": \"SECRET_PROC\", \"SessionToken\": \"TOK\", \"AccountId\": \"123456789012\"}");
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
@@ -48,11 +45,8 @@ class CredentialProcessHandlerTest {
 
     @Test
     void processWithExpirationParsesTimestamp(@TempDir Path tmp) throws IOException {
-        Path script = writeScript(tmp,
-                """
-                        #!/bin/sh
-                        echo '{"Version": 1, "AccessKeyId": "AK", "SecretAccessKey": "SK", "Expiration": "2099-01-01T00:00:00Z"}'
-                        """);
+        Path script = writeJsonScript(tmp,
+                "{\"Version\": 1, \"AccessKeyId\": \"AK\", \"SecretAccessKey\": \"SK\", \"Expiration\": \"2099-01-01T00:00:00Z\"}");
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
@@ -63,11 +57,8 @@ class CredentialProcessHandlerTest {
 
     @Test
     void processWithMalformedExpirationReturnsError(@TempDir Path tmp) throws IOException {
-        Path script = writeScript(tmp,
-                """
-                        #!/bin/sh
-                        echo '{"Version": 1, "AccessKeyId": "AK", "SecretAccessKey": "SK", "Expiration": "invalid"}'
-                        """);
+        Path script = writeJsonScript(tmp,
+                "{\"Version\": 1, \"AccessKeyId\": \"AK\", \"SecretAccessKey\": \"SK\", \"Expiration\": \"invalid\"}");
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
@@ -79,10 +70,7 @@ class CredentialProcessHandlerTest {
 
     @Test
     void processWithoutSessionTokenReturnsBasicCredentials(@TempDir Path tmp) throws IOException {
-        Path script = writeScript(tmp, """
-                #!/bin/sh
-                echo '{"Version": 1, "AccessKeyId": "AK", "SecretAccessKey": "SK"}'
-                """);
+        Path script = writeJsonScript(tmp, "{\"Version\": 1, \"AccessKeyId\": \"AK\", \"SecretAccessKey\": \"SK\"}");
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
@@ -94,11 +82,7 @@ class CredentialProcessHandlerTest {
 
     @Test
     void nonZeroExitCodeReturnsError(@TempDir Path tmp) throws IOException {
-        Path script = writeScript(tmp, """
-                #!/bin/sh
-                echo "Something went wrong" >&2
-                exit 1
-                """);
+        Path script = writeFailingScript(tmp, "Something went wrong", 1);
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
@@ -111,10 +95,7 @@ class CredentialProcessHandlerTest {
 
     @Test
     void missingRequiredFieldsReturnsError(@TempDir Path tmp) throws IOException {
-        Path script = writeScript(tmp, """
-                #!/bin/sh
-                echo '{"Version": 1, "AccessKeyId": "AK"}'
-                """);
+        Path script = writeJsonScript(tmp, "{\"Version\": 1, \"AccessKeyId\": \"AK\"}");
 
         AwsConfigCredentialSource.CredentialProcess source =
                 new AwsConfigCredentialSource.CredentialProcess(script.toString());
@@ -130,8 +111,25 @@ class CredentialProcessHandlerTest {
         assertNull(createFromProfileResult(other));
     }
 
+    private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("win");
+
+    private static Path writeJsonScript(Path tmp, String json) throws IOException {
+        // cmd's echo prints its argument verbatim (quotes included), so no quoting is needed there.
+        return IS_WINDOWS
+                ? writeScript(tmp, "@echo off\r\necho " + json + "\r\n")
+                : writeScript(tmp, "#!/bin/sh\necho '" + json + "'\n");
+    }
+
+    private static Path writeFailingScript(Path tmp, String stderr, int exitCode) throws IOException {
+        return IS_WINDOWS
+                ? writeScript(tmp, "@echo off\r\necho " + stderr + " 1>&2\r\nexit /b " + exitCode + "\r\n")
+                : writeScript(tmp, "#!/bin/sh\necho \"" + stderr + "\" >&2\nexit " + exitCode + "\n");
+    }
+
     private static Path writeScript(Path tmp, String content) throws IOException {
-        Path script = tmp.resolve("cred-proc.sh");
+        // On Windows the handler runs the command via cmd.exe, which would open a .sh file in its
+        // associated editor instead of executing it.
+        Path script = tmp.resolve(IS_WINDOWS ? "cred-proc.cmd" : "cred-proc.sh");
         Files.writeString(script, content, StandardCharsets.UTF_8);
         script.toFile().setExecutable(true);
         return script;

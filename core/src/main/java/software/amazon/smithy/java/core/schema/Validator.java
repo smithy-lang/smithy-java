@@ -195,12 +195,11 @@ public final class Validator {
             // ensure that the path length never exceeds maxDepth.
             if (depth == path.length) {
                 // Resize the path if needed by multiplying the size by 1.5.
-                int remainingDepth = maxDepth - depth;
-                if (remainingDepth == 0) {
+                if (depth == maxDepth) {
                     addError(new ValidationError.DepthValidationFailure(createPath(), maxDepth));
                     throw new Validator.ValidationShortCircuitException();
                 } else {
-                    int newSize = Math.min(remainingDepth, depth + (depth >> 1));
+                    int newSize = Math.min(maxDepth, depth + (depth >> 1));
                     Object[] resized = new Object[newSize];
                     System.arraycopy(path, 0, resized, 0, path.length);
                     path = resized;

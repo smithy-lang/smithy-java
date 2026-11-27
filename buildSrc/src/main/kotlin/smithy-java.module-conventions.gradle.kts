@@ -6,7 +6,7 @@ plugins {
     id("jacoco")
 }
 
-val smithyJavaVersion = project.file("${project.rootDir}/VERSION").readText().replace(System.lineSeparator(), "")
+val smithyJavaVersion = project.file("${project.rootDir}/VERSION").readText().trim()
 
 group = "software.amazon.smithy.java"
 version = smithyJavaVersion
