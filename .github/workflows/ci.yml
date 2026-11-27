@@ -122,3 +122,22 @@ jobs:
         with:
           name: java-${{ matrix.java }}-${{ matrix.os }}-test-report
           path: '**/build/reports/tests'
+
+  ci-success:
+    needs: [format, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          FORMAT_RESULT: ${{ needs.format.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          echo "format: $FORMAT_RESULT"
+          echo "build: $BUILD_RESULT"
+          if [ "$FORMAT_RESULT" != "success" ] && [ "$FORMAT_RESULT" != "skipped" ]; then
+            exit 1
+          fi
+          if [ "$BUILD_RESULT" != "success" ]; then
+            exit 1
+          fi
